@@ -1661,18 +1661,24 @@ To compare two data sets:
 
         private void ShowSelectedMarker()
         {
+#if UNITY_2019_1_OR_NEWER
             GUIStyle treeViewSelectionStyle = "TV Selection";
             GUIStyle backgroundStyle = new GUIStyle(treeViewSelectionStyle);
 
             GUIStyle treeViewLineStyle = "TV Line";
             GUIStyle textStyle = new GUIStyle(treeViewLineStyle);
+#else
+            GUIStyle textStyle = GUI.skin.label;
+#endif
 
             GUIContent content = new GUIContent(m_SelectedMarkerName, m_SelectedMarkerName);
             Vector2 size = textStyle.CalcSize(content);
             Rect rect = EditorGUILayout.GetControlRect(GUILayout.MaxWidth(size.x), GUILayout.Height(size.y));
             if (Event.current.type == EventType.Repaint)
             {
+#if UNITY_2019_1_OR_NEWER
                 backgroundStyle.Draw(rect, false, false, true, true);
+#endif
                 GUI.Label(rect, content, textStyle);
             }
         }
