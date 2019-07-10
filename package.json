@@ -1,12 +1,12 @@
 {
   "name": "com.unity.performance.profile-analyzer",
   "displayName": "Profile Analyzer",
-  "version": "0.4.0-preview.5",
+  "version": "0.4.0-preview.6",
   "description": "The profile analyzer tool augments the standard Unity Profiler. It provides multi frame analysis of the profiling data.\n\nMain features: \n▪ Multi frame analysis of a single scan \n▪ Comparison of two multi frame profile scans \n\n",
   "dependencies": {},
   "repository": {
     "type": "git",
     "url": "git@github.cds.internal.unity3d.com:unity/performance.profile-analyzer.git",
-    "revision": "2f8046f22939c55916735b2a0ca6fecefba2e13d"
+    "revision": "427bd4630853fa5d8b38af610b62300a32b51f37"
   }
 }

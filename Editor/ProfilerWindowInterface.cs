@@ -4,6 +4,8 @@ using System.Reflection;
 using System;
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.Profiling;
+using UnityEditorInternal.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -23,6 +25,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         private FieldInfo m_SelectedThreadIdFieldInfo;
         private FieldInfo m_SelectedNativeIndexFieldInfo;
 
+        private MethodInfo m_GetProfilerModuleInfo;
+        private Type m_CPUProfilerModuleType;
+
         public ProfilerWindowInterface()
         {
             Assembly assem = typeof(Editor).Assembly;
@@ -30,6 +35,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_CurrentFrameFieldInfo = m_ProfilerWindowType.GetField("m_CurrentFrame", BindingFlags.NonPublic | BindingFlags.Instance);
 
             m_TimeLineGUIFieldInfo = m_ProfilerWindowType.GetField("m_CPUTimelineGUI", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (m_TimeLineGUIFieldInfo == null)
+            {
+                // m_CPUTimelineGUI isn't present in 2019.3.0a8 onward
+                m_GetProfilerModuleInfo = m_ProfilerWindowType.GetMethod("GetProfilerModule", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (m_GetProfilerModuleInfo == null)
+                {
+                    Debug.Log("Unable to initialise link to Profiler Timeline, no GetProfilerModule found");
+                }
+
+                m_CPUProfilerModuleType = assem.GetType("UnityEditorInternal.Profiling.CPUProfilerModule");
+                m_TimeLineGUIFieldInfo = m_CPUProfilerModuleType.GetField("m_TimelineGUI", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (m_TimeLineGUIFieldInfo == null)
+                {
+                    Debug.Log("Unable to initialise link to Profiler Timeline");
+                }
+            }
+
             if (m_TimeLineGUIFieldInfo != null)
                 m_SelectedEntryFieldInfo = m_TimeLineGUIFieldInfo.FieldType.GetField("m_SelectedEntry", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (m_SelectedEntryFieldInfo != null)
@@ -43,6 +65,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_SelectedThreadIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedNativeIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("nativeIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             }
+
         }
 
         /*
@@ -100,15 +123,38 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_ProfilerWindow.Close();
         }
 
+        public object GetTimeLineGUI()
+        {
+            object timeLineGUI = null;
+
+            if (m_CPUProfilerModuleType != null)
+            {
+                object[] parametersArray = new object[] { ProfilerArea.CPU };
+                var getCPUProfilerModuleInfo = m_GetProfilerModuleInfo.MakeGenericMethod(m_CPUProfilerModuleType);
+                var cpuModule = getCPUProfilerModuleInfo.Invoke(m_ProfilerWindow, parametersArray);
+
+                timeLineGUI = m_TimeLineGUIFieldInfo.GetValue(cpuModule);
+            }
+            else if (m_TimeLineGUIFieldInfo != null)
+            {
+                timeLineGUI = m_TimeLineGUIFieldInfo.GetValue(m_ProfilerWindow);
+            }
+
+            return timeLineGUI;
+        }
+
         public string GetProfilerWindowMarkerName()
         {
-            var timeLineGUI = m_TimeLineGUIFieldInfo.GetValue(m_ProfilerWindow);
-            if (timeLineGUI != null && m_SelectedEntryFieldInfo != null)
+            if (m_ProfilerWindow!=null)
             {
-                var selectedEntry = m_SelectedEntryFieldInfo.GetValue(timeLineGUI);
-                if (selectedEntry != null && m_SelectedNameFieldInfo != null)
+                var timeLineGUI = GetTimeLineGUI();
+                if (timeLineGUI != null && m_SelectedEntryFieldInfo != null)
                 {
-                    return m_SelectedNameFieldInfo.GetValue(selectedEntry).ToString();
+                    var selectedEntry = m_SelectedEntryFieldInfo.GetValue(timeLineGUI);
+                    if (selectedEntry != null && m_SelectedNameFieldInfo != null)
+                    {
+                        return m_SelectedNameFieldInfo.GetValue(selectedEntry).ToString();
+                    }
                 }
             }
 
@@ -178,9 +224,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (m_ProfilerWindow == null)
                 return;
-            
-            var timeLineGUI = m_TimeLineGUIFieldInfo.GetValue(m_ProfilerWindow);
-            if (timeLineGUI != null && m_SelectedEntryFieldInfo != null)
+
+            var timeLineGUI = GetTimeLineGUI();
+            if (timeLineGUI==null)
+                return;
+
+            if (m_SelectedEntryFieldInfo != null)
             {
                 var selectedEntry = m_SelectedEntryFieldInfo.GetValue(timeLineGUI);
                 if (selectedEntry != null)
