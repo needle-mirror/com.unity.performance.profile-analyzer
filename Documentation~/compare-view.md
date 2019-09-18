@@ -48,24 +48,82 @@ A sortable list of markers showing a number of useful statistics, including the 
 
  Each marker in the list represents an aggregation of all the instances of that marker, across all filtered threads and in all ranged frames.
 
-### Available columns are:
+The Marker list columns can be filtered to a more salient set from the _Marker Columns_ drop down in the [filtering system](filtering-system.md), which can help minimise the noise when you are looking for _Time_ or _Count_ values.
 
+ ### Column and Groups Available:
 * **Name**
-    * Name of the marker
-* **Left**
-    * The sum of activity for the marker in upper (*left hand*) data set.
-* **Right**
-    * The sum of activity for the marker in lower (*right hand*) data set.
-* **Diff**
-    * The difference between the summed values in each data set, negative values show the left is bigger, positive means the right is bigger.
-* **Abs Diff**
-    * The absolute difference between the summed values in each data set.
-* **L Count**
-    * The number of times the marker is push / popped in the left data set.
-* **R Count**
-    * The number of times the marker is push / popped in the right data set.
-* **D Count**
-    * The difference between the count values in each data set.
+    * Name of the marker - available in all groups
+
+ * **Time and Count**
+    * **Left Median**
+        * The sum of activity for the marker in the upper (*left hand*) data set.
+    * **Right Median**
+        * The sum of activity for the marker in the lower (*right hand*) data set.
+    * **Diff**
+        * The difference between the summed values in each data set, negative values show the left is bigger, positive means the right is bigger.
+    * **Abs Diff**
+        * The absolute difference between the summed values in each data set.
+    * **Count Left**
+        * The number of times the marker is push / popped in the upper (*left hand*) data set.
+    * **Count Right**
+        * The number of times the marker is push / popped in the (*right hand*) data set.
+    * **Count Delta**
+        * The difference between the count values in each data set.
+
+ * **Time**
+    * **Left Median**
+        * The sum of activity for the marker in the upper (*left hand*) data set.
+    * **Right Median**
+        * The sum of activity for the marker in the lower (*right hand*) data set.
+    * **Diff**
+        * The difference between the summed values in each data set, negative values show the left is bigger, positive means the right is bigger.
+    * **Abs Diff**
+        * The absolute difference between the summed values in each data set.
+
+ * **Totals**
+    * **Total Left**
+        * The total time for the marker over the selected frames in the upper (*left hand*) data set.
+    * **Total Right**
+        * The total time for the marker over the selected frames in the lower (*right hand*) data set.
+    * **Total Delta**
+        * The difference between the total times over the selected frames in each data set, negative values show the left is bigger, positive means the right is bigger.
+    * **Abs Total**
+        * The absolute difference between the total times over all the selected frames in each data set.
+ 
+ * **Time with Totals**
+    * **Left Median**
+        * The sum of activity for the marker in upper (*left hand*) data set.
+    * **Right Median**
+        * The sum of activity for the marker in lower (*right hand*) data set.
+    * **Abs Diff**
+        * The absolute difference between the summed values in each data set.
+    * **Total Left**
+        * The total time for the marker over the selected frames in the upper (*left hand*) data set.
+    * **Total Right**
+        * The total time for the marker over the selected frames in the lower (*right hand*) data set.
+    * **Abs Total**
+        * The absolute difference between the total times over the selected frames in each data set.
+
+ * **Count Totals**
+    * **Count Left**
+        * The number of times the marker is push / popped in the selected frames in upper (*left hand*) data set.
+    * **Count Right**
+        * The number of times the marker is push / popped in the selected frames in lower (*right hand*) data set.
+    * **Count Delta**
+        * The difference between the number of times the marker is push / popped in the selected frames for each data set, negative values show the left is bigger, positive means the right is bigger.
+    * **Abs Count**
+        *  The difference between the number of times the marker is push / popped in the selected frames for each data set, negative values show the left is bigger, positive means the right is bigger.
+
+ * **Count Per Frame**
+    * **Count Left Frame**
+        * The number of times the marker is push / popped in the upper (*left hand*) data set.
+    * **Count Right Frame**
+        * The number of times the marker is push / popped in the lower (*right hand*) data set.
+    * **Abs Frame Count**
+        * The absolute difference between the number of times the marker is push / popped in each data set.
+
+ * **Custom**
+    * From any of the Marker Column Groups you can turn on / off any of the available columns to create a custom set of columns.
 
 ### Marker List Context Menu Commands
 * **Select Frames that contain this marker (within whole data set)**
@@ -89,5 +147,14 @@ A sortable list of markers showing a number of useful statistics, including the 
 
 * **Remove from Exclude Filter**
     * If the selected marker is already in the *exclude* filter then this command will remove from the filter.
+
+* **Set as Parent Marker Filter**
+    * Limit the analysis to this marker and markers *included* below it on the callstack.
+
+* **Clear Parent Marker Filter**
+    * Limit the analysis to this marker and markers *included* within it.
+
+* **Copy To Clipboard**
+    * Copies the selected marker name to the clipboard.
 
 [Back to manual](manual.md)

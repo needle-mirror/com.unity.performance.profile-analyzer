@@ -10,10 +10,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     class ProfileTreeViewItem: TreeViewItem
     {
         public MarkerData data { get; set; }
+        public GUIContent[] cachedRowString;
 
         public ProfileTreeViewItem(int id, int depth, string displayName, MarkerData data) : base(id, depth, displayName)
         {
             this.data = data;
+            cachedRowString = null;
         }
     }
 
@@ -22,6 +24,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         ProfileAnalysis m_Model;
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         float m_MaxMedian;
+        int m_MaxCount;
+        float m_MaxCountMean;
+        double m_MaxTotal;
 
         const float kRowHeights = 20f;
         readonly List<TreeViewItem> m_Rows = new List<TreeViewItem>(100);
@@ -38,10 +43,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Max,
             Range,
             Count,
+            CountBar,
             CountMean,
+            CountMeanBar,
             FirstFrame,
             AtMedian,
+            Total,
+            TotalBar,
         }
+
+        static int m_MaxColumns;
 
         public enum SortOption
         {
@@ -53,8 +64,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Max,
             Range,
             Count,
+            CountMean,
             FirstFrame,
             AtMedian,
+            Total,
         }
 
         // Sort options per column
@@ -70,8 +83,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.Range,
             SortOption.Count,
             SortOption.Count,
+            SortOption.CountMean,
+            SortOption.CountMean,
             SortOption.FirstFrame,
             SortOption.AtMedian,
+            SortOption.Total,
+            SortOption.Total,
         };
 
         internal static class Styles
@@ -83,6 +100,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemAddToExcludeFilter = new GUIContent("Add to Exclude Filter", "");
             public static readonly GUIContent menuItemRemoveFromIncludeFilter = new GUIContent("Remove from Include Filter", "");
             public static readonly GUIContent menuItemRemoveFromExcludeFilter = new GUIContent("Remove from Exclude Filter", "");
+            public static readonly GUIContent menuItemSetAsParentMarkerFilter = new GUIContent("Set as Parent Marker Filter", "");
+            public static readonly GUIContent menuItemClearParentMarkerFilter = new GUIContent("Clear Parent Marker Filter", "");
+            public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
         }
 
         public ProfileTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis model, ProfileAnalyzerWindow profileAnalyzerWindow) : base(state, multicolumnHeader)
@@ -90,7 +110,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_Model = model;
             m_ProfileAnalyzerWindow = profileAnalyzerWindow;
 
-            Assert.AreEqual(m_SortOptions.Length, Enum.GetValues(typeof(MyColumns)).Length, "Ensure number of sort options are in sync with number of MyColumns enum values");
+            m_MaxColumns = Enum.GetValues(typeof(MyColumns)).Length;
+            Assert.AreEqual(m_SortOptions.Length, m_MaxColumns, "Ensure number of sort options are in sync with number of MyColumns enum values");
 
             // Custom setup
             rowHeight = kRowHeights;
@@ -114,6 +135,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             List<string> nameExcludes = m_ProfileAnalyzerWindow.GetNameExcludes();
 
             m_MaxMedian = 0.0f;
+            m_MaxTotal = 0.0;
+            m_MaxCount = 0;
+            m_MaxCountMean = 0.0f;
             var markers = m_Model.GetMarkers();
             for (int index = 0; index < markers.Count; ++index)
             {
@@ -134,6 +158,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float ms = item.data.msMedian;
                 if (ms > m_MaxMedian)
                     m_MaxMedian = ms;
+
+                double msTotal = item.data.msTotal;
+                if (msTotal > m_MaxTotal)
+                    m_MaxTotal = msTotal;
+
+                int count = item.data.count;
+                if (count > m_MaxCount)
+                    m_MaxCount = count;
+
+                float countMean = item.data.countMean;
+                if (countMean > m_MaxCountMean)
+                    m_MaxCountMean = countMean;
             }
 
             return root;
@@ -163,7 +199,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         protected virtual void OnVisibleColumnsChanged(MultiColumnHeader multiColumnHeader)
         {
-            m_ProfileAnalyzerWindow.SetMode(Mode.Custom);
+            m_ProfileAnalyzerWindow.SetSingleModeColumns(multiColumnHeader.state.visibleColumns);
         }
 
         void SortIfNeeded(IList<TreeViewItem> rows)
@@ -233,11 +269,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     case SortOption.Count:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.count, ascending);
                         break;
+                    case SortOption.CountMean:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.countMean, ascending);
+                        break;
                     case SortOption.FirstFrame:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.firstFrameIndex, ascending);
                         break;
                     case SortOption.AtMedian:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.msAtMedian, ascending);
+                        break;
+                    case SortOption.Total:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.msTotal, ascending);
                         break;
                 }
             }
@@ -267,10 +309,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return myTypes.Order(l => (l.data.msMax - l.data.msMin), ascending);
                 case SortOption.Count:
                     return myTypes.Order(l => l.data.count, ascending);
+                case SortOption.CountMean:
+                    return myTypes.Order(l => l.data.countMean, ascending);
                 case SortOption.FirstFrame:
                     return myTypes.Order(l => l.data.firstFrameIndex, ascending);
                 case SortOption.AtMedian:
                     return myTypes.Order(l => l.data.msAtMedian, ascending);
+                case SortOption.Total:
+                    return myTypes.Order(l => l.data.msTotal, ascending);
                 default:
                     Assert.IsTrue(false, "Unhandled enum");
                     break;
@@ -284,6 +330,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             var item = (ProfileTreeViewItem)args.item;
 
+            if (item.cachedRowString == null)
+            {
+                GenerateStrings(item);
+            }
+
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
                 CellGUI(args.GetCellRect(i), item, (MyColumns)args.GetColumn(i), ref args);
@@ -295,12 +346,33 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0);
         }
 
-        GUIContent ToDisplayUnitsWithTooltips(float ms, bool showUnits = false)
+        GUIContent ToDisplayUnitsWithTooltips(float ms, bool showUnits = false, int onFrame=-1)
         {
+            if (onFrame >= 0)
+                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true), onFrame));
+
             return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true));
         }
 
-        void ShowContextMenu(Rect cellRect, string markerName)
+        string ToDisplayUnits(double ms, bool showUnits = false)
+        {
+            return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0);
+        }
+
+        GUIContent ToDisplayUnitsWithTooltips(double ms, bool showUnits = false, int onFrame = -1)
+        {
+            if (onFrame >= 0)
+                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true), onFrame));
+
+            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true));
+        }
+
+        void CopyToClipboard(Event current, string text)
+        {
+            EditorGUIUtility.systemCopyBuffer = text;
+        }
+
+        void ShowContextMenu(Rect cellRect, string markerName, GUIContent content)
         {
             Event current = Event.current;
             if (cellRect.Contains(current.mousePosition) && current.type == EventType.ContextClick)
@@ -319,6 +391,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     menu.AddItem(Styles.menuItemAddToExcludeFilter, false, () => m_ProfileAnalyzerWindow.AddToExcludeFilter(markerName));
                 else
                     menu.AddItem(Styles.menuItemRemoveFromExcludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromExcludeFilter(markerName));
+                menu.AddSeparator("");
+                menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
+                menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
+                menu.AddSeparator("");
+                if (content!=null && !string.IsNullOrEmpty(content.text))
+                    menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(current, content.text));
 
                 menu.ShowAsContext();
 
@@ -326,69 +404,99 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        void ShowText(Rect rect, string text)
+        {
+            EditorGUI.LabelField(rect, text);
+            //EditorGUI.TextArea(rect, text);
+        }
+
+        void ShowText(Rect rect, GUIContent content)
+        {
+            EditorGUI.LabelField(rect, content);
+            //ShowText(rect, content.text);
+        }
+
+        void GenerateStrings(ProfileTreeViewItem item)
+        {
+            item.cachedRowString = new GUIContent[m_MaxColumns];
+
+            item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
+            item.cachedRowString[(int)MyColumns.Mean] = ToDisplayUnitsWithTooltips(item.data.msMean, false);
+            item.cachedRowString[(int)MyColumns.Depth] = (item.data.minDepth == item.data.maxDepth) ? new GUIContent(string.Format("{0}", item.data.minDepth), "") : new GUIContent(string.Format("{0}-{1}", item.data.minDepth, item.data.maxDepth), "");
+            item.cachedRowString[(int)MyColumns.Median] = ToDisplayUnitsWithTooltips(item.data.msMedian, false, item.data.medianFrameIndex);
+            item.cachedRowString[(int)MyColumns.MedianBar] = new GUIContent("", string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msMedian, true), item.data.medianFrameIndex));
+            item.cachedRowString[(int)MyColumns.Min] = ToDisplayUnitsWithTooltips(item.data.msMin, false, item.data.minFrameIndex);
+            item.cachedRowString[(int)MyColumns.Max] = ToDisplayUnitsWithTooltips(item.data.msMax, false, item.data.maxFrameIndex);
+            item.cachedRowString[(int)MyColumns.Range] = ToDisplayUnitsWithTooltips(item.data.msMax - item.data.msMin);
+            item.cachedRowString[(int)MyColumns.Count] = new GUIContent(string.Format("{0}", item.data.count), "");
+            item.cachedRowString[(int)MyColumns.CountBar] = new GUIContent("", string.Format("{0}", item.data.count));
+            item.cachedRowString[(int)MyColumns.CountMean] = new GUIContent(string.Format("{0:f0}", item.data.countMean), "");
+            item.cachedRowString[(int)MyColumns.CountMeanBar] = new GUIContent("", string.Format("{0:f0}", item.data.countMean));
+            item.cachedRowString[(int)MyColumns.FirstFrame] = new GUIContent(item.data.firstFrameIndex.ToString());
+            item.cachedRowString[(int)MyColumns.AtMedian] = ToDisplayUnitsWithTooltips(item.data.msAtMedian, false, m_Model.GetFrameSummary().medianFrameIndex);
+            item.cachedRowString[(int)MyColumns.Total] = ToDisplayUnitsWithTooltips(item.data.msTotal);
+            item.cachedRowString[(int)MyColumns.TotalBar] = new GUIContent("", string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msTotal, true), item.data.medianFrameIndex));
+        }
+
+        void ShowBar(Rect rect, float ms, float range, GUIContent content)
+        {
+            if (ms > 0.0f)
+            {
+                if (m_ProfileAnalyzerWindow.m_2D.DrawStart(rect))
+                {
+                    float w = Math.Max(1.0f, rect.width * ms / range);
+                    m_ProfileAnalyzerWindow.m_2D.DrawFilledBox(0, 1, w, rect.height - 1, m_ProfileAnalyzerWindow.m_ColorBar);
+                    m_ProfileAnalyzerWindow.m_2D.DrawEnd();
+                }
+            }
+            GUI.Label(rect, content);
+        }
+
         void CellGUI(Rect cellRect, ProfileTreeViewItem item, MyColumns column, ref RowGUIArgs args)
         {
             // Center cell rect vertically (makes it easier to place controls, icons etc in the cells)
             CenterRectUsingSingleLineHeight(ref cellRect);
 
-            ShowContextMenu(cellRect, item.data.name);
-
+            GUIContent content = item.cachedRowString[(int)column];
             switch (column)
             {
                 case MyColumns.Name:
                     {
                         args.rowRect = cellRect;
                         //base.RowGUI(args);
-                        EditorGUI.LabelField(cellRect, new GUIContent(item.data.name, item.data.name));
+                        //content = new GUIContent(item.data.name, item.data.name);
+                        ShowText(cellRect, content);
                     }
                     break;
 
                 case MyColumns.Mean:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msMean, false));
-                    break;
                 case MyColumns.Depth:
-                    if (item.data.minDepth == item.data.maxDepth)
-                        EditorGUI.LabelField(cellRect, string.Format("{0}", item.data.minDepth));
-                    else 
-                        EditorGUI.LabelField(cellRect, string.Format("{0}-{1}", item.data.minDepth, item.data.maxDepth));
-                    break;
                 case MyColumns.Median:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msMedian));
+                case MyColumns.Min:
+                case MyColumns.Max:
+                case MyColumns.Range:
+                case MyColumns.Count:
+                case MyColumns.CountMean:
+                case MyColumns.AtMedian:
+                case MyColumns.Total:
+                    ShowText(cellRect, content);
                     break;
                 case MyColumns.MedianBar:
-                    {
-                        float ms = item.data.msMedian;
-                        if (ms > 0.0f)
-                        {
-                            if (m_ProfileAnalyzerWindow.m_2D.DrawStart(cellRect))
-                            {
-                                float w = cellRect.width * ms / m_MaxMedian;
-                                m_ProfileAnalyzerWindow.m_2D.DrawFilledBox(0, 1, w, cellRect.height - 1, m_ProfileAnalyzerWindow.m_ColorBar);
-                                m_ProfileAnalyzerWindow.m_2D.DrawEnd();
-                            }
-                        }
-                        GUI.Label(cellRect, new GUIContent("", ToDisplayUnits(item.data.msMedian,true)));
-                    }
+                    ShowBar(cellRect, item.data.msMedian, m_MaxMedian, content);
                     break;
-                case MyColumns.Min:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msMin));
+                case MyColumns.TotalBar:
+                    ShowBar(cellRect, (float)item.data.msTotal, (float)m_MaxTotal, content);
                     break;
-                case MyColumns.Max:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msMax));
+                case MyColumns.CountBar:
+                    ShowBar(cellRect, item.data.count, m_MaxCount, content);
                     break;
-                case MyColumns.Range:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msMax - item.data.msMin));
-                    break;
-                case MyColumns.Count:
-                    EditorGUI.LabelField(cellRect, string.Format("{0}", item.data.count));
-                    break;
-                case MyColumns.CountMean:
-                    EditorGUI.LabelField(cellRect, string.Format("{0}", item.data.count / m_Model.GetFrameSummary().count));
+                case MyColumns.CountMeanBar:
+                    ShowBar(cellRect, item.data.countMean, m_MaxCountMean, content);
                     break;
                 case MyColumns.FirstFrame:
                     if (!m_ProfileAnalyzerWindow.IsProfilerWindowOpen())
                         GUI.enabled = false;
-                    if (GUI.Button(cellRect, new GUIContent(item.data.firstFrameIndex.ToString())))
+                    if (GUI.Button(cellRect, content))
                     {
                         m_ProfileAnalyzerWindow.SelectMarker(item.id);
                         m_ProfileAnalyzerWindow.JumpToFrame(item.data.firstFrameIndex);
@@ -396,10 +504,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     GUI.enabled = true;
                     break;
-                case MyColumns.AtMedian:
-                    EditorGUI.LabelField(cellRect, ToDisplayUnitsWithTooltips(item.data.msAtMedian));
-                    break;
             }
+
+            ShowContextMenu(cellRect, item.data.name, content);
         }
 
 
@@ -429,24 +536,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(float treeViewWidth)
+        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(float treeViewWidth, MarkerColumnFilter modeFilter)
         {
             var columnList = new List<MultiColumnHeaderState.Column>();
             HeaderData[] headerData = new HeaderData[]
             {
-                new HeaderData("Name", "Marker Name\n\nFrame marker time is total of all instances in frame", 300, 100, false, false),
+                new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", 300, 100, false, false),
                 new HeaderData("Depth", "Marker depth in marker hierarchy\n\nMay appear at multiple levels"),
-                new HeaderData("Median", "Central marker time over all frames\n\nAlways present in data set\n1st of 2 central values for even frame count"),
-                new HeaderData("Median", "Central marker time over all frames", 50),
-                new HeaderData("Mean", "Per frame marker time / frame count"),
+                new HeaderData("Median", "Central marker time over all selected frames\n\nAlways present in data set\n1st of 2 central values for even frame count"),
+                new HeaderData("Median Bar", "Central marker time over all selected frames", 50),
+                new HeaderData("Mean", "Per frame marker time / number of non zero frames"),
                 new HeaderData("Min", "Minimum marker time"),
                 new HeaderData("Max", "Maximum marker time"),
                 new HeaderData("Range", "Difference between maximum and minimum"),
-                new HeaderData("Count", "Marker count over all frames\n\nMultiple can occur per frame"),
-                new HeaderData("Count Mean", "Average number of markers\n\ntotal count / number of frames",70,50),
+                new HeaderData("Count", "Marker count over all selected frames\n\nMultiple can occur per frame"),
+                new HeaderData("Count Bar", "Marker count over all selected frames\n\nMultiple can occur per frame"),
+                new HeaderData("Count Frame", "Average number of markers per frame\n\ntotal count / number of non zero frames",70,50),
+                new HeaderData("Count Frame Bar", "Average number of markers per frame\n\ntotal count / number of non zero frames",70,50),
                 new HeaderData("1st", "First frame index that the marker appears on"),
                 new HeaderData("At Median Frame", "Marker time on the median frame\n\nI.e. Marker total duration on the average frame",90,50),
-
+                new HeaderData("Total", "Marker total time over all selected frames"),
+                new HeaderData("Total Bar", "Marker total time over all selected frames"),
             };
             foreach (var header in headerData)
             {
@@ -464,10 +574,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             };
             var columns = columnList.ToArray();
 
-            Assert.AreEqual(columns.Length, Enum.GetValues(typeof(MyColumns)).Length, "Number of columns should match number of enum values: You probably forgot to update one of them.");
+            m_MaxColumns = Enum.GetValues(typeof(MyColumns)).Length;
+            Assert.AreEqual(columns.Length, m_MaxColumns, "Number of columns should match number of enum values: You probably forgot to update one of them.");
 
             var state = new MultiColumnHeaderState(columns);
-            SetMode(Mode.All, state);
+            SetMode(modeFilter, state);
             return state;
         }
 
@@ -479,12 +590,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_ProfileAnalyzerWindow.SelectMarker(selectedIds[0]);
         }
 
-        private static void SetMode(Mode mode, MultiColumnHeaderState state)
+        private static int[] GetDefaultVisibleColumns(MarkerColumnFilter.Mode mode)
         {
+            int[] visibleColumns;
+
             switch (mode)
             {
-                case Mode.All:
-                    state.visibleColumns = new int[] {
+                default:
+                case MarkerColumnFilter.Mode.Custom:
+                case MarkerColumnFilter.Mode.TimeAndCount:
+                    visibleColumns = new int[] {
                         (int)MyColumns.Name,
                         (int)MyColumns.Depth,
                         (int)MyColumns.Median,
@@ -493,41 +608,89 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.Min,
                         (int)MyColumns.Max,
                         (int)MyColumns.Range,
-                        //(int)MyColumns.FirstFrame,
                         (int)MyColumns.Count,
                         (int)MyColumns.CountMean,
-                        (int)MyColumns.AtMedian
+                        (int)MyColumns.AtMedian,
                     };
                     break;
-                case Mode.Time:
-                    state.visibleColumns = new int[] {
+                case MarkerColumnFilter.Mode.Time:
+                    visibleColumns = new int[] {
                         (int)MyColumns.Name,
                         (int)MyColumns.Depth,
                         (int)MyColumns.Median,
                         (int)MyColumns.MedianBar,
-                        //(int)MyColumns.Mean,
                         (int)MyColumns.Min,
                         (int)MyColumns.Max,
                         (int)MyColumns.Range,
-                        //(int)MyColumns.FirstFrame,
-                        (int)MyColumns.AtMedian
+                        (int)MyColumns.AtMedian,
                     };
                     break;
-                case Mode.Count:
-                    state.visibleColumns = new int[] {
+                case MarkerColumnFilter.Mode.Totals:
+                    visibleColumns = new int[] {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Depth,
+                        (int)MyColumns.Total,
+                        (int)MyColumns.TotalBar,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.TimeWithTotals:
+                    visibleColumns = new int[] {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Depth,
+                        (int)MyColumns.Median,
+                        (int)MyColumns.MedianBar,
+                        (int)MyColumns.Min,
+                        (int)MyColumns.Max,
+                        (int)MyColumns.Range,
+                        (int)MyColumns.AtMedian,
+                        (int)MyColumns.Total,
+                        (int)MyColumns.TotalBar,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.CountTotals:
+                    visibleColumns = new int[] {
                         (int)MyColumns.Name,
                         (int)MyColumns.Depth,
                         (int)MyColumns.Count,
+                        (int)MyColumns.CountBar,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.CountPerFrame:
+                    visibleColumns = new int[] {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Depth,
                         (int)MyColumns.CountMean,
-                        //(int)MyColumns.FirstFrame,
+                        (int)MyColumns.CountMeanBar,
                     };
                     break;
             }
+
+            return visibleColumns;
         }
 
-        public void SetMode(Mode mode)
+
+        private static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
         {
-            SetMode(mode, multiColumnHeader.state);
+            switch (modeFilter.mode)
+            {
+                case MarkerColumnFilter.Mode.Custom:
+                    if (modeFilter.visibleColumns == null)
+                        state.visibleColumns = GetDefaultVisibleColumns(modeFilter.mode);
+                    else
+                        state.visibleColumns = modeFilter.visibleColumns;
+                    break;
+                default:
+                    state.visibleColumns = GetDefaultVisibleColumns(modeFilter.mode);
+                    break;
+            }
+
+            if (modeFilter.visibleColumns == null)
+                modeFilter.visibleColumns = state.visibleColumns;
+        }
+
+        public void SetMode(MarkerColumnFilter modeFilter)
+        {
+            SetMode(modeFilter, multiColumnHeader.state);
             multiColumnHeader.ResizeToFit();
         }
     }

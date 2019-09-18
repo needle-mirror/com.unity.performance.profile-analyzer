@@ -5,7 +5,6 @@ using System;
 using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.Profiling;
-using UnityEditorInternal.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -85,11 +84,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public bool IsProfilerWindowOpen()
         {
+            Profiler.BeginSample("IsProfilerWindowOpen");
             UnityEngine.Object[] windows = Resources.FindObjectsOfTypeAll(m_ProfilerWindowType);
-            if (windows != null && windows.Length > 0)
-                return true;
+            bool result = (windows != null && windows.Length > 0) ? true : false;
+            Profiler.EndSample();
 
-            return false;
+            return result;
         }
 
         public void OpenProfilerOrUseExisting()
@@ -104,11 +104,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 first = 1 + ProfilerDriver.firstFrameIndex;
                 last = 1 + ProfilerDriver.lastFrameIndex;
-                // Clip to the visible frames in the profile which indents 1 in from start and end
+                // Clip to the visible frames in the profile which indents 1 in from end
                 if (first < last)
                     last--;
-                if (first < last)
-                    first++;
                 return true;
             }
 
@@ -172,7 +170,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return ms;
         }
 
-        private bool GetMarkerInfo(string markerName, int frameIndex, string threadFilter, out int outThreadIndex, out float time, out float duration, out int instanceId)
+        private bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
 
@@ -189,13 +187,25 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 frameData.SetRoot(frameIndex, threadIndex);
 
                 var threadName = frameData.GetThreadName();
-                if (!threadNameCount.ContainsKey(threadName))
-                    threadNameCount.Add(threadName, 1);
-                else
-                    threadNameCount[threadName] += 1;
+                // Name here could be "Worker Thread 1"
+
+                var groupName = frameData.GetGroupName();
+                threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
+
+                int nameCount = 0;
+                threadNameCount.TryGetValue(threadName, out nameCount);
+                threadNameCount[threadName] = nameCount + 1;
+
                 var threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
 
-                if (threadFilter == "All" || threadNameWithIndex == threadFilter)
+                // To compare on the filter we need to remove the postfix on the thread name
+                // "3:Worker Thread 0" -> "1:Worker Thread"
+                // The index of the thread (0) is used +1 as a prefix 
+                // The preceding number (3) is the count of number of threads with this name
+                // Unfortunately multiple threads can have the same name
+                threadNameWithIndex = ProfileData.CorrectThreadName(threadNameWithIndex);
+
+                if (threadFilters.Contains(threadNameWithIndex))
                 {
                     const bool enterChildren = true;
                     while (frameData.Next(enterChildren))
@@ -220,7 +230,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return found;
         }
 
-        public void SetProfilerWindowMarkerName(string markerName, string threadFilter)
+        public void SetProfilerWindowMarkerName(string markerName, List<string> threadFilters)
         {
             if (m_ProfilerWindow == null)
                 return;
@@ -240,7 +250,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     float duration;
                     int instanceId;
                     int threadIndex;
-                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilter, out threadIndex, out time, out duration, out instanceId))
+                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out time, out duration, out instanceId))
                     {
                         /*
                         Debug.Log(string.Format("Setting profiler to {0} on {1} at frame {2} at {3}ms for {4}ms ({5})", 

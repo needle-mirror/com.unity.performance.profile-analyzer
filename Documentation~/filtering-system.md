@@ -16,8 +16,17 @@ Markers can be added to either the include or exclude filter by right clicking t
 
 To remove a marker filter simply right click the marker in the marker list of the Single or Compare views and select the *Remove from Include Filter* or *Remove from Exclude Filter*.
 
-### Time Unit
+### Analysis Type
+* **Total**
+    * Marker times will be *inclusive*, meaning they include time spent in the marker and its children.
+* **Self**
+    * Marker times will be *exclusive*, meaning they exclude time spent in the markers children.
+
+### Units
 The unit of measurement used to display time used throughout the Profile Analyzer can be switched from [Milliseconds](https://en.wikipedia.org/wiki/Millisecond) and [Microseconds](https://en.wikipedia.org/wiki/Microsecond).
+
+### Marker Columns
+The Marker list columns can be filtered to a more salient set which can help minimise the noise when you are looking for _Time_ or _Count_ values.
 
 
 ## Single View

@@ -12,8 +12,7 @@ The Profile Analyzer uses data collected from the [Unity Profiler](https://docs.
 ### 1. Recording New Data
 1. Select which player you would like to record data from using the dropdown on the Profiler Window toolbar, by default the profiler will be set to record from the _Editor_.
 
-2. Press the _Record_ button located on the same toolbar to start recording data from your chosen player, a data window of 300 frames will fill and wrap until you press the _Record_ button again.
-
+2. Press the _Record_ button located on the same toolbar to start recording data from your chosen player, a data window of frames will fill and wrap until you press the _Record_ button again.
 
 ### 2. Loading a Previous data set
 1. Press _Load_  on the Profiler Window toolbar and navigate the file load dialog to a previously saved _.data_ file.

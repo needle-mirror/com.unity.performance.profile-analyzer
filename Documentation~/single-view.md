@@ -35,30 +35,86 @@ Summarises the marker data of the currently selected item in the marker list and
 ## Marker list
 A sortable list of markers showing a number of useful statistics, selecting a marker in the list drives the Marker Summary panel to show more in depth information. Each marker in the list represents an aggregation of all the instances of that marker, across all filtered threads and in all ranged frames.
 
-### Available columns are:
+The Marker list columns can be filtered to a more salient set from the _Marker Columns_ drop down in the [filtering system](filtering-system.md), which can help minimise the noise when you are looking for _Time_ or _Count_ values.
 
+ ### Column and Groups Available:
 * **Name**
-    * Name of the marker
-* **Depth**
-    * The depths in the hierarchy that the marker appears on.
-* **Median**
-    * The median value from the markers time distribution.
-* **Mean**
-    * The average value from the markers time distribution.
-* **Min**
-    * The minimum value from the markers time distribution.
-* **Max**
-    * The maximum value from the markers time distribution.
-* **Range**
-    * The difference from the maximum and minimum marker times.
-* **Count**
-    * The number of times the marker was push / popped.
-* **Count Mean**
-    * The average number of times the marker was pushed / popped per frame.
+    * Name of the marker - available in all groups
+
 * **1st**
-    * The frame number that the marker was first pushed / popped.
-* **At Median Frame**
-    * The sum of activity for the marker in the median frame.
+    * The frame number that the marker was first pushed / popped. - not on by default in any groups
+
+* **Time and Count**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Median**
+        * The median value from the markers time distribution.
+    * **Mean**
+        * The average value from the markers time distribution.
+    * **Min**
+        * The minimum value from the markers time distribution.
+    * **Max**
+        * The maximum value from the markers time distribution.
+    * **Range**
+        * The difference from the maximum and minimum marker times.
+    * **Count**
+        * The number of times the marker was push / popped.
+    * **Count Frame**
+        * The average number of times the marker was pushed / popped per frame.
+    * **At Median Frame**
+        * The sum of activity for the marker in the median frame.
+
+* **Time**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Median**
+        * The median value from the markers time distribution.
+    * **Min**
+        * The minimum value from the markers time distribution.
+    * **Max**
+        * The maximum value from the markers time distribution.
+    * **Range**
+        * The difference from the maximum and minimum marker times.
+    * **At Median Frame**
+        * The sum of activity for the marker in the median frame.
+
+* **Totals**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Total**
+        * The total time spent for this marker in all the selected frames.
+
+
+* **Time With Totals**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Median**
+        * The median value from the markers time distribution.
+    * **Min**
+        * The minimum value from the markers time distribution.
+    * **Max**
+        * The maximum value from the markers time distribution.
+    * **Range**
+        * The difference from the maximum and minimum marker times.
+    * **At Median Frame**
+        * The sum of activity for the marker in the median frame.
+    * **Total**
+        * The total time spent for this marker in all the selected frames.
+
+* **Count Total**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Count**
+        * The number of times the marker was push / popped.
+
+* **Count Per Frame**
+    * **Depth**
+        * The depths in the hierarchy that the marker appears on.
+    * **Count Frame**
+        * The average number of times the marker was pushed / popped per frame.
+
+ * **Custom**
+    * From any of the Marker Column Groups you can turn on / off any of the available columns to create a custom set of columns.
 
 
 ### Marker List Context Menu Commands
@@ -83,5 +139,14 @@ A sortable list of markers showing a number of useful statistics, selecting a ma
 
 * **Remove from Exclude Filter**
     * If the selected marker is already in the *exclude* filter then this command will remove from the filter.
+
+* **Set as Parent Marker Filter**
+    * Limit the analysis to this marker and markers *included* below it on the callstack.
+
+* **Clear Parent Marker Filter**
+    * Limit the analysis to this marker and markers *included* within it.
+
+* **Copy To Clipboard**
+    * Copies the selected marker name to the clipboard.
 
 [Back to manual](manual.md)

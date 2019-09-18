@@ -16,10 +16,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_FrameSummary.count = 0;
             m_FrameSummary.msTotal = 0.0;
             m_FrameSummary.msMin = float.MaxValue;
-            m_FrameSummary.msMax = 0;
+            m_FrameSummary.msMax = 0.0f;
             m_FrameSummary.minFrameIndex = 0;
             m_FrameSummary.maxFrameIndex = 0;
             m_FrameSummary.maxMarkerDepth = 0;
+            m_FrameSummary.totalMarkers = 0;
+            m_FrameSummary.markerCountMax = 0;
+            m_FrameSummary.markerCountMaxMean = 0.0f;
             for (int b = 0; b < m_FrameSummary.buckets.Length; b++)
                 m_FrameSummary.buckets[b] = 0;
 
@@ -61,13 +64,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_FrameSummary.frames.Add(new FrameTime(frameIndex, msFrame, 1));
         }
 
-        private float GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
+        private FrameTime GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
         {
             int index = (int)((frames.Count-1) * percent / 100);
             outputFrameIndex = frames[index].frameIndex;
 
             // True median is half of the sum of the middle 2 frames for an even count. However this would be a value never recorded so we avoid that.
-            return frames[index].ms;
+            return frames[index];
         }
 
         private float GetThreadPercentageOffset(List<ThreadFrameTime> frames, float percent, out int outputFrameIndex)
@@ -81,6 +84,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void SetupMarkers()
         {
+            int countMax = 0;
+            float countMaxMean = 0.0f;
+            
             foreach (MarkerData marker in m_Markers)
             {
                 marker.msAtMedian = 0.0f;
@@ -88,6 +94,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 marker.msMax = 0;
                 marker.minFrameIndex = 0;
                 marker.maxFrameIndex = 0;
+                marker.countMin = int.MaxValue;
+                marker.countMax = int.MinValue;
 
                 foreach (FrameTime frameTime in marker.frames)
                 {
@@ -108,17 +116,42 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     if (frameIndex == m_FrameSummary.medianFrameIndex)
                         marker.msAtMedian = ms;
+                    
+                    var count = frameTime.count;
+
+                    // count for marker over frame
+                    if (count < marker.countMin)
+                    {
+                        marker.countMin = count;
+                    }
+                    if (count > marker.countMax)
+                    {
+                        marker.countMax = count;
+                    }
                 }
+                
+                int unusedIndex;
 
                 marker.msMean = (float)(marker.msTotal / marker.presentOnFrameCount);
-                marker.frames.Sort();
-                marker.msMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex);
-                int unusedIndex;
-                marker.msLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex);
-                marker.msUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex);
-                // No longer need the frame time list ?
-                //marker.msFrame.Clear();
+                marker.frames.Sort(FrameTime.CompareCount);
+                marker.countMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).count;
+                marker.countLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).count;
+                marker.countUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).count;
+                
+                marker.countMean = (float)marker.count / marker.presentOnFrameCount;
+                marker.frames.Sort(FrameTime.CompareMs);
+                marker.msMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).ms;
+                marker.msLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).ms;
+                marker.msUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).ms;
+
+                if (marker.countMax > countMax)
+                    countMax = marker.countMax;
+                if (marker.countMean > countMaxMean)
+                    countMaxMean = marker.countMean;
             }
+
+            m_FrameSummary.markerCountMax = countMax;
+            m_FrameSummary.markerCountMaxMean = countMaxMean;
         }
 
         public void SetupMarkerBuckets()
@@ -126,6 +159,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             foreach (MarkerData marker in m_Markers)
             {
                 marker.ComputeBuckets(marker.msMin, marker.msMax);
+                marker.ComputeCountBuckets(marker.countMin, marker.countMax);
             }
         }
 
@@ -179,10 +213,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             m_FrameSummary.msMean = (float)(m_FrameSummary.msTotal / m_FrameSummary.count);
             m_FrameSummary.frames.Sort();
-            m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.medianFrameIndex);
+            m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.medianFrameIndex).ms;
             int unusedIndex;
-            m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out unusedIndex);
-            m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out unusedIndex);
+            m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out unusedIndex).ms;
+            m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out unusedIndex).ms;
             // No longer need the frame time list ?
             //m_frameSummary.msFrame.Clear();
             m_FrameSummary.maxMarkerDepth = maxMarkerDepth;

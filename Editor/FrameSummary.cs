@@ -7,7 +7,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public double msTotal;
         public int first;
         public int last;
-        public int count;   // Valid count may not be last-first
+        public int count;                     // Valid frame count may not be last-first
 
         public float msMean;
         public float msMedian;
@@ -22,6 +22,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public int maxMarkerDepth;
         public int totalMarkers;
+        public int markerCountMax;            // Largest marker count (over all frames)
+        public float markerCountMaxMean;      // Largest marker count mean
 
         public int[] buckets = new int[20];   // Each bucket contains 'number of frames' for frametime in that range
         public List<FrameTime> frames = new List<FrameTime>();

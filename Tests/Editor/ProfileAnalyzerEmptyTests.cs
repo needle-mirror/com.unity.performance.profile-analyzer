@@ -20,7 +20,7 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
         var analyzer = m_setupData.analyzer;
         var profileData = analyzer.PullFromProfiler(0, 300);
         var depthFilter = m_setupData.depthFilter;
-        var threadFilter = m_setupData.threadFilter;
+        var threadFilters = m_setupData.threadFilters;
 
         int firstFrameIndex = profileData.OffsetToDisplayFrame(0);
         int lastFrameIndex  = profileData.OffsetToDisplayFrame(profileData.GetFrameCount() - 1);
@@ -28,7 +28,7 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
         Assert.AreEqual(0, firstFrameIndex, "First Frame index not zero");
         Assert.AreEqual(300, lastFrameIndex, "Last Frame index is not 300");
 
-        var analysis = analyzer.Analyze(profileData, SelectRange(firstFrameIndex, lastFrameIndex), threadFilter, depthFilter);
+        var analysis = analyzer.Analyze(profileData, SelectRange(firstFrameIndex, lastFrameIndex), threadFilters, depthFilter);
         var frameSummary = analysis.GetFrameSummary();
 
         Assert.AreEqual(0, analysis.GetThreads().Count);

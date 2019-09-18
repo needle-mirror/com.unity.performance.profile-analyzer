@@ -21,7 +21,7 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
         {
             var marker = new ProfileMarker()
             {
-                msFrame = 0.5f,
+                msMarkerTotal = 0.5f,
                 depth = i
             };
 
@@ -66,7 +66,7 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
 
             var marker = new ProfileMarker()
             {
-                msFrame = 0.5f,
+                msMarkerTotal = 0.5f,
                 depth = i
             };
 

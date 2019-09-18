@@ -12,10 +12,10 @@ public class ProfileAnalyzerBaseTest
         internal ProfileAnalyzer analyzer;
         internal ProfileData profileData;
         internal int depthFilter;
-        internal string threadFilter;
+        internal List<string> threadFilters;
         internal int firstFrame;
         internal int lastFrame;
-        internal FrameSetupData(int minFrame, int maxFrame, int filterDepth, string filterThread)
+        internal FrameSetupData(int minFrame, int maxFrame, int filterDepth, List<string> filterThreads)
         {
             progressBar = new ProgressBarDisplay();
             firstFrame = minFrame;
@@ -23,7 +23,7 @@ public class ProfileAnalyzerBaseTest
             analyzer = new ProfileAnalyzer(progressBar);
             profileData = analyzer.PullFromProfiler(minFrame, maxFrame);
             depthFilter = filterDepth;
-            threadFilter = filterThread;
+            threadFilters = filterThreads;
         }
     };
 
@@ -33,7 +33,7 @@ public class ProfileAnalyzerBaseTest
     public void SetupTest()
     {
         UnityEditorInternal.ProfilerDriver.ClearAllFrames();
-        m_setupData = new FrameSetupData(0, 300, -1, "1:Main Thread");
+        m_setupData = new FrameSetupData(0, 300, -1, new List<string> { "1:Main Thread" });
     }
 
     [TearDown]
@@ -57,20 +57,24 @@ public class ProfileAnalyzerBaseTest
     {
         return m_setupData.analyzer.Analyze(profileData,
                                             SelectRange(m_setupData.firstFrame, m_setupData.lastFrame),
-                                            m_setupData.threadFilter,
+                                            m_setupData.threadFilters,
                                             m_setupData.depthFilter);
     }
 
     protected void StartProfiler()
     {
+#if UNITY_2017_1_OR_NEWER
         ProfilerDriver.enabled = true;
+#endif
         ProfilerDriver.profileEditor = true;
     }
 
     protected void StopProfiler()
     {
         EditorApplication.isPlaying = false;
+#if UNITY_2017_1_OR_NEWER
         ProfilerDriver.enabled = false;
+#endif
         ProfilerDriver.profileEditor = false;
     }
 

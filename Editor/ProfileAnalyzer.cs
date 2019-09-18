@@ -4,6 +4,7 @@ using UnityEditorInternal;
 using System.Text.RegularExpressions;
 using System;
 using System.Text;
+using UnityEngine.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 { 
@@ -14,6 +15,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         private List<string> m_threadNames = new List<string>();
         private ProfileAnalysis m_analysis;
         private ProgressBarDisplay m_progressBar;
+
         public ProfileAnalyzer(ProgressBarDisplay progressBar)
         {
             m_progressBar = progressBar;
@@ -34,11 +36,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 frameData.SetRoot(frameIndex, threadIndex);
 
                 var threadName = frameData.GetThreadName();
+                var groupName = frameData.GetGroupName();
+                threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
+
                 if (!threadNameCount.ContainsKey(threadName))
                     threadNameCount.Add(threadName, 1);
                 else
                     threadNameCount[threadName] += 1;
-                m_threadNames.Add(ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName));
+
+                string threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
+                threadNameWithIndex = ProfileData.CorrectThreadName(threadNameWithIndex);
+
+                m_threadNames.Add(threadNameWithIndex);
             }
 
             frameData.Dispose();
@@ -51,11 +60,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public ProfileData PullFromProfiler(int firstFrameDisplayIndex, int lastFrameDisplayIndex)
         {
+            Profiler.BeginSample("ProfileAnalyzer.PullFromProfiler");
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
             int firstFrameIndex = firstFrameDisplayIndex - 1;
             int lastFrameIndex = lastFrameDisplayIndex - 1;
             ProfileData profileData = GetData(frameData, firstFrameIndex, lastFrameIndex);
             frameData.Dispose();
+            Profiler.EndSample();
             return profileData;
         }
 
@@ -135,7 +146,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 */
 
                 ProfileFrame frame = new ProfileFrame();
-                frame.msStartTime = frameData.GetFrameStartS(frameIndex);
+                frame.msStartTime = 1000.0 * frameData.GetFrameStartS(frameIndex);
                 frame.msFrame = msFrame;
                 data.Add(frame);
 
@@ -151,6 +162,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         continue;
                     }
 
+                    var groupName = frameData.GetGroupName();
+                    threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
+
                     ProfileThread thread = new ProfileThread();
                     frame.Add(thread);
 
@@ -159,12 +173,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     threadNameCount[threadName] = nameCount + 1;
 
                     data.AddThreadName(ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName), thread);
-                    
-                    const bool enterChildren = true;
 
+                    const bool enterChildren = true;
+                    // The markers are in depth first order and the depth is known
+                    // So we can infer a parent child relationship
                     while (frameData.Next(enterChildren))
                     {
-                        var ms = frameData.durationMS;
                         var markerData = ProfileMarker.Create(frameData);
 
                         data.AddMarkerName(frameData.name, markerData);
@@ -172,9 +186,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     }
                 }
             }
+
+            data.Finalise();
+
             return data;
         }
-
 
         private int GetClampedOffsetToFrame(ProfileData profileData, int frameIndex)
         {
@@ -193,42 +209,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return frameOffset;
         }
 
-        public static string GetThreadFilterSettings(string threadFilter, out bool filterThreads, out bool filterThreadGroup)
+        public static bool MatchThreadFilter(string threadNameWithIndex, List<string> threadFilters)
         {
-            filterThreads = (!string.IsNullOrEmpty(threadFilter) && threadFilter != "All");
-            filterThreadGroup = false;
-            string threadGroupPrefix = "All:";
-            if (filterThreads && threadFilter.StartsWith(threadGroupPrefix))
-            {
-                filterThreadGroup = true;
-                return threadFilter.Substring(threadGroupPrefix.Length);
-            }
+            if (threadFilters == null || threadFilters.Count==0)
+                return false;
 
-            return threadFilter;
+            if (threadFilters.Contains(threadNameWithIndex))
+                return true;
+
+            return false;
         }
 
-        public static bool MatchThreadFilter(string threadNameWithIndex, string threadFilter, bool filterThreads, bool filterThreadGroup)
+        public bool IsNullOrWhiteSpace(string s)
         {
-            bool include = true;
-            if (filterThreads)
-            {
-                if (filterThreadGroup)
-                {
-                    var threadName = threadNameWithIndex.Substring(threadNameWithIndex.IndexOf(':') + 1);
+            // return string.IsNullOrWhiteSpace(parentMarker);
+            if (s == null || Regex.IsMatch(s,@"^[\s]*$"))
+                return true;
 
-                    if (threadFilter != threadName)
-                        include = false;
-                }
-                else
-                {
-                    if (threadFilter != threadNameWithIndex)
-                        include = false;
-                }
-            }
-            return include;
+            return false;
         }
 
-        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, string threadFilter, int depthFilter, float timeScaleMax = 0)
+        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMax = 0)
         {
             m_Progress = 0;
             if (profileData == null)
@@ -246,10 +247,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return null;
             }
 
-            bool filterThreads;
-            bool filterThreadGroup;
-            threadFilter = GetThreadFilterSettings(threadFilter, out filterThreads, out filterThreadGroup);
-            bool processMarkers = (threadFilter != "None");
+            bool processMarkers = (threadFilters != null);
 
             ProfileAnalysis analysis = new ProfileAnalysis();
             analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count-1]);
@@ -257,9 +255,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_threadNames.Clear();
 
             int maxMarkerDepthFound = 0;
-            Dictionary<string, ThreadData> threads = new Dictionary<string, ThreadData>();
-            Dictionary<string, MarkerData> markers = new Dictionary<string, MarkerData>();
-            Dictionary<string, int> allMarkers = new Dictionary<string, int>();
+            var threads = new Dictionary<string, ThreadData>();
+            var markers = new Dictionary<string, MarkerData>();
+            var allMarkers = new Dictionary<string, int>();
+
+
+            bool filteringByParentMarker = false;
+            int parentMarkerIndex = -1;
+            if (!IsNullOrWhiteSpace(parentMarker))
+            {
+                // Returns -1 if this marker doesn't exist in the data set
+                parentMarkerIndex = profileData.GetMarkerIndex(parentMarker);
+                filteringByParentMarker = true;
+            }
 
             int at = 0;
             foreach (int frameIndex in selectionIndices) 
@@ -310,16 +318,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             thread = threads[threadNameWithIndex];
                         }
 
-                        bool include = MatchThreadFilter(threadNameWithIndex, threadFilter, filterThreads, filterThreadGroup);
+                        bool include = MatchThreadFilter(threadNameWithIndex, threadFilters);
 
-                        foreach (var markerData in threadData.markers)
+                        int parentMarkerDepth = -1;
+                        foreach (ProfileMarker markerData in threadData.markers)
                         {
-                            var markerName = profileData.GetMarkerName(markerData);
+                            string markerName = profileData.GetMarkerName(markerData);
                             if (!allMarkers.ContainsKey(markerName))
                                 allMarkers.Add(markerName, 1);
                             // No longer counting how many times we see the marker (this saves 1/3 of the analysis time).
 
-                            var ms = markerData.msFrame;
+                            float ms = markerData.msMarkerTotal - (selfTimes ? markerData.msChildren : 0);
                             var markerDepth = markerData.depth;
                             if (markerDepth > maxMarkerDepthFound)
                                 maxMarkerDepthFound = markerDepth;
@@ -334,9 +343,35 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                             if (!include)
                                 continue;
-                            
-                            if (depthFilter>=0 && markerDepth != depthFilter)
+
+                            if (depthFilter >= 0 && markerDepth != depthFilter)
                                 continue;
+
+                            // If only looking for markers below the parent
+                            if (filteringByParentMarker)
+                            {
+                                // If found the parent marker
+                                if (markerData.nameIndex == parentMarkerIndex)
+                                {
+                                    // And we are not already below the parent higher in the depth tree
+                                    if (parentMarkerDepth < 0)
+                                    {
+                                        // record the parent marker depth
+                                        parentMarkerDepth = markerData.depth;
+                                    }
+                                }
+                                else
+                                {
+                                    // If we are now above or beside the parent marker then we are done for this level
+                                    if (markerData.depth <= parentMarkerDepth)
+                                    {
+                                        parentMarkerDepth = -1;
+                                    }
+                                }
+
+                                if (parentMarkerDepth < 0)
+                                    continue;
+                            }
 
                             MarkerData marker;
                             if (markers.ContainsKey(markerName))
@@ -369,7 +404,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
 
                             // Record highest depth foun
-                            if (markerDepth<marker.minDepth)
+                            if (markerDepth < marker.minDepth)
                                 marker.minDepth = markerDepth;
                             if (markerDepth > marker.maxDepth)
                                 marker.maxDepth = markerDepth;
