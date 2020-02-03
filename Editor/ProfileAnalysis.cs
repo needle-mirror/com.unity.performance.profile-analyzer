@@ -3,11 +3,11 @@ using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ProfileAnalysis
+    internal class ProfileAnalysis
     {
-        private FrameSummary m_FrameSummary = new FrameSummary();
-        private List<MarkerData> m_Markers = new List<MarkerData>();
-        private List<ThreadData> m_Threads = new List<ThreadData>();
+        FrameSummary m_FrameSummary = new FrameSummary();
+        List<MarkerData> m_Markers = new List<MarkerData>();
+        List<ThreadData> m_Threads = new List<ThreadData>();
 
         public ProfileAnalysis()
         {
@@ -64,7 +64,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_FrameSummary.frames.Add(new FrameTime(frameIndex, msFrame, 1));
         }
 
-        private FrameTime GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
+        FrameTime GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
         {
             int index = (int)((frames.Count-1) * percent / 100);
             outputFrameIndex = frames[index].frameIndex;
@@ -73,7 +73,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return frames[index];
         }
 
-        private float GetThreadPercentageOffset(List<ThreadFrameTime> frames, float percent, out int outputFrameIndex)
+        float GetThreadPercentageOffset(List<ThreadFrameTime> frames, float percent, out int outputFrameIndex)
         {
             int index = (int)((frames.Count-1) * percent / 100);
             outputFrameIndex = frames[index].frameIndex;
@@ -189,7 +189,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void CalculateThreadMedians()
+        void CalculateThreadMedians()
         {
             foreach (var thread in m_Threads)
             {
@@ -237,7 +237,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             CalculateThreadMedians();
         }
 
-        private int SortByAtMedian(MarkerData a, MarkerData b)
+        int SortByAtMedian(MarkerData a, MarkerData b)
         {
             return -a.msAtMedian.CompareTo(b.msAtMedian);
         }

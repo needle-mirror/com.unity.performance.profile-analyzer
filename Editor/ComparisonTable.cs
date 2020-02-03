@@ -22,8 +22,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
     class ComparisonTable : TreeView
     {
+        Draw2D m_2D;
         ProfileAnalysis m_Left;
         ProfileAnalysis m_Right;
+        Color m_LeftColor;
+        Color m_RightColor;
         List<MarkerPairing> m_Pairings;
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         float m_DiffRange;
@@ -133,10 +136,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent invalidEntry = new GUIContent("-");
         }
 
-        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis left, ProfileAnalysis right, List<MarkerPairing> pairings, ProfileAnalyzerWindow profileAnalyzerWindow) : base(state, multicolumnHeader)
+        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis left, ProfileAnalysis right, List<MarkerPairing> pairings, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color leftColor, Color rightColor) : base(state, multicolumnHeader)
         {
+            m_2D = draw2D;
             m_Left = left;
             m_Right = right;
+            m_LeftColor = leftColor;
+            m_RightColor = rightColor;
             m_Pairings = pairings;
             m_ProfileAnalyzerWindow = profileAnalyzerWindow;
 
@@ -629,12 +635,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (ms > 0.0f)
             {
-                if (m_ProfileAnalyzerWindow.m_2D.DrawStart(rect))
+                if (m_2D.DrawStart(rect))
                 {
                     float w = Math.Max(1.0f, rect.width * ms / range);
                     float x = rightAlign ? rect.width - w : 0.0f;
-                    m_ProfileAnalyzerWindow.m_2D.DrawFilledBox(x, 1, w, rect.height - 1, color);
-                    m_ProfileAnalyzerWindow.m_2D.DrawEnd();
+                    m_2D.DrawFilledBox(x, 1, w, rect.height - 1, color);
+                    m_2D.DrawEnd();
                 }
             }
             GUI.Label(rect, content);
@@ -674,28 +680,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     ShowText(cellRect, content);
                     break;
                 case MyColumns.LeftBar:
-                    ShowBar(cellRect, -Diff(item), m_DiffRange, content, m_ProfileAnalyzerWindow.m_ColorLeft, true);
+                    ShowBar(cellRect, -Diff(item), m_DiffRange, content, m_LeftColor, true);
                     break;
                 case MyColumns.RightBar:
-                    ShowBar(cellRect, Diff(item), m_DiffRange, content, m_ProfileAnalyzerWindow.m_ColorRight, false);
+                    ShowBar(cellRect, Diff(item), m_DiffRange, content, m_RightColor, false);
                     break;
                 case MyColumns.LeftCountBar:
-                    ShowBar(cellRect, -CountDiff(item), m_CountDiffRange, content, m_ProfileAnalyzerWindow.m_ColorLeft, true);
+                    ShowBar(cellRect, -CountDiff(item), m_CountDiffRange, content, m_LeftColor, true);
                     break;
                 case MyColumns.RightCountBar:
-                    ShowBar(cellRect, CountDiff(item), m_CountDiffRange, content, m_ProfileAnalyzerWindow.m_ColorRight, false);
+                    ShowBar(cellRect, CountDiff(item), m_CountDiffRange, content, m_RightColor, false);
                     break;
                 case MyColumns.LeftCountMeanBar:
-                    ShowBar(cellRect, -CountMeanDiff(item), m_CountMeanDiffRange, content, m_ProfileAnalyzerWindow.m_ColorLeft, true);
+                    ShowBar(cellRect, -CountMeanDiff(item), m_CountMeanDiffRange, content, m_LeftColor, true);
                     break;
                 case MyColumns.RightCountMeanBar:
-                    ShowBar(cellRect, CountMeanDiff(item), m_CountMeanDiffRange, content, m_ProfileAnalyzerWindow.m_ColorRight, false);
+                    ShowBar(cellRect, CountMeanDiff(item), m_CountMeanDiffRange, content, m_RightColor, false);
                     break;
                 case MyColumns.LeftTotalBar:
-                    ShowBar(cellRect, (float)-TotalDiff(item), (float)m_TotalDiffRange, content, m_ProfileAnalyzerWindow.m_ColorLeft, false);
+                    ShowBar(cellRect, (float)-TotalDiff(item), (float)m_TotalDiffRange, content, m_LeftColor, false);
                     break;
                 case MyColumns.RightTotalBar:
-                    ShowBar(cellRect, (float)TotalDiff(item), (float)m_TotalDiffRange, content, m_ProfileAnalyzerWindow.m_ColorRight, false);
+                    ShowBar(cellRect, (float)TotalDiff(item), (float)m_TotalDiffRange, content, m_RightColor, false);
                     break;
             }
 
@@ -729,7 +735,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(float treeViewWidth, MarkerColumnFilter modeFilter)
+        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(MarkerColumnFilter modeFilter)
         {
             var columnList = new List<MultiColumnHeaderState.Column>();
             HeaderData[] headerData = new HeaderData[]
@@ -795,7 +801,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_ProfileAnalyzerWindow.SelectPairing(selectedIds[0]);
         }
 
-        private static int[] GetDefaultVisibleColumns(MarkerColumnFilter.Mode mode)
+        static int[] GetDefaultVisibleColumns(MarkerColumnFilter.Mode mode)
         {
             int[] visibleColumns;
 
@@ -880,7 +886,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return visibleColumns;
         }
-        private static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
+        static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
         {
             switch (modeFilter.mode)
             {

@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ThreadFrameTime : IComparable<ThreadFrameTime>
+    internal class ThreadFrameTime : IComparable<ThreadFrameTime>
     {
         public int frameIndex;
         public float ms;

@@ -6,9 +6,9 @@ using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class Columns
+    internal class Columns
     {
-        private int[] m_ColumnWidth = new int[4];
+        int[] m_ColumnWidth = new int[4];
 
         public Columns(int a, int b, int c, int d)
         {

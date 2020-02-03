@@ -21,8 +21,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
     class ProfileTable : TreeView
     {
+        Draw2D m_2D;
         ProfileAnalysis m_Model;
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
+        Color m_BarColor;
         float m_MaxMedian;
         int m_MaxCount;
         float m_MaxCountMean;
@@ -105,10 +107,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
         }
 
-        public ProfileTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis model, ProfileAnalyzerWindow profileAnalyzerWindow) : base(state, multicolumnHeader)
+        public ProfileTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis model, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color barColor) : base(state, multicolumnHeader)
         {
+            m_2D = draw2D;
             m_Model = model;
             m_ProfileAnalyzerWindow = profileAnalyzerWindow;
+            m_BarColor = barColor;
 
             m_MaxColumns = Enum.GetValues(typeof(MyColumns)).Length;
             Assert.AreEqual(m_SortOptions.Length, m_MaxColumns, "Ensure number of sort options are in sync with number of MyColumns enum values");
@@ -442,11 +446,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (ms > 0.0f)
             {
-                if (m_ProfileAnalyzerWindow.m_2D.DrawStart(rect))
+                if (m_2D.DrawStart(rect))
                 {
                     float w = Math.Max(1.0f, rect.width * ms / range);
-                    m_ProfileAnalyzerWindow.m_2D.DrawFilledBox(0, 1, w, rect.height - 1, m_ProfileAnalyzerWindow.m_ColorBar);
-                    m_ProfileAnalyzerWindow.m_2D.DrawEnd();
+                    m_2D.DrawFilledBox(0, 1, w, rect.height - 1, m_BarColor);
+                    m_2D.DrawEnd();
                 }
             }
             GUI.Label(rect, content);
@@ -498,7 +502,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         GUI.enabled = false;
                     if (GUI.Button(cellRect, content))
                     {
-                        m_ProfileAnalyzerWindow.SelectMarker(item.id);
+                        m_ProfileAnalyzerWindow.SelectMarkerByIndex(item.id);
                         m_ProfileAnalyzerWindow.JumpToFrame(item.data.firstFrameIndex);
                     }
 
@@ -536,7 +540,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(float treeViewWidth, MarkerColumnFilter modeFilter)
+        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(MarkerColumnFilter modeFilter)
         {
             var columnList = new List<MultiColumnHeaderState.Column>();
             HeaderData[] headerData = new HeaderData[]
@@ -587,10 +591,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             base.SelectionChanged(selectedIds);
 
             if (selectedIds.Count>0)
-                m_ProfileAnalyzerWindow.SelectMarker(selectedIds[0]);
+                m_ProfileAnalyzerWindow.SelectMarkerByIndex(selectedIds[0]);
         }
 
-        private static int[] GetDefaultVisibleColumns(MarkerColumnFilter.Mode mode)
+        static int[] GetDefaultVisibleColumns(MarkerColumnFilter.Mode mode)
         {
             int[] visibleColumns;
 
@@ -669,7 +673,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
 
 
-        private static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
+        static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
         {
             switch (modeFilter.mode)
             {

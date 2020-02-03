@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
-    public class ProfileDataView
+    internal class ProfileDataView
     {
         public string path;
         public ProfileData data;
@@ -22,7 +22,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return true;
         }
 
-        private bool SelectAllFramesContainingMarker(string markerName, ProfileAnalysis inAnalysis)
+        bool SelectAllFramesContainingMarker(string markerName, ProfileAnalysis inAnalysis)
         {
             if (inAnalysis == null)
                 return false;
@@ -45,7 +45,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return SelectAllFramesContainingMarker(markerName, inSelection ? analysis : analysisFull);
         }
 
-        private int ClampToRange(int value, int min, int max)
+        int ClampToRange(int value, int min, int max)
         {
             if (value < min)
                 value = min;
@@ -68,7 +68,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void SelectIndexRangeFromOffsets(int startOffset, int endOffset)
+        void SelectIndexRangeFromOffsets(int startOffset, int endOffset)
         {
             selectedIndices.Clear();
 

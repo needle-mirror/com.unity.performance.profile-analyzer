@@ -2,12 +2,12 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ProgressBarDisplay
+    internal class ProgressBarDisplay
     {
-        private int m_TotalFrames;
-        private int m_CurrentFrame;
-        private string m_Title;
-        private string m_Description;
+        int m_TotalFrames;
+        int m_CurrentFrame;
+        string m_Title;
+        string m_Description;
 
         public void InitProgressBar(string title, string description, int frames)
         {

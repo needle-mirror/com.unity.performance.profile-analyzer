@@ -28,7 +28,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         ThreadIdentifier m_AllThreadIdentifier;
         ThreadSelection m_ThreadSelection;
 
-        private GUIStyle activeLineStyle;
+        GUIStyle activeLineStyle;
 
         // All columns
         public enum MyColumns
@@ -179,7 +179,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return root;
         }
         
-        private void BuildRowRecursive(IList<TreeViewItem> rows, TreeViewItem item)
+        void BuildRowRecursive(IList<TreeViewItem> rows, TreeViewItem item)
         {
             //if (item.children == null)
             //    return;
@@ -196,7 +196,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void BuildAllRows(IList<TreeViewItem> rows, TreeViewItem rootItem)
+        void BuildAllRows(IList<TreeViewItem> rows, TreeViewItem rootItem)
         {
             rows.Clear();
             if (rootItem == null)
@@ -635,12 +635,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
     }
 
-    public class ThreadSelectionWindow : EditorWindow
+    internal class ThreadSelectionWindow : EditorWindow
     {
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         TreeViewState m_ThreadTreeViewState;
         MultiColumnHeaderState m_ThreadMulticolumnHeaderState;
         ThreadTable m_ThreadTable;
+		bool m_RequestClose;
         
         static public bool IsOpen()
         {
@@ -666,6 +667,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             ThreadSelectionWindow window = GetWindow<ThreadSelectionWindow>("Threads");
             window.Close();
         }
+		
+		void OnEnable()
+		{
+			m_RequestClose = false;
+		}
 
         void CreateTable(ProfileAnalyzerWindow profileAnalyzerWindow, List<string> threadNames, List<string> threadUINames, ThreadSelection threadSelection)
         {
@@ -686,7 +692,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             CreateTable(profileAnalyzerWindow, threadNames, threadUINames, threadSelection);
         }
 
-        private void OnDestroy()
+        void OnDestroy()
         {
             m_ProfileAnalyzerWindow.SetThreadSelection(m_ThreadTable.GetThreadSelection());
         }
@@ -716,11 +722,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             EditorGUILayout.EndVertical();
+		}			
+		
+		void Update()
+		{
+			if (m_RequestClose)
+				Close();
         }
 
-        private void OnLostFocus()
+        void OnLostFocus()
         {
-            Close();
+			m_RequestClose = true;
         }
     }
 }

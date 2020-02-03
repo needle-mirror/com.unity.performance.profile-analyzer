@@ -4,14 +4,18 @@ using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    /// <summary>Unit type identifier</summary>
     public enum Units
     {
+        /// <summary>Time in milliseconds</summary>
         Milliseconds,
+        /// <summary>Time in microseconds</summary>
         Microseconds,
+        /// <summary>Count of number of instances</summary>
         Count,
     };
 
-    public class DisplayUnits
+    internal class DisplayUnits
     {
         public static readonly string[] UnitNames =
         {
@@ -45,7 +49,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private int ClampToRange(int value, int min, int max)
+        int ClampToRange(int value, int min, int max)
         {
             if (value < min)
                 value = min;

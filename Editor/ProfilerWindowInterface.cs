@@ -8,24 +8,24 @@ using UnityEngine.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ProfilerWindowInterface
+    internal class ProfilerWindowInterface
     {
-        private Type m_ProfilerWindowType;
-        private EditorWindow m_ProfilerWindow;
-        private FieldInfo m_CurrentFrameFieldInfo;
-        private FieldInfo m_TimeLineGUIFieldInfo;
-        private FieldInfo m_SelectedEntryFieldInfo;
-        private FieldInfo m_SelectedNameFieldInfo;
-        private FieldInfo m_SelectedTimeFieldInfo;
-        private FieldInfo m_SelectedDurationFieldInfo;
-        private FieldInfo m_SelectedInstanceIdFieldInfo;
-        private FieldInfo m_SelectedInstanceCountFieldInfo;
-        private FieldInfo m_SelectedFrameIdFieldInfo;
-        private FieldInfo m_SelectedThreadIdFieldInfo;
-        private FieldInfo m_SelectedNativeIndexFieldInfo;
+        Type m_ProfilerWindowType;
+        EditorWindow m_ProfilerWindow;
+        FieldInfo m_CurrentFrameFieldInfo;
+        FieldInfo m_TimeLineGUIFieldInfo;
+        FieldInfo m_SelectedEntryFieldInfo;
+        FieldInfo m_SelectedNameFieldInfo;
+        FieldInfo m_SelectedTimeFieldInfo;
+        FieldInfo m_SelectedDurationFieldInfo;
+        FieldInfo m_SelectedInstanceIdFieldInfo;
+        FieldInfo m_SelectedInstanceCountFieldInfo;
+        FieldInfo m_SelectedFrameIdFieldInfo;
+        FieldInfo m_SelectedThreadIdFieldInfo;
+        FieldInfo m_SelectedNativeIndexFieldInfo;
 
-        private MethodInfo m_GetProfilerModuleInfo;
-        private Type m_CPUProfilerModuleType;
+        MethodInfo m_GetProfilerModuleInfo;
+        Type m_CPUProfilerModuleType;
 
         public ProfilerWindowInterface()
         {
@@ -170,7 +170,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return ms;
         }
 
-        private bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
+        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
 

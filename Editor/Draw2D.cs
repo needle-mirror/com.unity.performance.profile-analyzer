@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class Draw2D
+    internal class Draw2D
     {
         public enum Origin
         {

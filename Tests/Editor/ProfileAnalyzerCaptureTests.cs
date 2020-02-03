@@ -2,7 +2,8 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.TestTools;
-
+using UnityEditor;
+using UnityEditorInternal;
 public class ProfileAnalyzerCaptureTests : ProfileAnalyzerBaseTest
 {
     [UnityTest]
@@ -17,6 +18,9 @@ public class ProfileAnalyzerCaptureTests : ProfileAnalyzerBaseTest
         yield return null;
 
         StopProfiler();
+
+        // Seem to need one more frame to get the data transfered over so the profile analyzer can pull it.
+        yield return null;
 
         //analyze the data
         m_setupData.profileData = m_setupData.analyzer.PullFromProfiler(m_setupData.firstFrame, m_setupData.lastFrame);

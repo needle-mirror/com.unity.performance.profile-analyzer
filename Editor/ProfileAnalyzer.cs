@@ -7,14 +7,14 @@ using System.Text;
 using UnityEngine.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
-{ 
-    public class ProfileAnalyzer
+{
+    internal class ProfileAnalyzer
     {
-        private int m_Progress = 0;
-        private ProfilerFrameDataIterator m_frameData;
-        private List<string> m_threadNames = new List<string>();
-        private ProfileAnalysis m_analysis;
-        private ProgressBarDisplay m_progressBar;
+        int m_Progress = 0;
+        ProfilerFrameDataIterator m_frameData;
+        List<string> m_threadNames = new List<string>();
+        ProfileAnalysis m_analysis;
+        ProgressBarDisplay m_progressBar;
 
         public ProfileAnalyzer(ProgressBarDisplay progressBar)
         {
@@ -70,7 +70,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return profileData;
         }
 
-        private void CalculateFrameTimeStats(ProfileData data, out float median, out float mean, out float standardDeviation)
+        void CalculateFrameTimeStats(ProfileData data, out float median, out float mean, out float standardDeviation)
         {
             List<float> frameTimes = new List<float>();
             for (int frameIndex = 0; frameIndex < data.GetFrameCount(); frameIndex++)
@@ -108,7 +108,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private ProfileData GetData(ProfilerFrameDataIterator frameData, int firstFrameIndex, int lastFrameIndex)
+        ProfileData GetData(ProfilerFrameDataIterator frameData, int firstFrameIndex, int lastFrameIndex)
         {
             var data = new ProfileData();
             data.SetFrameIndexOffset(firstFrameIndex);
@@ -192,7 +192,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return data;
         }
 
-        private int GetClampedOffsetToFrame(ProfileData profileData, int frameIndex)
+        int GetClampedOffsetToFrame(ProfileData profileData, int frameIndex)
         {
             int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
             if (frameOffset < 0)

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class TopMarkerList
+    internal class TopMarkerList
     {
         internal static class Styles
         {

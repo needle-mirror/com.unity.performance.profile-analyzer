@@ -33,18 +33,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         CompareDone,
     };
 
-    public enum TopTenDisplay
+    enum TopTenDisplay
     {
         Normalised,
         LongestTime,
     };
 
-    public enum NameFilterOperation
+    enum NameFilterOperation
     {
         All,    // AND
         Any,    // OR
     };
 
+    /// <summary>
+    /// Main profile Analyzer UI window
+    /// </summary>
     public class ProfileAnalyzerWindow : EditorWindow
     {
         internal static class Styles
@@ -133,96 +136,99 @@ To compare two data sets:
         }
 
 
-        static public Color Color256(int r, int g, int b, int a)
-        {
-            return new Color((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
-        }
+        ProgressBarDisplay m_ProgressBar;
+        ProfileAnalyzer m_ProfileAnalyzer;
 
-        private ProgressBarDisplay m_ProgressBar;
-        private ProfileAnalyzer m_ProfileAnalyzer;
+        ProfilerWindowInterface m_ProfilerWindowInterface;
+        string m_LastProfilerSelectedMarker;
 
-        private ProfilerWindowInterface m_ProfilerWindowInterface;
-        private string m_LastProfilerSelectedMarker;
-
-        private int m_TopNumber;
-        private string[] m_TopStrings;
-        private int[] m_TopValues;
-        private string[] m_DepthStrings;
-        private int[] m_DepthValues;
-        private string[] m_DepthStrings1;
-        private int[] m_DepthValues1;
-        private string[] m_DepthStrings2;
-        private int[] m_DepthValues2;
+        int m_TopNumber;
+        string[] m_TopStrings;
+        int[] m_TopValues;
+        string[] m_DepthStrings;
+        int[] m_DepthValues;
+        string[] m_DepthStrings1;
+        int[] m_DepthValues1;
+        string[] m_DepthStrings2;
+        int[] m_DepthValues2;
 
         [SerializeField]
-        private int m_DepthFilter = -1;
+        int m_DepthFilter = -1;
         [SerializeField]
-        private int m_DepthFilter1 = -1;
+        int m_DepthFilter1 = -1;
         [SerializeField]
-        private int m_DepthFilter2 = -1;
+        int m_DepthFilter2 = -1;
         [SerializeField]
-        private bool m_DepthFilter2Auto = true;
+        bool m_DepthFilter2Auto = true;
         [SerializeField]
-        private TimingOptions.TimingOption m_TimingOption = TimingOptions.TimingOption.Time;
+        TimingOptions.TimingOption m_TimingOption = TimingOptions.TimingOption.Time;
 
         [SerializeField]
-        private string m_ParentMarker = null;
+        string m_ParentMarker = null;
 
-        private List<string> m_ThreadUINames = new List<string>();
-        private List<string> m_ThreadNames = new List<string>();
-        private ThreadSelection m_ThreadSelection = new ThreadSelection();
-        private ThreadSelection m_ThreadSelectionNew;
+        List<string> m_ThreadUINames = new List<string>();
+        List<string> m_ThreadNames = new List<string>();
+        ThreadSelection m_ThreadSelection = new ThreadSelection();
+        ThreadSelection m_ThreadSelectionNew;
         
-        private DisplayUnits m_DisplayUnits = new DisplayUnits(Units.Milliseconds);
-        private string[] m_UnitNames;
-        private string m_NameFilter = "";
-        private string m_NameExclude = "";
-        private MarkerColumnFilter m_SingleModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
-        private MarkerColumnFilter m_CompareModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
-        private TopTenDisplay m_TopTenDisplay = TopTenDisplay.Normalised;
-        private NameFilterOperation m_NameFilterOperation = NameFilterOperation.All;
-        private NameFilterOperation m_NameExcludeOperation = NameFilterOperation.Any;
+        DisplayUnits m_DisplayUnits = new DisplayUnits(Units.Milliseconds);
+        string[] m_UnitNames;
+        string m_NameFilter = "";
+        string m_NameExclude = "";
+        MarkerColumnFilter m_SingleModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
+        MarkerColumnFilter m_CompareModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
+        TopTenDisplay m_TopTenDisplay = TopTenDisplay.Normalised;
+        NameFilterOperation m_NameFilterOperation = NameFilterOperation.All;
+        NameFilterOperation m_NameExcludeOperation = NameFilterOperation.Any;
 
-        private int m_ProfilerFirstFrameIndex = 0;
-        private int m_ProfilerLastFrameIndex = 0;
-        private int m_PullFirstFrameindex = 0;
-        private int m_PullLastFrameindex = 0;
+        int m_ProfilerFirstFrameIndex = 0;
+        int m_ProfilerLastFrameIndex = 0;
+        int m_PullFirstFrameindex = 0;
+        int m_PullLastFrameindex = 0;
 
-        private ActiveTab m_NextActiveTab = ActiveTab.Summary;
-        private ActiveTab m_ActiveTab = ActiveTab.Summary;
-        private bool m_OtherTabDirty = false;
-        private bool m_OtherTableDirty = false;
+        ActiveTab m_NextActiveTab = ActiveTab.Summary;
+        ActiveTab m_ActiveTab = ActiveTab.Summary;
+        bool m_OtherTabDirty = false;
+        bool m_OtherTableDirty = false;
 
-        private bool m_ShowFilters = true;
-        private bool m_ShowTopNMarkers = true;
-        private bool m_ShowFrameSummary = true;
-        private bool m_ShowThreadSummary = false;
-        private bool m_ShowMarkerSummary = true;
-        private bool m_ShowMarkerTable = true;
+        bool m_ShowFilters = true;
+        bool m_ShowTopNMarkers = true;
+        bool m_ShowFrameSummary = true;
+        bool m_ShowThreadSummary = false;
+        bool m_ShowMarkerSummary = true;
+        bool m_ShowMarkerTable = true;
 
-        public Color m_ColorWhite = new Color(1.0f, 1.0f, 1.0f);
-        public Color m_ColorBarBackground = new Color(0.5f, 0.5f, 0.5f);
-        public Color m_ColorBarBackgroundSelected = new Color(0.6f, 0.6f, 0.6f);
-        public Color m_ColorBoxAndWhiskerBoxColor = Color256(112, 112, 112, 255);
-        public Color m_ColorBoxAndWhiskerLineColorLeft = Color256(206, 219, 238, 255);
-        public Color m_ColorBoxAndWhiskerBoxColorLeft = Color256(59, 104, 144, 255);
-        public Color m_ColorBoxAndWhiskerLineColorRight = Color256(247, 212, 201, 255);
-        public Color m_ColorBoxAndWhiskerBoxColorRight = Color256(161, 83, 30, 255);
-        public Color m_ColorBar = new Color(0.95f, 0.95f, 0.95f);
-        public Color m_ColorBarSelected = new Color(0.5f, 1.0f, 0.5f);
-        public Color m_ColorStandardLine = new Color(1.0f, 1.0f, 1.0f);
-        public Color m_ColorGridLines = new Color(0.4f, 0.4f, 0.4f);
+        internal static class UIColor
+        {
+            static internal Color Color256(int r, int g, int b, int a)
+            {
+                return new Color((float)r / 255.0f, (float)g / 255.0f, (float)b / 255.0f, (float)a / 255.0f);
+            }
 
-        public Color m_ColorLeft = Color256(111, 163, 216, 255);
-        public Color m_ColorLeftSelected = Color256(06, 219, 238, 255);
-        public Color m_ColorRight = Color256(238, 134, 84, 255);
-        public Color m_ColorRightSelected = Color256(247, 212, 201, 255);
-        public Color m_ColorBoth = Color256(175, 150, 150, 255);
-        public Color m_ColorTextTopMarkers = Color256(0, 0, 0, 255);
-        public Color m_ColorMarker = new Color(0.0f, 0.5f, 0.5f);
-        public Color m_ColorMarkerSelected = new Color(0.0f, 0.6f, 0.6f);
-        public Color m_ColorThread = new Color(0.5f, 0.0f, 0.5f);
-        public Color m_ColorThreadSelected = new Color(0.6f, 0.0f, 0.6f);
+            public static readonly Color white = new UnityEngine.Color(1.0f, 1.0f, 1.0f);
+            public static readonly Color barBackground = new Color(0.5f, 0.5f, 0.5f);
+            public static readonly Color barBackgroundSelected = new Color(0.6f, 0.6f, 0.6f);
+            public static readonly Color boxAndWhiskerBoxColor = Color256(112, 112, 112, 255);
+            public static readonly Color boxAndWhiskerLineColorLeft = Color256(206, 219, 238, 255);
+            public static readonly Color boxAndWhiskerBoxColorLeft = Color256(59, 104, 144, 255);
+            public static readonly Color boxAndWhiskerLineColorRight = Color256(247, 212, 201, 255);
+            public static readonly Color boxAndWhiskerBoxColorRight = Color256(161, 83, 30, 255);
+            public static readonly Color bar = new Color(0.95f, 0.95f, 0.95f);
+            public static readonly Color barSelected = new Color(0.5f, 1.0f, 0.5f);
+            public static readonly Color standardLine = new Color(1.0f, 1.0f, 1.0f);
+            public static readonly Color gridLines = new Color(0.4f, 0.4f, 0.4f);
+
+            public static readonly Color left = Color256(111, 163, 216, 255);
+            public static readonly Color leftSelected = Color256(06, 219, 238, 255);
+            public static readonly Color right = Color256(238, 134, 84, 255);
+            public static readonly Color rightSelected = Color256(247, 212, 201, 255);
+            public static readonly Color both = Color256(175, 150, 150, 255);
+            public static readonly Color textTopMarkers = Color256(0, 0, 0, 255);
+            public static readonly Color marker = new Color(0.0f, 0.5f, 0.5f);
+            public static readonly Color markerSelected = new Color(0.0f, 0.6f, 0.6f);
+            public static readonly Color thread = new Color(0.5f, 0.0f, 0.5f);
+            public static readonly Color threadSelected = new Color(0.6f, 0.0f, 0.6f);
+        }
 
         [SerializeField]
         ProfileDataView m_ProfileSingleView;
@@ -255,18 +261,22 @@ To compare two data sets:
 
         internal static class LayoutSize
         {
-            public static readonly int WindowWidth = 1170;
-            public static readonly int WindowHeight = 840;
-            public static readonly int WidthRHS = 276;        // Column widths + label padding between
             public static readonly int WidthColumn0 = 100;
             public static readonly int WidthColumn1 = 50;
             public static readonly int WidthColumn2 = 50;
             public static readonly int WidthColumn3 = 50;
+            public static readonly int WidthRHS = 290;        // Column widths + label padding between (276) + scrollbar width
             public static readonly int FilterOptionsLeftLabelWidth = 100;
             public static readonly int FilterOptionsEnumWidth = 50;
             public static readonly int FilterOptionsRightLabelWidth = 110;
             public static readonly int FilterOptionsRightEnumWidth = 150;
             public static readonly int HistogramWidth = 150;
+
+            public static readonly int MinWindowWidth = 800 + WidthRHS;
+            public static readonly int MinWindowHeight = 480;
+
+            public static readonly int WindowWidth = MinWindowWidth;
+            public static readonly int WindowHeight = 840;
         }
 
         Columns m_Columns = new Columns(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
@@ -274,7 +284,7 @@ To compare two data sets:
         ThreadRange m_ThreadRange = ThreadRange.UpperQuartile;
         string[] m_ThreadRanges = { "Median frame time", "Upper quartile of frame time", "Max frame time" };
 
-        public Draw2D m_2D;
+        internal Draw2D m_2D;
 
         bool m_Async = true;
         Thread m_BackgroundThread;
@@ -303,6 +313,9 @@ To compare two data sets:
 
         Vector2 m_HelpScroll = new Vector2(0, 0);
         Vector2 m_ThreadScroll = new Vector2(0, 0);
+        Vector2 m_MarkerSummaryScroll = new Vector2(0, 0);
+
+        Rect m_ThreadsAreaRect = new Rect();
 
         Vector2 m_LastScreenSize = new Vector2(0, 0);
         bool m_ScreenSizeChanged;
@@ -318,21 +331,24 @@ To compare two data sets:
 #else
         [MenuItem("Window/Profile Analyzer")]
 #endif
-        private static void Init()
+        static void Init()
         {
             var window = GetWindow<ProfileAnalyzerWindow>("Profile Analyzer");
-            window.minSize = new Vector2(800, 480);
+            window.minSize = new Vector2(LayoutSize.MinWindowWidth, LayoutSize.MinWindowHeight);
             window.position.size.Set(LayoutSize.WindowWidth, LayoutSize.WindowHeight);
             window.Show();
             window.m_LastScreenSize = window.position.size;
         }
 
+        /// <summary>
+        /// Open profile analyzer window
+        /// </summary>
         public static void OpenProfileAnalyzer()
         {
 			Init();
         }
 
-        private void Awake()
+        void Awake()
         {
             m_ScreenSizeChanged = false;
             m_ScreenSizeChangedTimeStarted = 0.0;
@@ -350,7 +366,7 @@ To compare two data sets:
             m_FrameTimeGraphGlobalSettings = new FrameTimeGraphGlobalSettings();
         }
 
-        private void OnEnable()
+        void OnEnable()
         {
             ProfileAnalyzerAnalytics.EnableAnalytics();
 
@@ -364,11 +380,11 @@ To compare two data sets:
 
             m_2D = new Draw2D("Unlit/ProfileAnalyzerShader");
             FrameTimeGraph.SetGlobalSettings(m_FrameTimeGraphGlobalSettings);
-            m_FrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, m_ColorBarBackground, m_ColorBarBackgroundSelected, m_ColorBar, m_ColorBarSelected, m_ColorMarker, m_ColorMarkerSelected, m_ColorThread, m_ColorThreadSelected, m_ColorGridLines);
+            m_FrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.bar, UIColor.barSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_FrameTimeGraph.SetRangeCallback(SetRange); 
-            m_LeftFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, m_ColorBarBackground, m_ColorBarBackgroundSelected, m_ColorLeft, m_ColorLeftSelected, m_ColorMarker, m_ColorMarkerSelected, m_ColorThread, m_ColorThreadSelected, m_ColorGridLines);
+            m_LeftFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.left, UIColor.leftSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_LeftFrameTimeGraph.SetRangeCallback(SetLeftRange);
-            m_RightFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, m_ColorBarBackground, m_ColorBarBackgroundSelected, m_ColorRight, m_ColorRightSelected, m_ColorMarker, m_ColorMarkerSelected, m_ColorThread, m_ColorThreadSelected, m_ColorGridLines);
+            m_RightFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.right, UIColor.rightSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_RightFrameTimeGraph.SetRangeCallback(SetRightRange);
             m_LeftFrameTimeGraph.PairWith(m_FrameTimeGraphsPaired ? m_RightFrameTimeGraph : null);
 
@@ -396,7 +412,7 @@ To compare two data sets:
             UpdateActiveTab(true);
         }
         
-        private bool DisplayCount()
+        bool DisplayCount()
         {
             switch (m_SingleModeFilter.mode)
             {
@@ -408,7 +424,7 @@ To compare two data sets:
             }
         }
 
-        private void OpenProfilerOrUseExisting()
+        void OpenProfilerOrUseExisting()
         {
             m_ProfilerWindowInterface.OpenProfilerOrUseExisting();
             m_ProfilerWindowInterface.GetFrameRangeFromProfiler(out m_ProfilerFirstFrameIndex, out m_ProfilerLastFrameIndex);
@@ -416,14 +432,14 @@ To compare two data sets:
             m_PullLastFrameindex = m_ProfilerLastFrameIndex;
         }
 
-        private void OnGUI()
+        void OnGUI()
         {
             m_2D.OnGUI();
 
             Draw();
         }
 
-        private void SetView(ProfileDataView dst, ProfileData data, string path, FrameTimeGraph graph)
+        void SetView(ProfileDataView dst, ProfileData data, string path, FrameTimeGraph graph)
         {
             if (!data.IsSame(dst.data))
             {
@@ -441,12 +457,12 @@ To compare two data sets:
             graph.SetData(GetFrameTimeData(dst.data));
         }
 
-        private void SetView(ProfileDataView dst, ProfileDataView src, FrameTimeGraph graph)
+        void SetView(ProfileDataView dst, ProfileDataView src, FrameTimeGraph graph)
         {
             SetView(dst, src.data, src.path, graph);
         }
 
-        private void ProcessTabSwitch()
+        void ProcessTabSwitch()
         {
             if (m_NextActiveTab != m_ActiveTab)
             {
@@ -537,7 +553,7 @@ To compare two data sets:
             return isDocked;
         }
 
-        private void CheckScreenSizeChanges()
+        void CheckScreenSizeChanges()
         {
             // We get a 5 pixel change in y height during initialization.
             // We could wait before considering size changes but using a delta is also useful
@@ -579,12 +595,12 @@ To compare two data sets:
             }
         }
 
-        public void RequestRepaint()
+        internal void RequestRepaint()
         {
             m_RequestRepaint = true;
         }
 
-		private void Update()
+		void Update()
 		{
             CheckScreenSizeChanges();
 
@@ -750,7 +766,7 @@ To compare two data sets:
             }
         }
 
-        private void UpdateAnalysisFromAsyncProcessing(ProfileDataView view, bool full)
+        void UpdateAnalysisFromAsyncProcessing(ProfileDataView view, bool full)
         {
             view.analysis = view.analysisNew;
             if (full)
@@ -762,7 +778,7 @@ To compare two data sets:
             }
         }
 
-        private List<FrameTimeGraph.Data> GetFrameTimeData(ProfileData profileData)
+        List<FrameTimeGraph.Data> GetFrameTimeData(ProfileData profileData)
         {
             List<FrameTimeGraph.Data> data = new List<FrameTimeGraph.Data>();
             int frames = profileData.GetFrameCount();
@@ -777,7 +793,7 @@ To compare two data sets:
             return data;
         }
 
-        private void Load()
+        void Load()
         {
             string path = EditorUtility.OpenFilePanel("Load profile analyzer data file", "", "pdata");
             if (path.Length != 0)
@@ -793,7 +809,7 @@ To compare two data sets:
             }
         }
 
-        private void UpdateMatchingProfileData(ProfileData data, ref string path, ProfileAnalysis analysis, string newPath)
+        void UpdateMatchingProfileData(ProfileData data, ref string path, ProfileAnalysis analysis, string newPath)
         {
             // Update left/right data if we are effectively overwriting it.
             if (m_ProfileLeftView.path == newPath)
@@ -822,7 +838,7 @@ To compare two data sets:
             path = newPath;
         }
 
-        private void Save()
+        void Save()
         {
             string newPath = EditorUtility.SaveFilePanel("Save profile analyzer data file", "", "capture.pdata", "pdata");
             if (newPath.Length != 0)
@@ -889,7 +905,7 @@ To compare two data sets:
             return pairings;
         }
 
-        private void SetThreadPhaseCount(ThreadActivity activity)
+        void SetThreadPhaseCount(ThreadActivity activity)
         {
             // Will be refined by the analysis functions
             if (activity == ThreadActivity.Compare)
@@ -902,7 +918,7 @@ To compare two data sets:
             }
         }
 
-        private void BeginAsyncAction(ThreadActivity activity)
+        void BeginAsyncAction(ThreadActivity activity)
         {
             if (IsAnalysisRunning())
                 return;
@@ -916,7 +932,7 @@ To compare two data sets:
             m_BackgroundThread.Start();
         }
 
-        private void CreateComparisonTable()
+        void CreateComparisonTable()
         {
             GetThreadNames(m_ProfileLeftView.data, m_ProfileRightView.data, out m_ThreadUINames, out m_ThreadNames);
             UpdateThreadGroupSelection(m_ThreadNames, m_ThreadSelection);
@@ -925,12 +941,12 @@ To compare two data sets:
                 m_ComparisonTreeViewState = new TreeViewState();
 
             //if (m_ComparisonMulticolumnHeaderState == null)
-            m_ComparisonMulticolumnHeaderState = ComparisonTable.CreateDefaultMultiColumnHeaderState(700, m_CompareModeFilter);
+            m_ComparisonMulticolumnHeaderState = ComparisonTable.CreateDefaultMultiColumnHeaderState(m_CompareModeFilter);
 
             var multiColumnHeader = new MultiColumnHeader(m_ComparisonMulticolumnHeaderState);
             multiColumnHeader.SetSorting((int)ComparisonTable.MyColumns.AbsDiff, false);
             multiColumnHeader.ResizeToFit();
-            m_ComparisonTable = new ComparisonTable(m_ComparisonTreeViewState, multiColumnHeader, m_ProfileLeftView.analysis, m_ProfileRightView.analysis, m_Pairings, this);
+            m_ComparisonTable = new ComparisonTable(m_ComparisonTreeViewState, multiColumnHeader, m_ProfileLeftView.analysis, m_ProfileRightView.analysis, m_Pairings, this, m_2D, UIColor.left, UIColor.right);
 
             if (string.IsNullOrEmpty(m_SelectedMarkerName))
                 SelectPairing(0);
@@ -938,7 +954,7 @@ To compare two data sets:
                 SelectPairingByName(m_SelectedMarkerName);
         }
 
-        private void CalculatePairingbuckets(ProfileAnalysis left, ProfileAnalysis right, List<MarkerPairing> pairings)
+        void CalculatePairingbuckets(ProfileAnalysis left, ProfileAnalysis right, List<MarkerPairing> pairings)
         {
             var leftMarkers = left.GetMarkers();
             var rightMarkers = right.GetMarkers();
@@ -987,7 +1003,7 @@ To compare two data sets:
             }
         }
 
-        private int CalculateDepthDifference(ProfileAnalysis leftAnalysis, ProfileAnalysis rightAnalysis, List<MarkerPairing> pairings)
+        int CalculateDepthDifference(ProfileAnalysis leftAnalysis, ProfileAnalysis rightAnalysis, List<MarkerPairing> pairings)
         {
             if (pairings.Count <= 0)
                 return 0;
@@ -1016,7 +1032,7 @@ To compare two data sets:
             return m_DepthDiff;
         }
 
-        private bool CompareSync()
+        bool CompareSync()
         {
             if (m_ProfileLeftView.data == null)
                 return false;
@@ -1135,7 +1151,7 @@ To compare two data sets:
             return true;
         }
 
-        private void Compare()
+        void Compare()
         {
             if (m_Async)
             {
@@ -1156,18 +1172,18 @@ To compare two data sets:
             }
         }
 
-        private List<MarkerPairing> GetPairings()
+        List<MarkerPairing> GetPairings()
         {
             return m_Pairings;
         }
 
-        private void GetFrameRangeFromProfiler()
+        void GetFrameRangeFromProfiler()
         {
             m_ProfilerWindowInterface.GetFrameRangeFromProfiler(out m_PullFirstFrameindex, out m_PullLastFrameindex);
             m_ProfileAnalyzer.QuickScan();
         }
 
-        private int GetUnsavedIndex(string path)
+        int GetUnsavedIndex(string path)
         {
             if (path == null)
                 return 0;
@@ -1180,7 +1196,7 @@ To compare two data sets:
             return Int32.Parse(match.Groups[1].Value);
         }
 
-        private void PullFromProfiler(int firstFrame, int lastFrame, ProfileDataView view, FrameTimeGraph frameTimeGraph)
+        void PullFromProfiler(int firstFrame, int lastFrame, ProfileDataView view, FrameTimeGraph frameTimeGraph)
         {
             m_ProgressBar.InitProgressBar("Pulling Frames from Profiler", "Please wait...", lastFrame - firstFrame);
 
@@ -1233,7 +1249,7 @@ To compare two data sets:
             m_ProgressBar.ClearProgressBar();
         }
             
-        private void BackgroundThread()
+        void BackgroundThread()
         {
             switch (m_ThreadActivity)
             {
@@ -1259,9 +1275,9 @@ To compare two data sets:
             }
         }
 
-        private void SelectFirstMarkerInTable()
+        void SelectFirstMarkerInTable()
         {
-            // SelectMarker(0) would only select the first one found, not the first in the sorted list
+            // SelectMarkerByIndex(0) would only select the first one found, not the first in the sorted list
 
             if (m_ProfileTable == null)
                 return;
@@ -1273,18 +1289,18 @@ To compare two data sets:
             SelectMarkerByName(rows[0].displayName);
         }
 
-        private void CreateProfileTable()
+        void CreateProfileTable()
         {
             if (m_ProfileTreeViewState == null)
                 m_ProfileTreeViewState = new TreeViewState();
 
             //if (m_ProfileMulticolumnHeaderState == null)
-            m_ProfileMulticolumnHeaderState = ProfileTable.CreateDefaultMultiColumnHeaderState(700, m_SingleModeFilter);
+            m_ProfileMulticolumnHeaderState = ProfileTable.CreateDefaultMultiColumnHeaderState(m_SingleModeFilter);
 
             var multiColumnHeader = new MultiColumnHeader(m_ProfileMulticolumnHeaderState);
             multiColumnHeader.SetSorting((int)ProfileTable.MyColumns.Median, false);
             multiColumnHeader.ResizeToFit();
-            m_ProfileTable = new ProfileTable(m_ProfileTreeViewState, multiColumnHeader, m_ProfileSingleView.analysis, this);
+            m_ProfileTable = new ProfileTable(m_ProfileTreeViewState, multiColumnHeader, m_ProfileSingleView.analysis, this, m_2D, UIColor.bar);
 
             if (string.IsNullOrEmpty(m_SelectedMarkerName))
                 SelectFirstMarkerInTable();
@@ -1295,7 +1311,7 @@ To compare two data sets:
             UpdateThreadGroupSelection(m_ThreadNames, m_ThreadSelection);
         }
 
-        private void AnalyzeSync()
+        void AnalyzeSync()
         {
             if (m_ProfileSingleView.data==null)
                 return;
@@ -1340,7 +1356,7 @@ To compare two data sets:
                 m_LastAnalysisTime = string.Format("Last analysis time {0} ms ", ts.Milliseconds);
         }
 
-        private void Analyze()
+        void Analyze()
         {
             if (m_EnableAnalysisProfiling)
             {
@@ -1364,12 +1380,12 @@ To compare two data sets:
             }
         }
 
-        private void GetThreadNames(ProfileData profleData, out List<string> threadUINames, out List<string> threadFilters)
+        void GetThreadNames(ProfileData profleData, out List<string> threadUINames, out List<string> threadFilters)
         {
             GetThreadNames(profleData, null, out threadUINames, out threadFilters);
         }
 
-        private string GetFriendlyThreadName(string threadNameWithIndex, bool single)
+        string GetFriendlyThreadName(string threadNameWithIndex, bool single)
         {
             var info = threadNameWithIndex.Split(':');
             int threadGroupIndex = int.Parse(info[0]);
@@ -1388,7 +1404,7 @@ To compare two data sets:
             }
         }
 
-        private int CompareUINames(string a, string b)
+        int CompareUINames(string a, string b)
         {
             string[] aTokens = a.Split(':');
             string[] bTokens = b.Split(':');
@@ -1423,7 +1439,7 @@ To compare two data sets:
             return a.CompareTo(b);
         }
 
-        private void GetThreadNames(ProfileData leftData, ProfileData rightData, out List<string> threadUINames, out List<string> threadFilters)
+        void GetThreadNames(ProfileData leftData, ProfileData rightData, out List<string> threadUINames, out List<string> threadFilters)
         {
             threadUINames = new List<string>();
             threadFilters = new List<string>();
@@ -1496,7 +1512,7 @@ To compare two data sets:
             }
         }
 
-        private void UpdateThreadGroupSelection(List<string> threadNames, ThreadSelection threadSelection)
+        void UpdateThreadGroupSelection(List<string> threadNames, ThreadSelection threadSelection)
         {
             // Make sure all members of active groups are present
             foreach (string threadGroupNameWithIndex in threadSelection.groups)
@@ -1530,7 +1546,7 @@ To compare two data sets:
             }
         }
 
-        private List<string> GetLimitedThreadSelection(List<string> threadNames, ThreadSelection threadSelection)
+        List<string> GetLimitedThreadSelection(List<string> threadNames, ThreadSelection threadSelection)
         {
             List<string> limitedThreadSelection = new List<string>();
             if (threadSelection.selection == null)
@@ -1577,7 +1593,7 @@ To compare two data sets:
         }
 
 
-        private int ClampToRange(int value, int min, int max)
+        int ClampToRange(int value, int min, int max)
         {
             if (value < min)
                 value = min;
@@ -1587,7 +1603,7 @@ To compare two data sets:
             return value;
         }
 
-        private void DrawProfilerWindowPullControls()
+        void DrawProfilerWindowPullControls()
         {
             int minFrameindex = 1;
             int maxFrameindex = 1;
@@ -1617,7 +1633,7 @@ To compare two data sets:
             }
         }
 
-        private void SetRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
+        void SetRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
         {
             if (inputStatus == FrameTimeGraph.State.Dragging)
                 return;
@@ -1639,7 +1655,7 @@ To compare two data sets:
             }
         }
 
-        public void SelectAllFrames()
+        internal void SelectAllFrames()
         {
             if (m_ActiveTab == ActiveTab.Summary)
             {
@@ -1656,7 +1672,7 @@ To compare two data sets:
             }
         }
 
-        public void SelectFramesContainingMarker(string markerName, bool inSelection)
+        internal void SelectFramesContainingMarker(string markerName, bool inSelection)
         {
             if (m_ActiveTab == ActiveTab.Summary)
             {
@@ -1678,7 +1694,7 @@ To compare two data sets:
             }
         }
 
-        static private List<string> GetNameFilters(string nameFilter)
+        static List<string> GetNameFilters(string nameFilter)
         {
             List<string> nameFilters = new List<string>();
             if (string.IsNullOrEmpty(nameFilter))
@@ -1709,17 +1725,17 @@ To compare two data sets:
             return nameFilters;
         }
 
-        public List<string> GetNameFilters()
+        internal List<string> GetNameFilters()
         {
             return GetNameFilters(m_NameFilter);
         }
 
-        public List<string> GetNameExcludes()
+        internal List<string> GetNameExcludes()
         {
             return GetNameFilters(m_NameExclude);
         }
 
-        public bool NameInFilterList(string name, List<string> nameFilters)
+        internal bool NameInFilterList(string name, List<string> nameFilters)
         {
             switch (m_NameFilterOperation)
             {
@@ -1731,7 +1747,7 @@ To compare two data sets:
             }
         }
 
-        public bool NameInExcludeList(string name, List<string> nameFilters)
+        internal bool NameInExcludeList(string name, List<string> nameFilters)
         {
             switch (m_NameExcludeOperation)
             {
@@ -1743,7 +1759,7 @@ To compare two data sets:
             }
         }
 
-        private bool NameInAllFilterList(string name, List<string> nameFilters)
+        internal bool NameInAllFilterList(string name, List<string> nameFilters)
         {
             foreach (string subString in nameFilters)
             {
@@ -1756,7 +1772,7 @@ To compare two data sets:
             return true;
         }
 
-        private bool NameInAnyFilterList(string name, List<string> nameFilters)
+        bool NameInAnyFilterList(string name, List<string> nameFilters)
         {
             foreach (string subString in nameFilters)
             {
@@ -1768,7 +1784,7 @@ To compare two data sets:
             return false;
         }
 
-        private static bool AddFilter(List<string> nameFilters, ref string filter, string markerName)
+        static bool AddFilter(List<string> nameFilters, ref string filter, string markerName)
         {
             bool justAdded = false;
 
@@ -1786,7 +1802,7 @@ To compare two data sets:
             return justAdded;
         }
 
-        public void AddToIncludeFilter(string markerName)
+        internal void AddToIncludeFilter(string markerName)
         {
             if (AddFilter(GetNameFilters(), ref m_NameFilter, markerName))
                 UpdateMarkerTable();
@@ -1795,7 +1811,7 @@ To compare two data sets:
             RemoveFromExcludeFilter(markerName);
         }
 
-        public void AddToExcludeFilter(string markerName)
+        internal void AddToExcludeFilter(string markerName)
         {
             if (AddFilter(GetNameExcludes(), ref m_NameExclude, markerName))
                 UpdateMarkerTable();
@@ -1804,7 +1820,7 @@ To compare two data sets:
             RemoveFromIncludeFilter(markerName);
         }
 
-        public void RemoveFromIncludeFilter(string markerName)
+        internal void RemoveFromIncludeFilter(string markerName)
         {
             List<string> nameFilters = GetNameFilters();
             if (nameFilters.Count == 0)
@@ -1829,7 +1845,7 @@ To compare two data sets:
             }
         }
 
-        public void RemoveFromExcludeFilter(string markerName)
+        internal void RemoveFromExcludeFilter(string markerName)
         {
             List<string> nameFilters = GetNameExcludes();
             if (nameFilters.Count == 0)
@@ -1854,7 +1870,7 @@ To compare two data sets:
             }
         }
 
-        public void SetAsParentMarkerFilter(string markerName)
+        internal void SetAsParentMarkerFilter(string markerName)
         {
             if (markerName != m_ParentMarker)
             {
@@ -1863,7 +1879,7 @@ To compare two data sets:
             }
         }
 
-        private float GetFilenameWidth(string path)
+        float GetFilenameWidth(string path)
         {
             if (path == null)
                 return 0f;
@@ -1874,7 +1890,7 @@ To compare two data sets:
             return size.x;
         }
 
-        private void ShowFilename(string path)
+        void ShowFilename(string path)
         {
             if (path != null)
             {
@@ -1886,7 +1902,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawLoadSave()
+        void DrawLoadSave()
         {
             EditorGUILayout.BeginHorizontal(GUILayout.MaxWidth(300), GUILayout.ExpandWidth(false));
 
@@ -1903,12 +1919,12 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void ShowSelectedMarker()
+        void ShowSelectedMarker()
         {
             DrawSelectedText(m_SelectedMarkerName);
         }
 
-        private void DrawFrameTimeGraph(float height)
+        void DrawFrameTimeGraph(float height)
         {
             Profiler.BeginSample("DrawFrameTimeGraph");
 
@@ -1959,7 +1975,7 @@ To compare two data sets:
             Profiler.EndSample();
         }
 
-        private void SetDepthStrings(int maxDepth, out string[] strings, out int[] values)
+        void SetDepthStrings(int maxDepth, out string[] strings, out int[] values)
         {
             List<string> depthStrings = new List<string>();
             List<int> depthValues = new List<int>();
@@ -1975,7 +1991,7 @@ To compare two data sets:
             values = depthValues.ToArray();
         }
 
-        private void DrawDepthFilter()
+        void DrawDepthFilter()
         {
             if (!IsAnalysisRunning())
             {
@@ -2073,7 +2089,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawParentFilter()
+        void DrawParentFilter()
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(Styles.parentMarker, GUILayout.Width(100));
@@ -2099,7 +2115,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void UpdateAutoDepthFilter()
+        void UpdateAutoDepthFilter()
         {
             if (m_DepthFilter2Auto)
             {
@@ -2107,7 +2123,7 @@ To compare two data sets:
             }
         }
 
-        private void UpdateDepthFilters()
+        void UpdateDepthFilters()
         {
             if (m_ActiveTab == ActiveTab.Compare)
             {
@@ -2159,7 +2175,7 @@ To compare two data sets:
             }
         }
 
-        public void SetThreadSelection(ThreadSelection threadSelection)
+        internal void SetThreadSelection(ThreadSelection threadSelection)
         {
             m_ThreadSelectionNew = new ThreadSelection(threadSelection);
 
@@ -2245,7 +2261,7 @@ To compare two data sets:
             return threadsSelectedText;
         }
 
-        private void DrawThreadFilter(ProfileData profileData)
+        void DrawThreadFilter(ProfileData profileData)
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(Styles.threadFilter, GUILayout.Width(LayoutSize.FilterOptionsLeftLabelWidth));
@@ -2281,7 +2297,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawSelectedText(string text)
+        void DrawSelectedText(string text)
         {
 #if UNITY_2019_1_OR_NEWER
             GUIStyle treeViewSelectionStyle = "TV Selection";
@@ -2305,14 +2321,14 @@ To compare two data sets:
             }
         }
 
-        private void ShowSelectedThreads()
+        void ShowSelectedThreads()
         {
             string threadsSelected = GetSelectedThreadsSummary();
 
             DrawSelectedText(threadsSelected);
         }
 
-        private void DrawUnitFilter()
+        void DrawUnitFilter()
         {
             EditorGUILayout.BeginHorizontal(GUILayout.Width(LayoutSize.FilterOptionsRightLabelWidth + LayoutSize.FilterOptionsRightEnumWidth));
             EditorGUILayout.LabelField(Styles.unitFilter, m_StyleMiddleRight, GUILayout.Width(LayoutSize.FilterOptionsRightEnumWidth));
@@ -2335,12 +2351,12 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private bool IsSelfTime()
+        bool IsSelfTime()
         {
             return (m_TimingOption == TimingOptions.TimingOption.Self) ? true : false;
         }
 
-        private void DrawTimingFilter()
+        void DrawTimingFilter()
         {
             EditorGUILayout.BeginHorizontal(GUILayout.Width(LayoutSize.FilterOptionsRightLabelWidth + LayoutSize.FilterOptionsRightEnumWidth));
 
@@ -2359,27 +2375,27 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        public string GetDisplayUnits()
+        internal string GetDisplayUnits()
         {
             return m_DisplayUnits.Postfix();
         }
 
-        public string ToDisplayUnits(float ms, bool showUnits = false, int limitToDigits = 5)
+        internal string ToDisplayUnits(float ms, bool showUnits = false, int limitToDigits = 5)
         {
             return m_DisplayUnits.ToString(ms, showUnits, limitToDigits);
         }
 
-        public string ToDisplayUnits(double ms, bool showUnits = false, int limitToDigits = 5)
+        internal string ToDisplayUnits(double ms, bool showUnits = false, int limitToDigits = 5)
         {
             return m_DisplayUnits.ToString((float)ms, showUnits, limitToDigits);
         }
 
-        public void SetUnits(Units units)
+        void SetUnits(Units units)
         {
             m_DisplayUnits = new DisplayUnits(units);
         }
 
-        private void UpdateActiveTab(bool fullAnalysisRequired = false, bool markOtherDirty = true)
+        void UpdateActiveTab(bool fullAnalysisRequired = false, bool markOtherDirty = true)
         {
             switch (m_ActiveTab)
             {
@@ -2397,7 +2413,7 @@ To compare two data sets:
                 m_OtherTabDirty = true;
         }
 
-        private void UpdateMarkerTable(bool markOtherDirty = true)
+        void UpdateMarkerTable(bool markOtherDirty = true)
         {
             switch (m_ActiveTab)
             {
@@ -2415,7 +2431,7 @@ To compare two data sets:
                 m_OtherTableDirty = true;
         }
 
-        private void DrawNameFilter()
+        void DrawNameFilter()
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(Styles.nameFilter, GUILayout.Width(LayoutSize.FilterOptionsLeftLabelWidth));
@@ -2461,7 +2477,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        public void SetMode(MarkerColumnFilter.Mode newMode)
+        internal void SetMode(MarkerColumnFilter.Mode newMode)
         {
             m_SingleModeFilter.mode = newMode;
             m_CompareModeFilter.mode = newMode;
@@ -2472,7 +2488,7 @@ To compare two data sets:
                 m_ComparisonTable.SetMode(m_CompareModeFilter);
         }
 
-        public void SetSingleModeColumns(int[] visibleColumns)
+        internal void SetSingleModeColumns(int[] visibleColumns)
         {
             // If selecting the columns manually then override the currently stored selection with the current
             m_ProfileMulticolumnHeaderState.visibleColumns = visibleColumns;
@@ -2483,7 +2499,7 @@ To compare two data sets:
             // Also move other view to the custom set
             m_CompareModeFilter.mode = MarkerColumnFilter.Mode.Custom;
         }
-        public void SetComparisonModeColumns(int[] visibleColumns)
+        internal void SetComparisonModeColumns(int[] visibleColumns)
         {
             // If selecting the columns manually then override the currently stored selection with the current
             m_ComparisonMulticolumnHeaderState.visibleColumns = visibleColumns;
@@ -2495,7 +2511,7 @@ To compare two data sets:
             m_SingleModeFilter.mode = MarkerColumnFilter.Mode.Custom;
         }
 
-        private void DrawMarkerColumnFilter()
+        void DrawMarkerColumnFilter()
         {
             EditorGUILayout.BeginHorizontal(GUILayout.Width(LayoutSize.FilterOptionsRightLabelWidth + LayoutSize.FilterOptionsRightEnumWidth));
             EditorGUILayout.LabelField(Styles.markerColumns, m_StyleMiddleRight, GUILayout.Width(LayoutSize.FilterOptionsRightLabelWidth));
@@ -2513,7 +2529,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private int GetCombinedThreadCount()
+        int GetCombinedThreadCount()
         {
             var threads = new Dictionary<string, int>();
             foreach (var threadName in m_ProfileLeftView.data.GetThreadNames())
@@ -2531,7 +2547,7 @@ To compare two data sets:
             return threads.Keys.Count;
         }
 
-        private void DrawMarkerCount()
+        void DrawMarkerCount()
         {
             if (!IsAnalysisValid())
                 return;
@@ -2562,7 +2578,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawThreadCount()
+        void DrawThreadCount()
         {
             if (!IsAnalysisValid())
                 return;
@@ -2595,7 +2611,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawAnalysisOptions()
+        void DrawAnalysisOptions()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
@@ -2639,7 +2655,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private bool IsAnalysisRunning()
+        bool IsAnalysisRunning()
         {
             if (m_ThreadActivity != ThreadActivity.None)
                 return true;
@@ -2647,13 +2663,13 @@ To compare two data sets:
             return false;
         }
 
-        private int GetProgress()
+        int GetProgress()
         {
             // We return the value from the update loop so the data doesn't change over the time onGui is called for layout and repaint
             return m_ThreadProgress;
         }
 
-        private bool IsAnalysisValid()
+        bool IsAnalysisValid()
         {
             switch (m_ActiveTab)
             {
@@ -2706,7 +2722,7 @@ To compare two data sets:
                 if (m_2D.DrawStart(width, height, Draw2D.Origin.TopLeft, GUI.skin.label))
                 {
                     float barLength = (width * progress) / 100;
-                    m_2D.DrawFilledBox(x, y, barLength, height, m_ColorWhite);
+                    m_2D.DrawFilledBox(x, y, barLength, height, UIColor.white);
                       
                     m_2D.DrawEnd();
                 }
@@ -2719,7 +2735,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawPullButton(Color color, ProfileDataView view, FrameTimeGraph frameTimeGraph)
+        void DrawPullButton(Color color, ProfileDataView view, FrameTimeGraph frameTimeGraph)
         {
             bool lastEnabled = GUI.enabled;
             GUI.enabled = !IsAnalysisRunning();
@@ -2752,7 +2768,7 @@ To compare two data sets:
             GUI.enabled = lastEnabled;
         }
 
-        private void DrawFilesLoaded()
+        void DrawFilesLoaded()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
@@ -2782,7 +2798,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void ShowHelp()
+        void ShowHelp()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
@@ -2799,7 +2815,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawAnalysis()
+        void DrawAnalysis()
         {
             EditorGUILayout.BeginHorizontal();
 
@@ -2826,9 +2842,9 @@ To compare two data sets:
 
                     EditorGUILayout.BeginVertical(GUILayout.Height(20));
                     Rect rect = EditorGUILayout.GetControlRect(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                    var topMarkers = new TopMarkers(this, this.m_2D, m_ColorBarBackground, m_ColorTextTopMarkers);
+                    var topMarkers = new TopMarkers(this, this.m_2D, UIColor.barBackground, UIColor.textTopMarkers);
                     float range = topMarkers.GetTopMarkerTimeRange(m_ProfileSingleView.analysis, m_TopNBars, m_DepthFilter);
-                    topMarkers.Draw(m_ProfileSingleView.analysis, rect, m_ColorBar, m_TopNBars, range, m_DepthFilter, m_ColorBarBackground, Color.black, Color.white, true, true);
+                    topMarkers.Draw(m_ProfileSingleView.analysis, rect, UIColor.bar, m_TopNBars, range, m_DepthFilter, UIColor.barBackground, Color.black, Color.white, true, true);
                     EditorGUILayout.EndVertical();
 
                     EditorGUILayout.BeginVertical(GUILayout.Height(20));
@@ -2880,7 +2896,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void SetRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus, ProfileData mainData, List<int> selectedIndices)
+        void SetRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus, ProfileData mainData, List<int> selectedIndices)
         {
             if (inputStatus == FrameTimeGraph.State.Dragging)
                 return;
@@ -2902,17 +2918,17 @@ To compare two data sets:
             }
         }
 
-        private void SetLeftRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
+        void SetLeftRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
         {
             SetRange(selectedOffsets, clickCount, singleControlAction, inputStatus, m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices);
         }
 
-        private void SetRightRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
+        void SetRightRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
         {
             SetRange(selectedOffsets, clickCount, singleControlAction, inputStatus, m_ProfileRightView.data, m_ProfileRightView.selectedIndices);
         }
 
-        private void DrawComparisonLoadSaveButton(Color color, ProfileDataView view, FrameTimeGraph frameTimeGraph)
+        void DrawComparisonLoadSaveButton(Color color, ProfileDataView view, FrameTimeGraph frameTimeGraph)
         {
             bool lastEnabled = GUI.enabled;
             bool enabled = !IsAnalysisRunning();
@@ -2972,7 +2988,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private float GetComparisonYRange()
+        float GetComparisonYRange()
         {
             float yRangeLeft = m_ProfileLeftView.data != null ? m_LeftFrameTimeGraph.GetDataRange() : 0f;
             float yRangeRight = m_ProfileRightView.data != null ? m_RightFrameTimeGraph.GetDataRange() : 0f;
@@ -2981,7 +2997,7 @@ To compare two data sets:
             return yRange;
         }
 
-        private void SetFrameTimeGraphPairing(bool paired)
+        void SetFrameTimeGraphPairing(bool paired)
         {
             if (paired != m_FrameTimeGraphsPaired)
             {
@@ -2990,7 +3006,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawComparisonLoadSave()
+        void DrawComparisonLoadSave()
         {
             GUIStyle buttonStyle = GUI.skin.button;
 
@@ -3010,10 +3026,10 @@ To compare two data sets:
             filenameWidth = Math.Min(filenameWidth, 200);
 
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(100 + filenameWidth), GUILayout.ExpandWidth(false));
-            DrawPullButton(m_ColorLeft, m_ProfileLeftView, m_LeftFrameTimeGraph);
-            DrawComparisonLoadSaveButton(m_ColorLeft, m_ProfileLeftView, m_LeftFrameTimeGraph);
-            DrawPullButton(m_ColorRight, m_ProfileRightView, m_RightFrameTimeGraph);
-            DrawComparisonLoadSaveButton(m_ColorRight, m_ProfileRightView, m_RightFrameTimeGraph);
+            DrawPullButton(UIColor.left, m_ProfileLeftView, m_LeftFrameTimeGraph);
+            DrawComparisonLoadSaveButton(UIColor.left, m_ProfileLeftView, m_LeftFrameTimeGraph);
+            DrawPullButton(UIColor.right, m_ProfileRightView, m_RightFrameTimeGraph);
+            DrawComparisonLoadSaveButton(UIColor.right, m_ProfileRightView, m_RightFrameTimeGraph);
             EditorGUILayout.EndVertical();
 
 
@@ -3108,7 +3124,7 @@ To compare two data sets:
             }
         }
 
-        private void DrawComparisonFrameSummary()
+        void DrawComparisonFrameSummary()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
 
@@ -3189,17 +3205,17 @@ To compare two data sets:
 
                                     if ((int)rightBarHeight == (int)leftBarHeight)
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.both);
                                     }
                                     else if (rightBarHeight > leftBarHeight)
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, m_ColorRight);
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, UIColor.right);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.both);
                                     }
                                     else
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorLeft);
-                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.left);
+                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, UIColor.both);
                                     }
 
                                     float bucketStart = min + (bucketAt * bucketWidth);
@@ -3226,10 +3242,10 @@ To compare two data sets:
                     plotWidth /= 2.0f;
                     boxAndWhiskerPlot.Draw(plotWidth, plotHeight, leftFrameSummary.msMin, leftFrameSummary.msLowerQuartile,
                         leftFrameSummary.msMedian, leftFrameSummary.msUpperQuartile, leftFrameSummary.msMax, 0, yRange,
-                        m_ColorBoxAndWhiskerLineColorLeft, m_ColorBoxAndWhiskerBoxColorLeft);
+                        UIColor.boxAndWhiskerLineColorLeft, UIColor.boxAndWhiskerBoxColorLeft);
                     boxAndWhiskerPlot.Draw(plotWidth, plotHeight, rightFrameSummary.msMin, rightFrameSummary.msLowerQuartile,
-                        rightFrameSummary.msMedian, rightFrameSummary.msUpperQuartile, rightFrameSummary.msMax, 0, yRange, 
-                        m_ColorBoxAndWhiskerLineColorRight, m_ColorBoxAndWhiskerBoxColorRight);
+                        rightFrameSummary.msMedian, rightFrameSummary.msUpperQuartile, rightFrameSummary.msMax, 0, yRange,
+                        UIColor.boxAndWhiskerLineColorRight, UIColor.boxAndWhiskerBoxColorRight);
 
                     boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, 0, yRange, 
                         "Min frame time for selected frames in the 2 data sets", 
@@ -3251,15 +3267,15 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void ShowThreadRange()
+        void ShowThreadRange()
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, "Graph Scale : ");
-            m_ThreadRange = (ThreadRange)EditorGUILayout.Popup((int)m_ThreadRange, m_ThreadRanges, GUILayout.Width(150));
+            m_ThreadRange = (ThreadRange)EditorGUILayout.Popup((int)m_ThreadRange, m_ThreadRanges, GUILayout.Width(160));
             EditorGUILayout.EndHorizontal();
         }
 
-        private float GetThreadTimeRange(ProfileAnalysis profileAnalysis)
+        float GetThreadTimeRange(ProfileAnalysis profileAnalysis)
         {
             if (profileAnalysis==null)
                 return 0.0f;
@@ -3282,7 +3298,7 @@ To compare two data sets:
             return range;
         }
 
-        private void DrawComparisonThreadSummary()
+        void DrawComparisonThreadSummary()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
 
@@ -3304,8 +3320,8 @@ To compare two data sets:
 
                     m_Columns.Draw3(Styles.emptyString, Styles.median, Styles.thread);
 
-                    m_ThreadScroll = EditorGUILayout.BeginScrollView(m_ThreadScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.Height(200));
-                    Rect clipRect = new Rect(m_ThreadScroll.x, m_ThreadScroll.y, 400, 200);
+                    m_ThreadScroll = EditorGUILayout.BeginScrollView(m_ThreadScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
+                    Rect clipRect = new Rect(m_ThreadScroll.x, m_ThreadScroll.y, m_ThreadsAreaRect.width, m_ThreadsAreaRect.height);
                     m_2D.SetClipRect(clipRect);
                     for (int i = 0; i < m_ThreadUINames.Count; i++)
                     {
@@ -3327,7 +3343,7 @@ To compare two data sets:
                         BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, m_DisplayUnits.Units);
                         EditorGUILayout.BeginHorizontal();
                         if (threadLeft != null)
-                            boxAndWhiskerPlot.DrawHorizontal(width, height, threadLeft.msMin, threadLeft.msLowerQuartile, threadLeft.msMedian, threadLeft.msUpperQuartile, threadLeft.msMax, xAxisMin, xAxisMax, m_ColorBoxAndWhiskerLineColorLeft, m_ColorBoxAndWhiskerBoxColorLeft, GUI.skin.label);
+                            boxAndWhiskerPlot.DrawHorizontal(width, height, threadLeft.msMin, threadLeft.msLowerQuartile, threadLeft.msMedian, threadLeft.msUpperQuartile, threadLeft.msMax, xAxisMin, xAxisMax, UIColor.boxAndWhiskerLineColorLeft, UIColor.boxAndWhiskerBoxColorLeft, GUI.skin.label);
                         else
                             EditorGUILayout.LabelField("", GUILayout.Width(width));
                         float left = (threadLeft != null) ? threadLeft.msMedian : 0.0f;
@@ -3337,7 +3353,7 @@ To compare two data sets:
 
                         EditorGUILayout.BeginHorizontal();
                         if (threadRight != null)
-                            boxAndWhiskerPlot.DrawHorizontal(width, height, threadRight.msMin, threadRight.msLowerQuartile, threadRight.msMedian, threadRight.msUpperQuartile, threadRight.msMax, xAxisMin, xAxisMax, m_ColorBoxAndWhiskerLineColorRight, m_ColorBoxAndWhiskerBoxColorRight, GUI.skin.label);
+                            boxAndWhiskerPlot.DrawHorizontal(width, height, threadRight.msMin, threadRight.msLowerQuartile, threadRight.msMedian, threadRight.msUpperQuartile, threadRight.msMax, xAxisMin, xAxisMax, UIColor.boxAndWhiskerLineColorRight, UIColor.boxAndWhiskerBoxColorRight, GUI.skin.label);
                         else
                             EditorGUILayout.LabelField("", GUILayout.Width(width));
                         float right = (threadRight != null) ? threadRight.msMedian : 0.0f;
@@ -3347,6 +3363,12 @@ To compare two data sets:
                     }
                     m_2D.ClearClipRect();
                     EditorGUILayout.EndScrollView();
+
+                    if (Event.current.type == EventType.Repaint)
+                    {
+                        // This value is not valid at layout phase
+                        m_ThreadsAreaRect = GUILayoutUtility.GetLastRect();
+                    }
                 }
                 else
                 {
@@ -3362,7 +3384,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private bool IsComparisonValid()
+        bool IsComparisonValid()
         {
             if (m_ProfileLeftView.data == null)
                 return false;
@@ -3385,7 +3407,7 @@ To compare two data sets:
             return true;
         }
 
-        private void DrawCompareOptions()
+        void DrawCompareOptions()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
@@ -3434,7 +3456,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawComparison()
+        void DrawComparison()
         {
             EditorGUILayout.BeginHorizontal();
 
@@ -3460,7 +3482,7 @@ To compare two data sets:
                     EditorGUILayout.BeginVertical(GUILayout.Height(40));
                     Rect rect = EditorGUILayout.GetControlRect(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                     rect.height = rect.height / 2;
-                    var topMarkers = new TopMarkers(this, this.m_2D, m_ColorBarBackground, m_ColorTextTopMarkers);
+                    var topMarkers = new TopMarkers(this, this.m_2D, UIColor.barBackground, UIColor.textTopMarkers);
 
                     float leftRange = topMarkers.GetTopMarkerTimeRange(m_ProfileLeftView.analysis, m_TopNBars, m_DepthFilter1);
                     float rightRange = topMarkers.GetTopMarkerTimeRange(m_ProfileRightView.analysis, m_TopNBars, m_DepthFilter2);
@@ -3471,9 +3493,9 @@ To compare two data sets:
                         rightRange = max;
                     }
 
-                    topMarkers.Draw(m_ProfileLeftView.analysis, rect, m_ColorLeft, m_TopNBars, leftRange, m_DepthFilter1, m_ColorBarBackground, Color.black, Color.white, true, true);
+                    topMarkers.Draw(m_ProfileLeftView.analysis, rect, UIColor.left, m_TopNBars, leftRange, m_DepthFilter1, UIColor.barBackground, Color.black, Color.white, true, true);
                     rect.y += rect.height;
-                    topMarkers.Draw(m_ProfileRightView.analysis, rect, m_ColorRight, m_TopNBars, rightRange, m_DepthFilter2, m_ColorBarBackground, Color.black, Color.white, true, true);
+                    topMarkers.Draw(m_ProfileRightView.analysis, rect, UIColor.right, m_TopNBars, rightRange, m_DepthFilter2, UIColor.barBackground, Color.black, Color.white, true, true);
                     EditorGUILayout.EndVertical();
 
                     EditorGUILayout.BeginHorizontal();
@@ -3530,7 +3552,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private bool BoldFoldout(bool toggle, GUIContent content)
+        bool BoldFoldout(bool toggle, GUIContent content)
         {
             GUIStyle foldoutStyle = new GUIStyle(EditorStyles.foldout);
             foldoutStyle.fontStyle = FontStyle.Bold;
@@ -3574,6 +3596,12 @@ To compare two data sets:
                     int pairingAt = m_SelectedPairing;
                     if (leftMarkers != null && rightMarkers != null && m_Pairings!=null && pairingAt >= 0 && pairingAt < m_Pairings.Count)
                     {
+                        m_MarkerSummaryScroll = GUILayout.BeginScrollView(m_MarkerSummaryScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
+                        Rect clipRect = new Rect(m_MarkerSummaryScroll.x, m_MarkerSummaryScroll.y, LayoutSize.WidthRHS, 500);
+                        m_2D.SetClipRect(clipRect);
+
+                        EditorGUILayout.BeginVertical();
+
                         var pairing = m_Pairings[pairingAt];
 
                         var leftMarker = (pairing.leftIndex >= 0 && pairing.leftIndex < leftMarkers.Count) ? leftMarkers[pairing.leftIndex] : null;
@@ -3680,17 +3708,17 @@ To compare two data sets:
 
                                     if ((int)rightBarHeight == (int)leftBarHeight)
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.both);
                                     }
                                     else if (rightBarHeight > leftBarHeight)
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, m_ColorRight);
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, UIColor.right);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.both);
                                     }
                                     else
                                     {
-                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, m_ColorLeft);
-                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, m_ColorBoth);
+                                        m_2D.DrawFilledBox(x, y, w, leftBarHeight, UIColor.left);
+                                        m_2D.DrawFilledBox(x, y, w, rightBarHeight, UIColor.both);
                                     }
 
                                     float bucketStart = min + (bucketAt * bucketWidth);
@@ -3717,9 +3745,9 @@ To compare two data sets:
                         plotWidth /= 2.0f;
                         BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, units);
                         DrawBoxAndWhiskerPlotForMarker(boxAndWhiskerPlot, plotWidth, plotHeight, m_ProfileLeftView.analysis, leftMarker, minValue, maxValue,
-                             m_ColorBoxAndWhiskerLineColorLeft, m_ColorBoxAndWhiskerBoxColorLeft);
+                             UIColor.boxAndWhiskerLineColorLeft, UIColor.boxAndWhiskerBoxColorLeft);
                         DrawBoxAndWhiskerPlotForMarker(boxAndWhiskerPlot, plotWidth, plotHeight, m_ProfileRightView.analysis, rightMarker, minValue, maxValue,
-                             m_ColorBoxAndWhiskerLineColorRight, m_ColorBoxAndWhiskerBoxColorRight);
+                             UIColor.boxAndWhiskerLineColorRight, UIColor.boxAndWhiskerBoxColorRight);
 
                         boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, minValue, maxValue,
                             string.Format("Min {0} for selected frames in the 2 data sets", unitName), 
@@ -3730,6 +3758,11 @@ To compare two data sets:
                         GUILayout.Space(style.lineHeight);
 
                         DrawComparisonSelectedStats(leftMarker, rightMarker);
+
+                        EditorGUILayout.EndVertical();
+
+                        m_2D.ClearClipRect();
+                        GUILayout.EndScrollView();
                     }
                 }
                 else
@@ -3746,12 +3779,12 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void SelectTab(ActiveTab newTab)
+        void SelectTab(ActiveTab newTab)
         {
             m_NextActiveTab = newTab;
         }
 
-        private void DrawToolbar()
+        void DrawToolbar()
         {
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
@@ -3837,7 +3870,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void SetupStyles()
+        void SetupStyles()
         {
             if (!m_StylesSetup)
             {
@@ -3848,7 +3881,7 @@ To compare two data sets:
             }
         }
 
-        private void Draw()
+        void Draw()
         {
             // Make sure we start enabled (in case something overrode it last frame)
             GUI.enabled = true;
@@ -3875,7 +3908,7 @@ To compare two data sets:
             Profiler.EndSample();
         }
 
-        private int FindSelectionByName(List<MarkerData> markers, string name)
+        int FindSelectionByName(List<MarkerData> markers, string name)
         {
             int index = 0;
             foreach (var marker in markers)
@@ -3887,6 +3920,10 @@ To compare two data sets:
             return -1; // not found
         }
 
+        /// <summary>
+        /// Select marker to focus on 
+        /// </summary>
+        /// <param name="name">Name of the marker</param>
         public void SelectMarker(string name)
         {
             switch (m_ActiveTab)
@@ -3900,7 +3937,7 @@ To compare two data sets:
             }
         }
 
-        private void UpdateSelectedMarkerName(string markerName)
+        void UpdateSelectedMarkerName(string markerName)
         {
             m_SelectedMarkerName = markerName;
             if (m_ThreadSelection.selection != null && m_ThreadSelection.selection.Count > 0)
@@ -3909,7 +3946,7 @@ To compare two data sets:
             }
         }
 
-        public void SelectMarker(int index)
+        internal void SelectMarkerByIndex(int index)
         {
             m_SelectedMarker = index;
 
@@ -3925,6 +3962,10 @@ To compare two data sets:
             UpdateSelectedMarkerName(markerName);
         }
 
+        /// <summary>
+        /// Get currently selected marker
+        /// </summary>
+        /// <returns>Name of currently selected marker, or null if none selected</returns>
         public string GetSelectedMarkerName()
         {
             switch (m_ActiveTab)
@@ -3938,7 +3979,7 @@ To compare two data sets:
             return null;
         }
 
-        private string GetMarkerName(int index)
+        string GetMarkerName(int index)
         {
             if (m_ProfileSingleView.analysis == null)
                 return null;
@@ -3950,14 +3991,14 @@ To compare two data sets:
             return marker.name;
         }
 
-        private void SelectMarkerByName(string markerName)
+        void SelectMarkerByName(string markerName)
         {
             int index = (m_ProfileSingleView.analysis != null) ? m_ProfileSingleView.analysis.GetMarkerIndexByName(markerName) : -1;
 
-            SelectMarker(index);
+            SelectMarkerByIndex(index);
         }
 
-        public void SelectPairing(int index)
+        internal void SelectPairing(int index)
         {
             m_SelectedPairing = index;
 
@@ -3973,7 +4014,7 @@ To compare two data sets:
             UpdateSelectedMarkerName(markerName);
         }
 
-        private string GetPairingName(int index)
+        string GetPairingName(int index)
         {
             if (m_Pairings == null)
                 return null;
@@ -3984,7 +4025,7 @@ To compare two data sets:
             return m_Pairings[index].name;
         }
 
-        private void SelectPairingByName(string pairingName)
+        void SelectPairingByName(string pairingName)
         {
             if (m_Pairings != null && pairingName != null)
             {
@@ -4002,7 +4043,7 @@ To compare two data sets:
             SelectPairing(-1);
         }
 
-        private string GetFrameRangeText(ProfileAnalysis analysis)
+        string GetFrameRangeText(ProfileAnalysis analysis)
         {
             var frameSummary = analysis.GetFrameSummary();
 
@@ -4015,7 +4056,7 @@ To compare two data sets:
             return frameRange;
         }
 
-        private void DrawFrameSummary()
+        void DrawFrameSummary()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
 
@@ -4051,13 +4092,13 @@ To compare two data sets:
 
                     EditorGUILayout.BeginHorizontal();
                     Histogram histogram = new Histogram(m_2D, m_DisplayUnits.Units);
-                    histogram.Draw(LayoutSize.HistogramWidth, 40, frameSummary.buckets, frameSummary.count, 0, frameSummary.msMax, m_ColorBar);
+                    histogram.Draw(LayoutSize.HistogramWidth, 40, frameSummary.buckets, frameSummary.count, 0, frameSummary.msMax, UIColor.bar);
 
                     BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, m_DisplayUnits.Units);
 
                     float plotWidth = 40 + GUI.skin.box.padding.horizontal;
                     float plotHeight = 40;
-                    boxAndWhiskerPlot.Draw(plotWidth, plotHeight, frameSummary.msMin, frameSummary.msLowerQuartile, frameSummary.msMedian, frameSummary.msUpperQuartile, frameSummary.msMax, 0, frameSummary.msMax, m_ColorStandardLine, m_ColorStandardLine);
+                    boxAndWhiskerPlot.Draw(plotWidth, plotHeight, frameSummary.msMin, frameSummary.msLowerQuartile, frameSummary.msMedian, frameSummary.msUpperQuartile, frameSummary.msMax, 0, frameSummary.msMax, UIColor.standardLine, UIColor.standardLine);
 
                     boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, frameSummary.msMin, frameSummary.msMax,
                         "Min frame time for selected frames",
@@ -4079,7 +4120,7 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private GUIContent GetThreadNameWithGroupTooltip(string threadNameWithIndex, bool singleThread)
+        GUIContent GetThreadNameWithGroupTooltip(string threadNameWithIndex, bool singleThread)
         {
             string friendlyThreadName = GetFriendlyThreadName(threadNameWithIndex, singleThread);
             string groupName;
@@ -4091,7 +4132,7 @@ To compare two data sets:
                 return new GUIContent(friendlyThreadName, string.Format("{0}\n{1}", friendlyThreadName, groupName));
         }
 
-        private void DrawThreadSummary()
+        void DrawThreadSummary()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
 
@@ -4131,7 +4172,7 @@ To compare two data sets:
 
                         BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, m_DisplayUnits.Units);
                         EditorGUILayout.BeginHorizontal();
-                        boxAndWhiskerPlot.DrawHorizontal(100, GUI.skin.label.lineHeight, thread.msMin, thread.msLowerQuartile, thread.msMedian, thread.msUpperQuartile, thread.msMax, xAxisMin, xAxisMax, m_ColorBar, m_ColorBarBackground, GUI.skin.label);
+                        boxAndWhiskerPlot.DrawHorizontal(100, GUI.skin.label.lineHeight, thread.msMin, thread.msLowerQuartile, thread.msMedian, thread.msUpperQuartile, thread.msMax, xAxisMin, xAxisMax, UIColor.bar, UIColor.barBackground, GUI.skin.label);
 
                         m_Columns.Draw(1, ToDisplayUnitsWithTooltips(thread.msMedian));
                         m_Columns.Draw(2, GetThreadNameWithGroupTooltip(thread.threadNameWithIndex, singleThread));
@@ -4154,20 +4195,20 @@ To compare two data sets:
             EditorGUILayout.EndVertical();
         }
 
-        private void DrawHistogramForMarker(Histogram histogram, MarkerData marker)
+        void DrawHistogramForMarker(Histogram histogram, MarkerData marker)
         {
             if (DisplayCount())
-                histogram.Draw(LayoutSize.HistogramWidth, 100, marker.countBuckets, marker.presentOnFrameCount, marker.countMin, marker.countMax, m_ColorBar);
+                histogram.Draw(LayoutSize.HistogramWidth, 100, marker.countBuckets, marker.presentOnFrameCount, marker.countMin, marker.countMax, UIColor.bar);
             else
-                histogram.Draw(LayoutSize.HistogramWidth, 100, marker.buckets, marker.presentOnFrameCount, marker.msMin, marker.msMax, m_ColorBar);
+                histogram.Draw(LayoutSize.HistogramWidth, 100, marker.buckets, marker.presentOnFrameCount, marker.msMin, marker.msMax, UIColor.bar);
         }
 
-        public bool IsProfilerWindowOpen()
+        internal bool IsProfilerWindowOpen()
         {
             return m_ProfilerWindowInterface.IsReady();
         }
 
-        public bool DataMatchesProfiler(ProfileData data, int frameIndex, out string message)
+        bool DataMatchesProfiler(ProfileData data, int frameIndex, out string message)
         {
             if (data == null)
             {
@@ -4217,7 +4258,7 @@ To compare two data sets:
             return true;
         }
 
-        public void JumpToFrame(int frameindex, bool reportErrors=true)
+        internal void JumpToFrame(int frameindex, bool reportErrors=true)
         {
             if (m_ProfilerWindowInterface.JumpToFrame(frameindex))
             {
@@ -4233,7 +4274,7 @@ To compare two data sets:
             }
         }
 
-        public void DrawFrameIndexButton(int index)
+        internal void DrawFrameIndexButton(int index)
         {
             if (index < 0)
                 return;
@@ -4250,7 +4291,7 @@ To compare two data sets:
             GUI.enabled = enabled;
         }
 
-        public void DrawFrameIndexButton(Rect rect, int index)
+        internal void DrawFrameIndexButton(Rect rect, int index)
         {
             if (index < 0)
                 return;
@@ -4277,7 +4318,7 @@ To compare two data sets:
             return m_DisplayUnits.ToGUIContentWithTooltips(ms, showUnits, 5, frameIndex);
         }
 
-        private void Draw3LabelMsFrame(string col1, float ms, int frameIndex)
+        void Draw3LabelMsFrame(string col1, float ms, int frameIndex)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4286,7 +4327,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void Draw3LabelMsFrame(GUIContent col1, float ms, int frameIndex)
+        void Draw3LabelMsFrame(GUIContent col1, float ms, int frameIndex)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4295,7 +4336,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void Draw2LabelMs(GUIContent col1, float ms)
+        void Draw2LabelMs(GUIContent col1, float ms)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4303,7 +4344,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void Draw4DiffMs(GUIContent col1, float msLeft, float msRight)
+        void Draw4DiffMs(GUIContent col1, float msLeft, float msRight)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4313,7 +4354,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void Draw4DiffMs(GUIContent col1, float msLeft, int frameIndexLeft, float msRight, int frameIndexRight)
+        void Draw4DiffMs(GUIContent col1, float msLeft, int frameIndexLeft, float msRight, int frameIndexRight)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4323,7 +4364,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void Draw4Ms(GUIContent col1, float value2, float value3, float value4)
+        void Draw4Ms(GUIContent col1, float value2, float value3, float value4)
         {
             EditorGUILayout.BeginHorizontal();
             m_Columns.Draw(0, col1);
@@ -4333,7 +4374,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        private void DrawBoxAndWhiskerPlotForMarker(BoxAndWhiskerPlot boxAndWhiskerPlot, float width, float height,ProfileAnalysis analysis, MarkerData marker, float yAxisStart, float yAxisEnd, Color color, Color colorBackground)
+        void DrawBoxAndWhiskerPlotForMarker(BoxAndWhiskerPlot boxAndWhiskerPlot, float width, float height,ProfileAnalysis analysis, MarkerData marker, float yAxisStart, float yAxisEnd, Color color, Color colorBackground)
         {
             if (marker == null)
             {
@@ -4347,7 +4388,7 @@ To compare two data sets:
                 boxAndWhiskerPlot.Draw(width, height, marker.msMin, marker.msLowerQuartile, marker.msMedian, marker.msUpperQuartile, marker.msMax, yAxisStart, yAxisEnd, color, colorBackground);
         }
 
-        private void DrawBoxAndWhiskerPlotHorizontalForMarker(BoxAndWhiskerPlot boxAndWhiskerPlot, float width, float height, ProfileAnalysis analysis, MarkerData marker, float yAxisStart, float yAxisEnd, Color color, Color colorBackground)
+        void DrawBoxAndWhiskerPlotHorizontalForMarker(BoxAndWhiskerPlot boxAndWhiskerPlot, float width, float height, ProfileAnalysis analysis, MarkerData marker, float yAxisStart, float yAxisEnd, Color color, Color colorBackground)
         {
             boxAndWhiskerPlot.DrawHorizontal(width,height, marker.msMin, marker.msLowerQuartile, marker.msMedian, marker.msUpperQuartile, marker.msMax, yAxisStart, yAxisEnd, color, colorBackground);
         }
@@ -4388,8 +4429,8 @@ To compare two data sets:
             // Not clear why
             if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
             {
-                m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, m_ColorBar);
-                m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, m_ColorBarBackground);
+                m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, UIColor.bar);
+                m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, UIColor.barBackground);
                 m_2D.DrawEnd();
 
                 Rect rect = GUILayoutUtility.GetLastRect();
@@ -4452,10 +4493,10 @@ To compare two data sets:
             EditorGUILayout.BeginHorizontal();
             if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
             {
-                m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, m_ColorBarBackground);
+                m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, UIColor.barBackground);
 
-                m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, m_ColorLeft);
-                m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, m_ColorRight);
+                m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, UIColor.left);
+                m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, UIColor.right);
                 m_2D.DrawEnd();
 
                 Rect rect = GUILayoutUtility.GetLastRect();
@@ -4498,7 +4539,7 @@ To compare two data sets:
             
             TopMarkerList topMarkerList = new TopMarkerList(m_2D, units,
                 LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2,
-                m_ColorBar, m_ColorBarBackground, DrawFrameIndexButton);
+                UIColor.bar, UIColor.barBackground, DrawFrameIndexButton);
             m_TopNumber = topMarkerList.DrawTopNumber(m_TopNumber, m_TopStrings, m_TopValues);
 
             float barMax = Math.Max(leftMax, rightMax);
@@ -4527,10 +4568,10 @@ To compare two data sets:
                 {
                     if (leftIndex >= 0 || rightIndex >= 0)
                     {
-                        m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, m_ColorBarBackground);
+                        m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, UIColor.barBackground);
 
-                        m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, m_ColorLeft);
-                        m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, m_ColorRight);
+                        m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, UIColor.left);
+                        m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, UIColor.right);
                     }
                     m_2D.DrawEnd();
 
@@ -4592,6 +4633,12 @@ To compare two data sets:
                         {
                             var marker = markers[markerAt];
 
+                            m_MarkerSummaryScroll = GUILayout.BeginScrollView(m_MarkerSummaryScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
+                            Rect clipRect = new Rect(m_MarkerSummaryScroll.x, m_MarkerSummaryScroll.y, LayoutSize.WidthRHS, 500);
+                            m_2D.SetClipRect(clipRect);
+
+                            EditorGUILayout.BeginVertical();
+
                             EditorGUILayout.LabelField(marker.name,
                                 GUILayout.MaxWidth(LayoutSize.WidthRHS -
                                                    (GUI.skin.box.padding.horizontal + GUI.skin.box.margin.horizontal)));
@@ -4622,7 +4669,7 @@ To compare two data sets:
                             
                             TopMarkerList topMarkerList = new TopMarkerList(m_2D, units,
                                 LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2,
-                                m_ColorBar, m_ColorBarBackground, DrawFrameIndexButton);
+                                UIColor.bar, UIColor.barBackground, DrawFrameIndexButton);
                             m_TopNumber = topMarkerList.Draw(marker, m_TopNumber, m_TopStrings, m_TopValues);
 
                             GUILayout.Space(style.lineHeight);
@@ -4637,7 +4684,7 @@ To compare two data sets:
                             
                             BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, units);
                             DrawBoxAndWhiskerPlotForMarker(boxAndWhiskerPlot, plotWidth, plotHeight, m_ProfileSingleView.analysis, marker,
-                                                           min, max, m_ColorStandardLine, m_ColorBoxAndWhiskerBoxColor);
+                                                           min, max, UIColor.standardLine, UIColor.boxAndWhiskerBoxColor);
 
                             boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, min, max, 
                                 string.Format("Min {0} for selected frames", fieldString), 
@@ -4647,6 +4694,11 @@ To compare two data sets:
                             GUILayout.Space(style.lineHeight);
 
                             DrawSelectedStats(marker);
+
+                            EditorGUILayout.EndVertical();
+
+                            m_2D.ClearClipRect();
+                            GUILayout.EndScrollView();
                         }
                     }
                 }

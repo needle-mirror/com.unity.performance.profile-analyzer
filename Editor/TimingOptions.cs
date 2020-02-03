@@ -1,6 +1,6 @@
 ﻿namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class TimingOptions
+    internal class TimingOptions
     {
         public enum TimingOption
         {

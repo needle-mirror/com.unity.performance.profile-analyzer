@@ -4,7 +4,7 @@ using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ProfileAnalyzerExportWindow : EditorWindow
+    internal class ProfileAnalyzerExportWindow : EditorWindow
     {
         ProfileDataView m_ProfileDataView;
         ProfileDataView m_LeftDataView;
@@ -43,7 +43,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             EditorGUILayout.EndVertical();
         }
 
-        private void SaveMarkerTableCSV()
+        void SaveMarkerTableCSV()
         {
             if (m_ProfileDataView.analysis == null)
                 return;
@@ -95,7 +95,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void SaveFrameTimesCSV()
+        void SaveFrameTimesCSV()
         {
             if (m_ProfileDataView == null)
                 return;
@@ -130,7 +130,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void SaveComparisonFrameTimesCSV()
+        void SaveComparisonFrameTimesCSV()
         {
             if (m_LeftDataView == null || m_RightDataView == null)
                 return;

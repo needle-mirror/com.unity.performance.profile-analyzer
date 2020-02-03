@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
-    public class ProfileData
+    internal class ProfileData
     {
         static int latestVersion = 7;
         /*
@@ -21,21 +21,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Version 6 - fixed msStartTime (previously was 'seconds')
         Version 7 - Data now only skips the frame at the end
         */
-        private static Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
+        static Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
         public int Version { get; private set; }
-        private int frameIndexOffset = 0;
-        private List<ProfileFrame> frames = new List<ProfileFrame>();
-        private List<string> markerNames = new List<string>();
-        private List<string> threadNames = new List<string>();
-        private Dictionary<string, int> markerNamesDict = new Dictionary<string, int>();
-        private Dictionary<string, int> threadNameDict = new Dictionary<string, int>();
+        int frameIndexOffset = 0;
+        List<ProfileFrame> frames = new List<ProfileFrame>();
+        List<string> markerNames = new List<string>();
+        List<string> threadNames = new List<string>();
+        Dictionary<string, int> markerNamesDict = new Dictionary<string, int>();
+        Dictionary<string, int> threadNameDict = new Dictionary<string, int>();
 
         public ProfileData()
         {
             Version = latestVersion;
         }
 
-        private bool IsFrameSame(int frameIndex, ProfileData other)
+        bool IsFrameSame(int frameIndex, ProfileData other)
         {
             ProfileFrame thisFrame = GetFrame(frameIndex);
             ProfileFrame otherFrame = other.GetFrame(frameIndex);
@@ -367,13 +367,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return true;
         }
 
-        private void PushMarker(List<ProfileMarker> markerStack, ProfileMarker markerData)
+        void PushMarker(List<ProfileMarker> markerStack, ProfileMarker markerData)
         {
             Debug.Assert(markerData.depth == markerStack.Count + 1);
             markerStack.Add(markerData);
         }
 
-        private ProfileMarker PopMarkerAndRecordTimeInParent(List<ProfileMarker> markerStack)
+        ProfileMarker PopMarkerAndRecordTimeInParent(List<ProfileMarker> markerStack)
         {
             ProfileMarker child = markerStack[markerStack.Count - 1];
             markerStack.RemoveAt(markerStack.Count - 1);
@@ -393,7 +393,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             markerNamesDict.Clear();
         }
 
-        private void CalculateMarkerChildTimes()
+        void CalculateMarkerChildTimes()
         {
             var markerStack = new List<ProfileMarker>();
 
@@ -449,7 +449,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     }
 
     [Serializable]
-    public class ProfileFrame
+    internal class ProfileFrame
     {
         public List<ProfileThread> threads = new List<ProfileThread>();
         public double msStartTime;
@@ -514,7 +514,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     }
 
     [Serializable]
-    public class ProfileThread
+    internal class ProfileThread
     {
         public List<ProfileMarker> markers = new List<ProfileMarker>();
         public int threadIndex;
@@ -551,7 +551,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     }
 
     [Serializable]
-    public class ProfileMarker
+    internal class ProfileMarker
     {
         public int nameIndex;
         public float msMarkerTotal;

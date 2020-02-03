@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class FrameSummary
+    internal class FrameSummary
     {
         public double msTotal;
         public int first;

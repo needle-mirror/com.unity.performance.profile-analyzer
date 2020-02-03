@@ -3,9 +3,10 @@ using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class BoxAndWhiskerPlot
+    internal class BoxAndWhiskerPlot
     {
         Draw2D m_2D;
+
         Color m_ColorBackground;
         DisplayUnits m_Units;
 
@@ -38,7 +39,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ColorBackground = new Color(0.4f, 0.4f, 0.4f);
         }
 
-        private float ClampToRange(float value, float min, float max)
+        float ClampToRange(float value, float min, float max)
         {
             return Math.Max(min, Math.Min(value, max));
         }
@@ -59,7 +60,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private string GetTooltip(float min, float lowerQuartile, float median, float upperQuartile, float max)
+        string GetTooltip(float min, float lowerQuartile, float median, float upperQuartile, float max)
         {
             string tooltip = string.Format(
                 "Max :\t\t{0}\n\nUpper Quartile :\t{1}\nMedian :\t\t{2}\nLower Quartile :\t{3}\nInterquartile range : \t{4}\n\nMin :\t\t{5}\nUnits :\t\t{6}",
@@ -220,11 +221,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             GUIStyle shiftUpStyle = new GUIStyle(GUI.skin.label);
             shiftUpStyle.contentOffset = new Vector2(0, -5);
+            shiftUpStyle.alignment = TextAnchor.UpperLeft;
             EditorGUILayout.BeginVertical(GUILayout.Height(plotHeight));
             EditorGUILayout.LabelField(new GUIContent(ToDisplayUnits(max), maxTooltip), shiftUpStyle, GUILayout.Width(width));
             GUILayout.FlexibleSpace();
             GUIStyle shiftDownStyle = new GUIStyle(GUI.skin.label);
-            shiftDownStyle.contentOffset = new Vector2(0, 2);
+            shiftDownStyle.contentOffset = new Vector2(0, 1);
+            shiftDownStyle.alignment = TextAnchor.LowerLeft;
             EditorGUILayout.LabelField(new GUIContent(ToDisplayUnits(min), minTooltip), shiftDownStyle, GUILayout.Width(width));
             EditorGUILayout.EndVertical();
         }

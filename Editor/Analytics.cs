@@ -350,7 +350,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
 
 
-        public class Analytic
+        internal class Analytic
         {
             double m_StartTime;
             float m_DurationInSeconds;

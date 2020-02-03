@@ -1,6 +1,6 @@
 ﻿namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class MarkerPairing
+    internal class MarkerPairing
     {
         public string name;
         public int leftIndex;

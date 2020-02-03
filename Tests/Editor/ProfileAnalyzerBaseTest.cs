@@ -33,7 +33,7 @@ public class ProfileAnalyzerBaseTest
     public void SetupTest()
     {
         UnityEditorInternal.ProfilerDriver.ClearAllFrames();
-        m_setupData = new FrameSetupData(0, 300, -1, new List<string> { "1:Main Thread" });
+        m_setupData = new FrameSetupData(1, 300, -1, new List<string> { "1:Main Thread" });
     }
 
     [TearDown]
@@ -53,7 +53,7 @@ public class ProfileAnalyzerBaseTest
         return list;
     }
 
-    protected ProfileAnalysis GetAnalysisFromFrameData(ProfileData profileData)
+    internal ProfileAnalysis GetAnalysisFromFrameData(ProfileData profileData)
     {
         return m_setupData.analyzer.Analyze(profileData,
                                             SelectRange(m_setupData.firstFrame, m_setupData.lastFrame),

@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class ThreadSelection
+    internal class ThreadSelection
     {
         public List<string> groups;
         public List<string> selection;

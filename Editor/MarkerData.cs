@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class MarkerData
+    internal class MarkerData
     {
         public string name;
         public double msTotal;          // total time of this marker on a frame

@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
-    public class FrameTimeGraphGlobalSettings
+    internal class FrameTimeGraphGlobalSettings
     {
         public bool showThreads = false;
         public bool showSelectedMarker = true;
@@ -15,7 +15,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public bool showOrderedByFrameDuration = false;
     }
 
-    public class FrameTimeGraph
+    internal class FrameTimeGraph
     {
         static FrameTimeGraphGlobalSettings m_GlobalSettings = new FrameTimeGraphGlobalSettings();
 
@@ -199,7 +199,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_MouseReleased = false;
         }
 
-        private void Init()
+        void Init()
         {
             Reset();
 
@@ -249,7 +249,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ColorGridLine = colorGridlines;
         }
 
-        private int ClampToRange(int value, int min, int max)
+        int ClampToRange(int value, int min, int max)
         {
             if (value < min)
                 value = min;
@@ -259,7 +259,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return value;
         }
 
-        private int GetDataOffsetForXUnclamped(int xPosition, int width, int totalDataSize)
+        int GetDataOffsetForXUnclamped(int xPosition, int width, int totalDataSize)
         {
             int visibleDataSize;
             if (m_Zoomed)
@@ -276,14 +276,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
 
 
-        private int GetDataOffsetForX(int xPosition, int width, int totalDataSize)
+        int GetDataOffsetForX(int xPosition, int width, int totalDataSize)
         {
             //xPosition = ClampToRange(xPosition, 0, width-1);
             int dataOffset = GetDataOffsetForXUnclamped(xPosition, width, totalDataSize);
             return ClampToRange(dataOffset, 0, totalDataSize - 1);
         }
 
-        private int GetXForDataOffset(int dataOffset, int width, int totalDataSize)
+        int GetXForDataOffset(int dataOffset, int width, int totalDataSize)
         {
             //frameOffset = ClampToRange(frameOffset, 0, frames-1);
 
@@ -303,7 +303,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return x;
         }
 
-        private void SetDragMovement(int startOffset, int endOffset, int currentSelectionFirstDataOffset, int currentSelectionLastDataOffset)
+        void SetDragMovement(int startOffset, int endOffset, int currentSelectionFirstDataOffset, int currentSelectionLastDataOffset)
         {
             // Maintain length but clamp to range
             int frames = m_Values.Count;
@@ -322,7 +322,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        private void SetDragSelection(int startOffset, int endOffset, DragDirection dragDirection)
+        void SetDragSelection(int startOffset, int endOffset, DragDirection dragDirection)
         {
             // No need to clamp these as input is clamped.
             switch (dragDirection)
@@ -1636,7 +1636,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_PairedWithFrameTimeGraph.SelectMax(false);
         }
 
-        private float GetPercentageOffset(List<Data> data, float percent, out int outputFrameOffset)
+        float GetPercentageOffset(List<Data> data, float percent, out int outputFrameOffset)
         {
             int index = (int)((data.Count - 1) * percent / 100);
             outputFrameOffset = data[index].frameOffset;

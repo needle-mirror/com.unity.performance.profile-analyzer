@@ -2,7 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class Histogram
+    internal class Histogram
     {
         Draw2D m_2D;
         Color m_ColorBarBackground;
