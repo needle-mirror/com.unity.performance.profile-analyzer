@@ -1,29 +1,33 @@
-# Workflows
-## Collecting and Viewing Data
+# Collecting and viewing data
 
-This workflow will take you through the steps need to populate the Unity Profiler and Profile Analyzer with data.
+This workflow explains how to populate the [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) and Profile Analyzer with data. Note that the Profile Analyzer only analyzes CPU data from the Profiler. 
 
-### Opening the Unity Profiler Window
-1. Open the Unity Profiler window via the main menu using _Window->Analysis->Profiler_ or using the _Ctrl+7_ keyboard shortcut, alternatively if you already have the Profile Analyzer window open you can use the _Open Profiler Window_ from the view's toolbar.
+## Step 1: Open the Unity Profiler
+Go to the menu: **Window &gt; Analysis &gt; Profiler** or press Ctrl+7 (Command+7 on macOS). If you have the Profile Analyzer window open, you can click the **Open Profiler Window** button.
 
-## Populating the Unity Profiler
-The Profile Analyzer uses data collected from the [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html). We can populate the Unity Profiler with data in a number of ways, for instance we can make a  new capture or alternatively by loading a saved Unity Profiler capture file (.data) from a previous session.
+## Step 2: Populate the Profiler with data
+To use the Profile Analyzer, you must populate it with data from the Profiler. To add data to the Profiler, you can either record some new data, or load a Profiler capture file in the .data file format.
 
-### 1. Recording New Data
-1. Select which player you would like to record data from using the dropdown on the Profiler Window toolbar, by default the profiler will be set to record from the _Editor_.
+### a) Record new data
+Click the **Attach to Player** dropdown at the top of the window (next to the Record button) and select a player to profile. By default this is set to **Playmode**. Click the **Record** button to start recording data. If you enabled **Autoconnect to Profiler** in the Build Settings, the Profiler automatically collects data when you start a built player. 
 
-2. Press the _Record_ button located on the same toolbar to start recording data from your chosen player, a data window of frames will fill and wrap until you press the _Record_ button again.
+![Profiler dropdown](images/profiler-attach-to-player-dropdown.png)<br/>*The Attach To Player dropdown in the Profiler*
 
-### 2. Loading a Previous data set
-1. Press _Load_  on the Profiler Window toolbar and navigate the file load dialog to a previously saved _.data_ file.
+For more information on how to record data in the Profiler, see the documentation on [Profiling your application](https://docs.unity3d.com/Manual/profiler-profiling-applications.html) in the Unity User Manual.
 
-## Opening the Profile Analyzer Window and Pull the Recorded Data
-1. Open the Profile Analyzer window via the main menu using _Window->Analysis->Profile Analyzer_.
+### b) Load data
+To load a saved .data file, in the top right of the Profiler window, select the **Load** button.
 
-2. Press the _Pull Data_ button on the Single View.
+## Step 3: Pull the data into the Profile Analyzer window
+Open the Profile Analyzer window (menu: **Window &gt; Analysis &gt; Profile Analyzer**) and then select the **Pull Data** button in the [Frame Control](frame-range-selection.md) pane. The Profile Analyzer then pulls in the data that is loaded in the Profiler window.
 
-**Note:** The Profiler Window and Profile Analyzer Window both require a reasonable amount of screen real-estate so docking the 2 together into a single tabbed window can be advantageous as you will be moving between the two views frequently when reasoning about the data supplied.
+>[!TIP]
+>The Profiler window and the Profile Analyzer window require a lot of screen real-estate. Docking the two windows together in a single tabbed window lets you navigate between the two views quickly.
 
-![FilterSystem.](images/collecting-and-viewing-data1.png)
+![Profiler and Profile Analyzer](images/profile-analyzer-profiler-docked.png)<br/>*The Profiler and Profile Analyzer docked side by-side in one window*
 
-[Back to manual](manual.md)
+## Step 4: Load and save Profile Analyzer data
+To save the data from the Profile Analyzer, click the **Save** button in any view. Select where you would like to save your data, and then Unity saves the data in the .pdata format. To load this data, click the **Load** button in any view.
+
+>[!NOTE]
+>When you load data into the Profile Analyzer, the data must be in the Profile Analyzer .pdata format. If you have data from the Profiler in the .data file format, open it in the Profiler first, and in the Profile Analyzer select the **Pull Data** button.

@@ -93,11 +93,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var count = buckets[bucketAt];
 
                 float barHeight = (h * count) / totalFrameCount;
+                if (count > 0)  // Make sure we always slow a small bar if non zero
+                    barHeight = Mathf.Max(1.0f, barHeight);
                 m_2D.DrawFilledBox(x, y, w, barHeight, barColor);
 
                 float bucketStart = min + (bucketAt * bucketWidth);
                 float bucketEnd = bucketStart + bucketWidth;
-                GUI.Label(new Rect(rect.x + x, rect.y + y, w, h), new GUIContent("", string.Format("{0}-{1}\n{2} frames", ToDisplayUnits(bucketStart), ToDisplayUnits(bucketEnd,true), count)));
+
+                var tooltip = string.Format("{0}-{1}\n{2} {3}",
+                        ToDisplayUnits(bucketStart),
+                        ToDisplayUnits(bucketEnd, true),
+                        count,
+                        count == 1 ? "frame" : "frames");
+
+                var content = new GUIContent("", tooltip);
+                GUI.Label(new Rect(rect.x + x, rect.y + y, w, h), content);
 
                 x += w;
                 x += spacing;

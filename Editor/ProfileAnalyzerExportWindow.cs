@@ -28,13 +28,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     SaveMarkerTableCSV();
             }
 
-            if (m_ProfileDataView != null && m_ProfileDataView.data != null)
+            if (m_ProfileDataView != null && m_ProfileDataView.IsDataValid())
             {
                 if (GUILayout.Button("Single Frame Times"))
                     SaveFrameTimesCSV();
             }
 
-            if (m_LeftDataView != null && m_LeftDataView.data != null && m_RightDataView != null && m_RightDataView.data != null)
+            if (m_LeftDataView != null && m_LeftDataView.IsDataValid() && m_RightDataView != null && m_RightDataView.IsDataValid())
             {
                 if (GUILayout.Button("Comparison Frame Times"))
                     SaveComparisonFrameTimesCSV();
@@ -99,7 +99,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (m_ProfileDataView == null)
                 return;
-            if (m_ProfileDataView.data == null)
+            if (!m_ProfileDataView.IsDataValid())
                 return;
 
             string path = EditorUtility.SaveFilePanel("Save frame time CSV data", "", "frameTime.csv", "csv");
@@ -134,7 +134,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (m_LeftDataView == null || m_RightDataView == null)
                 return;
-            if (m_LeftDataView.data == null || m_RightDataView.data == null)
+            if (!m_LeftDataView.IsDataValid() || !m_RightDataView.IsDataValid())
                 return;
 
             string path = EditorUtility.SaveFilePanel("Save comparison frame time CSV data", "", "frameTimeComparison.csv", "csv");
@@ -163,7 +163,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         leftFrame = m_LeftDataView.data.GetFrame(frameOffset);
                         rightFrame = m_RightDataView.data.GetFrame(frameOffset);
                         int leftFrameIndex = m_LeftDataView.data.OffsetToDisplayFrame(frameOffset);
-                        int rightFrameIndex = m_LeftDataView.data.OffsetToDisplayFrame(frameOffset);
+                        int rightFrameIndex = m_RightDataView.data.OffsetToDisplayFrame(frameOffset);
                         float msFrameLeft = leftFrame != null ? leftFrame.msFrame : 0;
                         float msFrameRight = rightFrame != null ? rightFrame.msFrame : 0;
                         float msFrameDiff = msFrameRight - msFrameLeft;

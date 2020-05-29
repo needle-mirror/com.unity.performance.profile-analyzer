@@ -1,152 +1,106 @@
-﻿# Single View
+﻿# Single view
 
-The single view is populated from a loaded .pdata file or from frames pulled from an active [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) session and allows you to see how markers are performing across the selected frames.
+The **Single** view displays information about a single set of profiling data. You can use it to analyze how markers perform across frames. The view is divided into several frames, which contain information on frame timings, as well as min, max, median, mean, and lower / upper quartile values for frames, threads, and markers. 
 
-![SingleView.](images/single-view-populated.png)
+The Single view is laid out as follows:
 
-The analysed data is broken into a number of panels, a [Frame Control](frame-range-selection.md) showing the individual frame times, a set of summary panels detailing min, max, [median](https://en.wikipedia.org/wiki/Median), [mean](https://en.wikipedia.org/wiki/Arithmetic_mean) and lower/upper [quartile](https://en.wikipedia.org/wiki/Interquartile_range) values for the frames, threads and markers. This data is also represented as a [histogram](https://en.wikipedia.org/wiki/Histogram) and [box and whisker plots](https://en.wikipedia.org/wiki/Box_plot).
+![Single View](images/profile-analyzer-single-view.png)<br/> *The Single view in the Profile Analyzer window, with some data loaded*
 
-## Frame Control
-![SingleView.](images/single-view-frame-selection.png)
+|Pane|Description|
+|---|---|
+|**A:** Frame control| Displays individual frame timings, ordered by frame index or frame duration. You can also use this pane to select a range of frames for the Profile Analyzer to analyze. For more information on this pane, see the [Frame control](frame-range-selection.md) documentation.|
+|**B:** Filters| Use the filter pane to limit the data the Profile Analyzer displays. You can filter by partial match name, thread, or depth slice. You can also exclude markers to remove any markers that aren't relevant from the filtered view. For more information on how to use the filter pane, see the [Filter](filtering-system.md) documentation.|
+|**C:** Top 10 markers on median frame| Visualizes the ten highest duration markers that contributed to the frame. You can select any of the markers in this pane to see more information on them. The Profile Analyzer reflects changes you make to the depth filter in this pane. |
+|**D:** Marker details for currently selected range| A sortable list of markers, with detailed information on its timings. For more information, see the [Marker details list](#marker-details-list) section of this page.|
+|**E:** Frame summary| Displays a summary of frame times. This pane provides useful information if you select a range of frames including the maximum, minimum, upper and lower quartile, mean, and median timings. It also displays the timings as a histogram and box and whisker plot. For more information on the statistics available and how to analyze them, see the documentation on [Statistics in the Profile Analyzer](statistics.md).|
+|**F:** Thread summary|Displays information about the threads in the data set. **Total Count** is the total number of threads in the data set, and **Selected** is the number of threads you've selected from the data set. To select more threads, see the documentation on the [Thread Window](filtering-system.html#thread-window) in the Filters pane documentation. <br/><br/> There is also a summary of the median run time of the current filtered thread with a box and whisker plot of the thread. Use the **Graph Scale** dropdown to select a scale for the plot. You can choose from **Median frame time**, **Upper quartile of frame time**, or **Max frame time**.|
+|**G:** Marker summary| Summarizes the marker data of the current selected item in the **Marker Details** list. Visualizes the marker's mean frame contribution as a percentage of total time, and links to the first occurrence of that marker in the Profiler window. <br/><br/>Use the **Top by frame costs** dropdown to select the number of highest occurrences of this marker to display. If you select a range of frames, the Profile Analyzer displays a histogram and box and whisker plot of the data. It also displays the maximum, minimum, upper and lower quartile, mean, and median timings of the frames, plus the individual maximum and minimum.| 
 
-Displays the individual frame times ordered by frame index or by frame time. Use this control to select sub-ranges and have the analysis done over the newly selected frame set. See [Frame Range Selection](frame-range-selection.md) for detailed usage.
+To load data into the **Single** view, select the **Pull Data** button in the frame control pane, and the Profile Analyzer pulls in any data in the [Profiler](https://docs.unity3d.com/Manual/Profiler.html) window. Alternatively, select the **Load** button to load Profile Analyzer (.pdata) data you have saved from a previous session. 
 
-## Filters
-![SingleView.](images/single-view-frames-and-filters.png)
+>[!NOTE]
+>If you select the **Load** option, the data must be in the Profile Analyzer .pdata format. If you have data from the Profiler in the .data file format, open it in the Profiler first, and then select the **Pull Data** button in the Profile Analyzer.
 
-The Single View’s working set can be reduced with the use of the [filtering system](filtering-system.md), limiting markers by partial name match, which thread they ran on and limiting to a specific stack level.
+For more information on how to pull data into the Profile Analyzer, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
 
-Along with filtering to a specific name match you can also elect to exclude a further set of markers by name to remove any markers that are not statistically relevant from the filter set or are somehow distorting the view of your filtered marker set.
+## Marker details list
+The **Marker details** pane contains a sortable list of markers with a number of useful statistics. If you select a marker in the list, the **Marker Summary** panel displays in depth information on the marker. Each marker in the list is an aggregation of all the instances of that marker, across all filtered threads and in all ranged frames.
 
-## Median Frame Top 10 Marker stack
-![SingleView.](images/single-view-top-10-markers.png)
+You can filter the columns in the **Marker details** to a more relevant set. This is particularly useful if you want to filter out irrelevant data when you look for **Time** or **Count** values.  To filter the columns, select the **Marker columns** dropdown from the **Filters** pane.  For more information on how to filter data, see the [Filters](filtering-system.md) documentation.
 
-Shows the top 10 contributing markers matching the current filter set and frame selection, changes to the depth filter will be reflected in this control.
+### Marker details columns and groups
+By default, the **Marker columns** dropdown in the **Filters** pane has six preset column layouts that you can use to adjust the layout of the **Marker details** pane. They are:
 
-## Frame Summary
-Summarises the frame times with links to relevant frames in the profiler window for the min, median and max frames. This data is also represented as a histogram and box and whisker plot. For some example data distributions see our [distributions](distributions.md) page.
-
-## Thread Summary
-Summarises the currently filtered thread median run time and shows a box and whisker plot that can be scaled by Median frame time, Upper quartile of frame time or Max frame time.
-
-## Marker Summary
-Summarises the marker data of the currently selected item in the marker list and includes the mean frame contribution, Top ‘n’ frames by total frame cost and individual min and max values. Links are provided to allow simple navigation to the relevant frame in the Unity Profiler window. This data is also represented as a histogram and box and whisker plot. For some example data distributions see our [distributions](distributions.md) page.
-
-## Marker list
-A sortable list of markers showing a number of useful statistics, selecting a marker in the list drives the Marker Summary panel to show more in depth information. Each marker in the list represents an aggregation of all the instances of that marker, across all filtered threads and in all ranged frames.
-
-The Marker list columns can be filtered to a more salient set from the _Marker Columns_ drop down in the [filtering system](filtering-system.md), which can help minimise the noise when you are looking for _Time_ or _Count_ values.
-
- ### Column and Groups Available:
-* **Name**
-    * Name of the marker - available in all groups
-
-* **1st**
-    * The frame number that the marker was first pushed / popped. - not on by default in any groups
-
-* **Time and Count**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Median**
-        * The median value from the markers time distribution.
-    * **Mean**
-        * The average value from the markers time distribution.
-    * **Min**
-        * The minimum value from the markers time distribution.
-    * **Max**
-        * The maximum value from the markers time distribution.
-    * **Range**
-        * The difference from the maximum and minimum marker times.
-    * **Count**
-        * The number of times the marker was push / popped.
-    * **Count Frame**
-        * The average number of times the marker was pushed / popped per frame.
-    * **At Median Frame**
-        * The sum of activity for the marker in the median frame.
-
-* **Time**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Median**
-        * The median value from the markers time distribution.
-    * **Min**
-        * The minimum value from the markers time distribution.
-    * **Max**
-        * The maximum value from the markers time distribution.
-    * **Range**
-        * The difference from the maximum and minimum marker times.
-    * **At Median Frame**
-        * The sum of activity for the marker in the median frame.
-
-* **Totals**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Total**
-        * The total time spent for this marker in all the selected frames.
+* **Time and count:** Displays information on the average timings and number of times the markers were called.
+* **Time:** Displays information on the average timings of the markers. 
+* **Totals:** Displays information about the total amount of time the markers took on the whole data set.
+* **Time with totals:** Displays information about both the average and total times of the markers. 
+* **Count totals:** Displays information about the total number of times the markers were called.
+* **Count per frame:** Displays information on the average total per frame the markers were called. 
+* **Depths:** Displays information on where the markers are in the Hierarchy. For more information, see the documentation on Depth Slices in [Filters pane](filtering-system.html#depth-slice).
+* **Threads:** Displays the name of the thread that the markers appear on. For more information, see the documentation on the Thread window in [Filters pane](filtering-system.html#thread-window).
 
 
-* **Time With Totals**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Median**
-        * The median value from the markers time distribution.
-    * **Min**
-        * The minimum value from the markers time distribution.
-    * **Max**
-        * The maximum value from the markers time distribution.
-    * **Range**
-        * The difference from the maximum and minimum marker times.
-    * **At Median Frame**
-        * The sum of activity for the marker in the median frame.
-    * **Total**
-        * The total time spent for this marker in all the selected frames.
+You can also use the **Custom** column layout, to select your own custom mix of columns to add to the layout. To do this, right-click on the header of any column, and manually enable or disable any of the columns as necessary. 
 
-* **Count Total**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Count**
-        * The number of times the marker was push / popped.
+![Context menu](images/marker-details-custom-columns.png)<br/>*The list of columns you can add to the Marker Details pane*
 
-* **Count Per Frame**
-    * **Depth**
-        * The depths in the hierarchy that the marker appears on.
-    * **Count Frame**
-        * The average number of times the marker was pushed / popped per frame.
+The following table shows the columns that the Profile Analyzer displays when you select that layout.
 
- * **Custom**
-    * From any of the Marker Column Groups you can turn on / off any of the available columns to create a custom set of columns.
+||**Time and count**|**Time**|**Totals**|**Time with totals**|**Count totals**|**Count per frame**|**Depths**|**Threads**|**Custom only**|
+|---|---|---|---|---|---|---|---|---|---|
+|**Marker Name**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;||
+|**Depth**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|||
+|**Median**|&#10003;|&#10003;||&#10003;||||||
+|**Median Bar**|&#10003;|&#10003;||&#10003;||||||
+|**Mean**|&#10003;|||||||||
+|**Min**|&#10003;|&#10003;||&#10003;||||||
+|**Max**|&#10003;|&#10003;||&#10003;||||||
+|**Range**|&#10003;|&#10003;||&#10003;|||||
+|**Count**|&#10003;||||&#10003;|||||
+|**Count Bar**|||||&#10003;|||||
+|**Count Frame**|&#10003;|||||&#10003;||||
+|**Count Frame Bar**||||||&#10003;||||
+|**1st**|||||||&#10003;||||
+|**At Median Frame**|&#10003;|&#10003;||&#10003;||||||
+|**Total**|||&#10003;|&#10003;||||||
+|**Total Bar**|||&#10003;|&#10003;||||||
+|**Threads**||||||||&#10003;||
 
+The following table explains what each column does:
 
-### Marker List Context Menu Commands
-* **Select Frames that contain this marker (within whole data set)**
-    * Select all the frames from the entire time range that contain an instance of this marker.
+|**Column**|**Description**|
+|---|---|
+|**Marker Name**| Displays the name of the marker.|
+|**Depth**|The depth in the hierarchy that the marker appears on.|
+|**Median**| The median value of the marker's time distribution.|
+|**Median Bar**| A visualization of the **Median** value.|
+|**Mean**| The average value of the marker's time distribution.|
+|**Min**| The minimum value of the marker's time distribution.|
+|**Max**| The maximum value of the marker's time distribution.|
+|**Range**| The difference between the marker's **Min** and **Max** timings.|
+|**Count**| The number of times the marker was pushed / popped.|
+|**Count Bar**|A visualization of the **Count** value. |
+|**Count Frame**|The average number of times per frame that the marker was pushed/popped.|
+|**Count Frame Bar**|A visualization of the **Count Frame** value.|
+|**1st**| The frame number in which the marker first was pushed / popped.|
+|**At Median Frame**| The sum of activity for the marker in the median frame.|
+|**Total**| The total time spent for this marker in all selected frames.|
+|**Total Bar**|A visualization of the **Total** value.|
+|**Thread**|The name of the thread that the marker appears on.|
 
-* **Select Frames that contain this marker (within current selection)**
-    * Reduce the current range selection to only include frames that contain an instance of this marker.
+### Marker Details context menu commands
+If you right click on a marker in the **Marker Details** list you can control the filter and list even further.
 
-* **Clear Selection**
-    * Clear any range selection.
+![Context menu](images/marker-details-context-menu.png)<br/>*The context menu of the Marker Details pane*
 
-* **Add to Include Filter**
-    * Add the currently selected marker to the *include* filter, this will filter the marker list to only markers that match.
-
-* **Add to Exclude Filter**
-    * Add the currently selected marker to the *exclude* filter, this will remove the marker from the marker list, useful to remove markers that are costly but are dwarfing markers that you are interested in.
-
-* **Remove from Include Filter**
-    * If the selected marker is already in the *include* filter then this command will remove it from the filter, resulting in more markers becoming visible again.
-
-
-* **Remove from Exclude Filter**
-    * If the selected marker is already in the *exclude* filter then this command will remove from the filter.
-
-* **Set as Parent Marker Filter**
-    * Limit the analysis to this marker and markers *included* below it on the callstack.
-
-* **Clear Parent Marker Filter**
-    * Limit the analysis to this marker and markers *included* within it.
-
-* **Copy To Clipboard**
-    * Copies the selected marker name to the clipboard.
-
-[Back to manual](manual.md)
+|**Command**|**Function**|
+|---|---|
+|**Select Frames that contain this marker (within whole data set)**| Select all the frames from the entire data set that contain an instance of this marker.|
+|**Select Frames that contain this marker (within current selection)**| Select all the frames from a selected range of data that contain an instance of this marker.|
+|**Clear Selection**| Clear any range selection.|
+|**Add to / Remove From Include Filter**| Add or remove the selected marker to the **Include** filter. This filters the marker list to only markers that match.|
+|**Add to / Remove From Exclude Filter**| Add the selected marker to the **Exclude** filter. This removes the marker from the marker list. This is useful if you want to remove markers that are using up resources and skewing the markers that you are interested in.|
+|**Set as Parent Marker Filter**| Limit the analysis to this marker and markers included below it on the callstack. For more information, see the [Parent Marker](filtering-system.html#parent-marker) documentation on the Filters page.|
+|**Clear Parent Marker Filter**| Select this to clear the marker as a parent marker filter.|
+|**Copy To Clipboard**| Copies the selected value to the clipboard.|

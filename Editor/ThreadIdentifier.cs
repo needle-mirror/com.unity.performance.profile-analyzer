@@ -6,7 +6,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     /// <summary>
     /// Individual Thread details
     /// </summary>
-    public struct ThreadIdentifier
+    internal struct ThreadIdentifier
     {
         /// <summary>Thread name with index combined. A profiler analyzer specific unique thread representation</summary>
         public string threadNameWithIndex { get; private set; }

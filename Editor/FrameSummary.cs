@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class FrameSummary
     {
         public double msTotal;

@@ -1,5 +1,8 @@
-﻿namespace UnityEditor.Performance.ProfileAnalyzer
+﻿using System;
+
+namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class MarkerPairing
     {
         public string name;

@@ -17,14 +17,10 @@ public class MarkerDataAPITests : ProfileAnalyzerBaseTest
 
         marker.ComputeBuckets(0, 20);
 
-        Assert.IsTrue(2 == marker.buckets[0]);
-
         for (int i = 1; i < marker.buckets.Length - 1; ++i)
         {
             Assert.IsTrue(1 == marker.buckets[i]);
         }
-
-        Assert.IsTrue(0 == marker.buckets[19]);
     }
 }
 

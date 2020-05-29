@@ -97,6 +97,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return threadNames;
         }
+        
+        public int GetThreadCount()
+        {
+            return threadNames.Count;
+        }
 
         public int OffsetToDisplayFrame(int offset)
         {

@@ -106,12 +106,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemSelectMax = new GUIContent("Select Longest Frame");
             public static readonly GUIContent menuItemSelectMedian = new GUIContent("Select Median Frame");
 
-//            public static readonly GUIContent menuItemSelectPrevious = new GUIContent("Select previous frame (cursor left)");
-//            public static readonly GUIContent menuItemSelectNext = new GUIContent("Select next frame (cursor right)");
-            public static readonly GUIContent menuItemSelectGrow = new GUIContent("Grow selection (+), hold SHIFT for faster");
-            public static readonly GUIContent menuItemSelectGrowLeft = new GUIContent("Grow selection left (<), hold ALT for reverse");
-            public static readonly GUIContent menuItemSelectGrowRight = new GUIContent("Grow selection right (>)");
-            public static readonly GUIContent menuItemSelectShrink = new GUIContent("Shrink selection (-)");
+            public static readonly GUIContent menuItemSelectPrevious = new GUIContent("Move selection left _LEFT");
+            public static readonly GUIContent menuItemSelectNext = new GUIContent("Move selection right _RIGHT");
+
+            public static readonly GUIContent menuItemSelectGrow = new GUIContent("Grow selection  _=");
+            public static readonly GUIContent menuItemSelectShrink = new GUIContent("Shrink selection  _-");
+            public static readonly GUIContent menuItemSelectGrowLeft = new GUIContent("Grow selection left  _<");
+            public static readonly GUIContent menuItemSelectGrowRight = new GUIContent("Grow selection right  _>");
+            public static readonly GUIContent menuItemSelectShrinkLeft = new GUIContent("Shrink selection left  _&<");
+            public static readonly GUIContent menuItemSelectShrinkRight = new GUIContent("Shrink selection right  _&>");
+
+            public static readonly GUIContent menuItemSelectGrowFast = new GUIContent("Grow selection (fast)  _#=");
+            public static readonly GUIContent menuItemSelectShrinkFast = new GUIContent("Shrink selection (fast)  _#-");
+            public static readonly GUIContent menuItemSelectGrowLeftFast = new GUIContent("Grow selection left (fast)  _#<");
+            public static readonly GUIContent menuItemSelectGrowRightFast = new GUIContent("Grow selection right (fast) _#>");
+            public static readonly GUIContent menuItemSelectShrinkLeftFast = new GUIContent("Shrink selection left (fast) _#&<");
+            public static readonly GUIContent menuItemSelectShrinkRightFast = new GUIContent("Shrink selection right (fast) _#&>");
 
             public static readonly GUIContent menuItemShowSelectedMarker = new GUIContent("Show Selected Marker");
             public static readonly GUIContent menuItemShowThreads = new GUIContent("Show Filtered Threads");
@@ -121,7 +131,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemShowOrderedByFrameDuration = new GUIContent("Order by Frame Duration");
         }
 
-        const int kXAxisWidth = 60;
+        const int kXAxisWidth = 80;
         const int kYAxisDetailThreshold = 40;
         const int kOverrunHeight = 3;
 
@@ -131,6 +141,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         bool m_IsOrderedByFrameDuration;
 
         List<Data> m_Values = new List<Data> { };
+        List<int> m_LastSelectedFrameOffsets = new List<int> { };
         int[] m_FrameOffsetToDataOffsetMapping = new int[] { };
         SetRange m_SetRange;
 
@@ -172,15 +183,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         List<BarData> m_Bars = new List<BarData>();
 
         DisplayUnits m_Units;
+        Rect m_LastRect;
+        int m_MaxFrames;
 
         string DisplayUnits()
         {
             return m_Units.Postfix();
         }
 
-        string ToDisplayUnits(float ms, bool showUnits = false)
+        string ToDisplayUnits(float ms, bool showUnits = false, int limitToNDigits = 5)
         {
-            return m_Units.ToString(ms, showUnits, 5);
+            return m_Units.ToString(ms, showUnits, limitToNDigits);
         }
 
         public void SetUnits(Units units)
@@ -209,6 +222,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_IsOrderedByFrameDuration = false;
 
             m_Enabled = true;
+
+            m_LastRect = new Rect(0, 0, 0, 0);
+            m_MaxFrames = -1;
         }
 
         int GetGraphIDAndIncrement()
@@ -428,13 +444,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public State ProcessInput(Rect rect, List<int> selectedFrameOffsets, int maxFrames = 0)
+        public bool IsMultiSelectControlHeld()
+        {
+#if UNITY_EDITOR_OSX
+            return Event.current.command;
+#else
+            return Event.current.control;
+#endif
+        }
+
+        public State ProcessInput()
         {
             if (!IsEnabled())
                 return State.None;
 
             if (m_Values == null)
                 return State.None;
+
+            if (m_LastRect.width == 0 || m_MaxFrames < 0)
+                return State.None;
+
+            Rect rect = m_LastRect;
+            int maxFrames = m_MaxFrames;
 
             int dataLength = m_Values.Count;
             if (dataLength <= 0)
@@ -451,10 +482,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int currentSelectionFirstFrameOffset;
             int currentSelectionLastFrameOffset;
 
-            GetSelectedRange(selectedFrameOffsets, out currentSelectionFirstDataOffset, out currentSelectionLastDataOffset, out currentSelectionFirstFrameOffset, out currentSelectionLastFrameOffset);
+            GetSelectedRange(m_LastSelectedFrameOffsets, out currentSelectionFirstDataOffset, out currentSelectionLastDataOffset, out currentSelectionFirstFrameOffset, out currentSelectionLastFrameOffset);
 
             m_CurrentSelection.Clear();
-            m_CurrentSelection.AddRange(selectedFrameOffsets);
+            m_CurrentSelection.AddRange(m_LastSelectedFrameOffsets);
             m_CurrentSelectionFirstDataOffset = currentSelectionFirstDataOffset;
             m_CurrentSelectionLastDataOffset = currentSelectionLastDataOffset;
 
@@ -508,7 +539,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if ((EditorApplication.timeSinceStartup - m_LastClickTime) > doubleClickTimeout)
                 {
                     // By this point we will know if its a single or double click
-                    CallSetRange(m_DragFirstOffset, m_DragLastOffset, m_ClickCount, m_SingleControlAction, FrameTimeGraph.State.DragComplete);
+                    bool append = IsMultiSelectControlHeld();
+                    CallSetRange(m_DragFirstOffset, m_DragLastOffset, m_ClickCount, m_SingleControlAction, FrameTimeGraph.State.DragComplete, append);
 
                     ClearDragSelection();
                     if (m_PairedWithFrameTimeGraph != null && !m_SingleControlAction)
@@ -529,7 +561,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
             if (maxFrames > 0)
             {
-                width = width * dataLength / maxFrames;
+                if (!m_Zoomed)
+                    width = width * dataLength / maxFrames;
             }
 
             // Process input 
@@ -584,6 +617,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         s_LastSelectedGraphId = m_GraphId;
 
+                        if (GUI.GetNameOfFocusedControl() != "FrameTimeGraph")
+                        {
+                            // Take focus away from any other control
+                            // Doesn't really matter what the name is here
+                            GUI.FocusControl("FrameTimeGraph");
+                        }
+
                         if (e.type == EventType.MouseDown && e.button == 0)
                         {
                             // Drag start (must be within the bounds of the control)
@@ -605,7 +645,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
 
                             if (m_PairedWithFrameTimeGraph != null)
-                                m_SingleControlAction = e.control || e.alt;  // Record if we are acting only on this control rather than the paired one too
+                                m_SingleControlAction = e.alt;  // Record if we are acting only on this control rather than the paired one too
                             else
                                 m_SingleControlAction = true;
 
@@ -617,7 +657,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
                             else
                             {
-                                SetDragSelection(dataOffset, frameOffsetBeforeNext, DragDirection.Start);
+                                //SetDragSelection(dataOffset, frameOffsetBeforeNext, DragDirection.Start);
+
+                                // Select just 1 frame
+                                SetDragSelection(dataOffset, dataOffset, DragDirection.Start);
                             }
                             CallSetRange(m_DragFirstOffset, m_DragLastOffset, m_ClickCount, m_SingleControlAction, FrameTimeGraph.State.Dragging);
                             return State.Dragging;
@@ -746,7 +789,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_SetRange = setRange;
         }
 
-        void CallSetRange(int startDataOffset, int endDataOffset, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus, bool effectPaired = true)
+        void CallSetRange(int startDataOffset, int endDataOffset, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus, bool append = false, bool effectPaired = true)
         {
             if (m_SetRange == null)
                 return;
@@ -755,10 +798,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             endDataOffset = Math.Min(endDataOffset, m_Values.Count-1);
 
             List<int> selected = new List<int>();
+            if (append && m_LastSelectedFrameOffsets.Count!=m_Values.Count)
+            {
+                foreach (int frameOffset in m_LastSelectedFrameOffsets)
+                {
+                    int dataOffset = m_FrameOffsetToDataOffsetMapping[frameOffset];
+                    if (dataOffset >= 0 && dataOffset < m_Values.Count)
+                    {
+                        selected.Add(frameOffset);
+                    }
+                }
+            }
             for (int dataOffset = startDataOffset; dataOffset <= endDataOffset; dataOffset++)
             {
                 if (dataOffset >= 0 && dataOffset < m_Values.Count)
-                    selected.Add(m_Values[dataOffset].frameOffset);
+                {
+                    int frameOffset = m_Values[dataOffset].frameOffset;
+                    if (append==false || !selected.Contains(frameOffset))
+                    {
+                        selected.Add(frameOffset);
+                    }
+                }
             }
             // Sort selection in frame index order so start is lowest and end is highest
             selected.Sort();
@@ -776,6 +836,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (startOffset > otherMaxFrame)
                 {
+                    if (append)
+                    {
+                        // Nothing more to do
+                        return;
+                    }
+
                     // Select all, if the main selection is outsize the range of the other
                     startOffset = 0;
                     endOffset = otherMaxFrame;
@@ -792,7 +858,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     endOffset = ClampToRange(endOffset, 0, otherMaxFrame);
                 }
 
-                m_PairedWithFrameTimeGraph.CallSetRange(startOffset, endOffset, clickCount, singleControlAction, inputStatus, false);
+                m_PairedWithFrameTimeGraph.CallSetRange(startOffset, endOffset, clickCount, singleControlAction, inputStatus, append, false);
             }
         }
 
@@ -862,6 +928,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return totalMs;
         }
+        float GetTotalSelectionTime(int firstOffset, int lastOffset)
+        {
+            float totalMs = 0;
+            for (int frameOffset = firstOffset; frameOffset <= lastOffset; frameOffset++)
+            {
+                if (frameOffset < m_FrameOffsetToDataOffsetMapping.Length)
+                {
+                    int dataOffset = m_FrameOffsetToDataOffsetMapping[frameOffset];
+                    totalMs += m_Values[dataOffset].ms;
+                }
+            }
+
+            return totalMs;
+        }
 
         void ShowFrameLines(float x, float y, float yRange, float width, float height)
         {
@@ -876,10 +956,58 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        bool InSelectedRegion(int startDataOffset, int endDataOffset, int selectedFirstOffset, int selectedLastOffset, Dictionary<int, int> frameOffsetToSelectionIndex, bool subsetSelected)
+        {
+            bool inSelectionRegion = false;
+
+            bool showCurrentSelection = false;
+            if (HasDragRegion())
+            {
+                if (endDataOffset >= selectedFirstOffset && startDataOffset <= selectedLastOffset)
+                {
+                    inSelectionRegion = true;
+                }
+                if (IsMultiSelectControlHeld() && m_LastSelectedFrameOffsets.Count != m_Values.Count)
+                {
+                    // Show current selection too
+                    showCurrentSelection = true;
+                }
+            }
+            else
+            {
+                showCurrentSelection = true;
+            }
+
+            if (showCurrentSelection)
+            { 
+                if (subsetSelected)
+                {
+                    for (int dataOffset = startDataOffset; dataOffset <= endDataOffset; dataOffset++)
+                    {
+                        int frameOffset = m_Values[dataOffset].frameOffset;
+                        if (frameOffsetToSelectionIndex.ContainsKey(frameOffset))
+                        {
+                            inSelectionRegion = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return inSelectionRegion;
+        }
+
         public void Draw(Rect rect, ProfileAnalysis analysis, List<int> selectedFrameOffsets, float yMax, int displayOffset, string selectedMarkerName, int maxFrames = 0, ProfileAnalysis fullAnalysis = null)
         {
+            if (Event.current.type == EventType.Repaint)
+                m_LastRect = rect;
+
+            m_MaxFrames = maxFrames;
+
             if (m_Values == null)
                 return;
+
+            m_LastSelectedFrameOffsets = selectedFrameOffsets;
 
             int totalDataSize = m_Values.Count;
             if (totalDataSize <= 0)
@@ -918,7 +1046,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 selectedFirstOffset = m_DragFirstOffset;
                 selectedLastOffset = m_DragLastOffset;
-                selectedCount = 1 + (m_DragLastOffset - m_DragFirstOffset);
+
+                if (selectedFirstOffset > m_Values.Count - 1)
+                {
+                    // Selection off the end
+                    selectedFirstOffset = m_Values.Count;
+                    selectedLastOffset = m_Values.Count;
+                    selectedCount = 0;
+                }
+                else
+                {
+                    selectedFirstOffset = ClampToRange(selectedFirstOffset, 0, m_Values.Count - 1);
+                    selectedLastOffset = ClampToRange(selectedLastOffset, 0, m_Values.Count - 1);
+
+                    selectedCount = 1 + (selectedLastOffset - selectedFirstOffset);
+                }
+
                 subsetSelected = true;
             }
             else
@@ -926,7 +1069,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 selectedFirstOffset = currentSelectionFirstDataOffset;
                 selectedLastOffset = currentSelectionLastDataOffset;
                 selectedCount = selectedFrameOffsets.Count;
-                subsetSelected = (selectedCount > 0) && (selectedCount != totalDataSize);
+                subsetSelected = (selectedCount != totalDataSize);
             }
 
             // Draw frames and selection
@@ -949,7 +1092,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
             if (maxFrames > 0)
             {
-                width = width * totalDataSize / maxFrames;
+                if (!m_Zoomed)
+                    width = width * totalDataSize / maxFrames;
             }
 
             // Start / End
@@ -1002,22 +1146,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 foreach (BarData bar in m_Bars)
                 {
-                    bool containsSelection = false;
-                    for (int dataOffset = bar.startDataOffset; dataOffset <= bar.endDataOffset; dataOffset++)
-                    {
-                        int frameOffset = m_Values[dataOffset].frameOffset;
-                        if (frameOffsetToSelectionIndex.ContainsKey(frameOffset))
-                        {
-                            containsSelection = true;
-                            break;
-                        }
-                    }
-
-                    if (HasDragRegion() && bar.endDataOffset >= selectedFirstOffset && bar.startDataOffset <= selectedLastOffset)
-                    {
-                        m_2D.DrawFilledBox(bar.x, bar.y, bar.w, height, m_ColorBarBackgroundSelected);
-                    }
-                    else if (!HasDragRegion() && subsetSelected && containsSelection)
+                    bool inSelectionRegion = InSelectedRegion(bar.startDataOffset, bar.endDataOffset, selectedFirstOffset, selectedLastOffset, frameOffsetToSelectionIndex, subsetSelected);
+                    if (inSelectionRegion)
                     {
                         m_2D.DrawFilledBox(bar.x, bar.y, bar.w, height, m_ColorBarBackgroundSelected);
                     }
@@ -1036,33 +1166,25 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     full = true;
                 }
 
-                float totalMs = GetTotalSelectionTime(selectedFrameOffsets);
-                string selectionAreaString = string.Format("\n\nTotal time for {0} selected frames {1}",selectedCount,ToDisplayUnits(totalMs, true));
+
+                float totalMs;
+                if (HasDragRegion())
+                {
+                    totalMs = GetTotalSelectionTime(selectedFirstOffset, selectedLastOffset);
+                }
+                else
+                {
+                    totalMs = GetTotalSelectionTime(selectedFrameOffsets);
+                }
+
+                string timeForSelectedFrames = ToDisplayUnits(totalMs, true, 0);
+                string timeForSelectedFramesClamped = ToDisplayUnits(totalMs, true, 1);
+                string selectionAreaString = string.Format("\n\nTotal time for {0} selected frames\n{1} ({2})", selectedCount, timeForSelectedFrames, timeForSelectedFramesClamped);
 
                 MarkerData selectedMarker = (m_GlobalSettings.showSelectedMarker && analysisData!=null) ? analysisData.GetMarkerByName(selectedMarkerName) : null;
                 foreach (BarData bar in m_Bars)
                 {
-                    bool containsSelection = false;
-                    for (int dataOffset = bar.startDataOffset; dataOffset <= bar.endDataOffset; dataOffset++)
-                    {
-                        int frameOffset = m_Values[dataOffset].frameOffset;
-                        if (frameOffsetToSelectionIndex.ContainsKey(frameOffset))
-                        {
-                            containsSelection = true;
-                            break;
-                        }
-                    }
-
-                    bool inSelectionRegion = false;
-                    if (HasDragRegion() && bar.endDataOffset >= selectedFirstOffset && bar.startDataOffset <= selectedLastOffset)
-                    {
-                        inSelectionRegion = true;
-                    }
-                    else if (!HasDragRegion() && subsetSelected && containsSelection)
-                    {
-                        inSelectionRegion = true;
-                    }
-                    
+                    bool inSelectionRegion = InSelectedRegion(bar.startDataOffset, bar.endDataOffset, selectedFirstOffset, selectedLastOffset, frameOffsetToSelectionIndex, subsetSelected);
                     if (inSelectionRegion)
                     {
                         m_2D.DrawFilledBox(bar.x, bar.y, bar.w, bar.h, m_ColorBarSelected);
@@ -1124,7 +1246,39 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (showAxis)
             {
-                ShowAxis(rect, xStart, width, startOffset, endOffset, selectedFirstOffset, selectedLastOffset, selectedCount, yMax, totalDataSize, displayOffset); 
+                int zoomedSelectedFirstOffset = selectedFirstOffset;
+                int zoomedSelectedLastOffset = selectedLastOffset;
+                int zoomedSelectedCount = selectedCount;
+                if (m_Zoomed)
+                {
+                    if (selectedFirstOffset > endOffset || selectedLastOffset < startOffset)
+                    {
+                        zoomedSelectedCount = 0;
+                    }
+                    else
+                    {
+                        // Clamp selection range to zoom range
+                        zoomedSelectedFirstOffset = ClampToRange(selectedFirstOffset, startOffset, endOffset);
+                        zoomedSelectedLastOffset = ClampToRange(selectedLastOffset, startOffset, endOffset);
+                        if (HasDragRegion())
+                        {
+                            zoomedSelectedCount = 1 + (zoomedSelectedLastOffset - zoomedSelectedFirstOffset);
+                        }
+                        else
+                        {
+                            zoomedSelectedCount = 0;
+                            foreach (var offset in selectedFrameOffsets)
+                            {
+                                if (offset >= startOffset && offset <= endOffset)
+                                {
+                                    zoomedSelectedCount++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ShowAxis(rect, xStart, width, startOffset, endOffset, zoomedSelectedFirstOffset, zoomedSelectedLastOffset, zoomedSelectedCount, selectedCount, yMax, totalDataSize, displayOffset); 
             }
 
             GUI.enabled = enabled;
@@ -1183,7 +1337,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (full || selected)
             {
-                // Clamp to frame time (these values can be tiem summed over multiple threads)
+                // Clamp to frame time (these values can be time summed over multiple threads)
                 if (max > bar.yMax)
                     max = bar.yMax;
 
@@ -1306,46 +1460,43 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        void ShowSelectionMenuItem(bool subsetSelected, GenericMenu menu, GUIContent style, bool state, GenericMenu.MenuFunction func)
+        {
+            if (subsetSelected)
+                menu.AddItem(style, state, func);
+            else
+                menu.AddDisabledItem(style);
+        }
+
         void ShowContextMenu(bool subsetSelected)
         {
             GenericMenu menu = new GenericMenu();
             bool showselectionOptions = subsetSelected || ((m_PairedWithFrameTimeGraph != null) && m_PairedWithFrameTimeGraph.HasSubsetSelected());
-            if (showselectionOptions)
-            {
-                menu.AddItem(Styles.menuItemClearSelection, false, () => ClearSelection());
-                if (subsetSelected)
-                    menu.AddItem(Styles.menuItemInvertSelection, false, () => InvertSelection());
-                else
-                    menu.AddDisabledItem(Styles.menuItemInvertSelection);
-            }
-            else
-            {
-                menu.AddDisabledItem(Styles.menuItemClearSelection);
-                menu.AddDisabledItem(Styles.menuItemInvertSelection);
-            }
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemClearSelection, false, () => ClearSelection());
+            ShowSelectionMenuItem(showselectionOptions && subsetSelected, menu, Styles.menuItemInvertSelection, false, () => InvertSelection());
             menu.AddItem(Styles.menuItemSelectMin, false, () => SelectMin());
             menu.AddItem(Styles.menuItemSelectMax, false, () => SelectMax());
             menu.AddItem(Styles.menuItemSelectMedian, false, () => SelectMedian());
             menu.AddSeparator("");
-            //menu.AddItem(Styles.menuItemSelectPrevious, false, () => SelectPrevious(1));
-            //menu.AddItem(Styles.menuItemSelectNext, false, () => SelectNext(1));
-            menu.AddItem(Styles.menuItemSelectGrow, false, () => SelectGrow(1));
-            menu.AddItem(Styles.menuItemSelectShrink, false, () => SelectShrink(1));
-            menu.AddItem(Styles.menuItemSelectGrowLeft, false, () => SelectGrowLeft(1));
-            menu.AddItem(Styles.menuItemSelectGrowRight, false, () => SelectGrowRight(1));
-            //menu.AddItem(Styles.menuItemSelectShrinkLeft, false, () => SelectShrinkLeft(1));
-            //menu.AddItem(Styles.menuItemSelectShrinkRight, false, () => SelectShrinkRight(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectPrevious, false, () => SelectPrevious(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectNext, false, () => SelectNext(1));
             menu.AddSeparator("");
-            if (showselectionOptions)
-            {
-                menu.AddItem(Styles.menuItemZoomSelection, false, () => ZoomSelection());
-                menu.AddItem(Styles.menuItemZoomAll, false, () => ZoomAll());
-            }
-            else
-            {
-                menu.AddDisabledItem(Styles.menuItemZoomSelection);
-                menu.AddDisabledItem(Styles.menuItemZoomAll);
-            }
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrow, false, () => SelectGrow(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrink, false, () => SelectShrink(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrowLeft, false, () => SelectGrowLeft(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrowRight, false, () => SelectGrowRight(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrinkLeft, false, () => SelectShrinkLeft(1));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrinkRight, false, () => SelectShrinkRight(1));
+            menu.AddSeparator("");
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrowFast, false, () => SelectGrow(10));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrinkFast, false, () => SelectShrink(10));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrowLeftFast, false, () => SelectGrowLeft(10));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectGrowRightFast, false, () => SelectGrowRight(10));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrinkLeftFast, false, () => SelectShrinkLeft(10));
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemSelectShrinkRightFast, false, () => SelectShrinkRight(10));
+            menu.AddSeparator("");
+            ShowSelectionMenuItem(showselectionOptions, menu, Styles.menuItemZoomSelection, false, () => ZoomSelection());
+            ShowSelectionMenuItem(m_Zoomed, menu, Styles.menuItemZoomAll, false, () => ZoomAll());
             menu.AddSeparator("");
             menu.AddItem(Styles.menuItemShowSelectedMarker, m_GlobalSettings.showSelectedMarker, () => ToggleShowSelectedMarker());
             menu.AddItem(Styles.menuItemShowThreads, m_GlobalSettings.showThreads, () => ToggleShowThreads());
@@ -1375,10 +1526,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             yAxisOptions.Add(new GUIContent(ToDisplayUnits(1000f/30f,true), "Graph Scale : 2 60 Hz frames"));
             yAxisOptions.Add(new GUIContent(ToDisplayUnits(1000f/15f,true), "Graph Scale : 4 60 Hz frames)"));
             yAxisOptions.Add(new GUIContent(yMaxText, "Graph Scale : Max frame time from data"));
+
+            float width = 0;
+            foreach (var content in yAxisOptions)
+            {
+                Vector2 size = EditorStyles.popup.CalcSize(content);
+                if (size.x > width)
+                    width = size.x;
+            }
+
+            // Use smaller width if text is shorter
+            width = Math.Min(width, rect.width);
+            // Shift right to right align
+            rect.x += (rect.width - width);
+            rect.width = width;
             s_YAxisMode = (AxisMode)EditorGUI.Popup(rect, (int)s_YAxisMode, yAxisOptions.ToArray());
         }
 
-        void ShowAxis(Rect rect, float xStart, float width, int startOffset, int endOffset, int selectedFirstOffset, int selectedLastOffset, int selectedCount, float yMax, int totalDataSize, int displayOffset)
+        void ShowAxis(Rect rect, float xStart, float width, int startOffset, int endOffset, int selectedFirstOffset, int selectedLastOffset, int selectedCount, int totalSelectedCount, float yMax, int totalDataSize, int displayOffset)
         {
             GUIStyle leftAlignStyle = new GUIStyle(GUI.skin.label);
             leftAlignStyle.padding = new RectOffset(leftAlignStyle.padding.left, leftAlignStyle.padding.right, 0, 0);
@@ -1419,82 +1584,105 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
 
             // Show selection frame values (if space for them)
-            int selectedFirstX = GetXForDataOffset(selectedFirstOffset, (int)width, totalDataSize);
-            int selectedLastX = GetXForDataOffset(selectedLastOffset+1, (int)width, totalDataSize);   // last + 1 so right hand side of the bbar
-            int selectedRangeWidth = 1 + (selectedLastX - selectedFirstX);
-
-            int selectedFirstIndex = displayOffset + selectedFirstOffset;
-            int selectedLastIndex = displayOffset + selectedLastOffset;
-            string selectionRangeText;
-            if (selectedCount > 1)
+            if (totalSelectedCount > 0)
             {
-                if (m_GlobalSettings.showOrderedByFrameDuration)
-                    selectionRangeText = string.Format("[{0}]", selectedCount);
+                if (selectedCount==0)
+                {
+                    // If we have no selection then adjust 'selection start/end to span whole view so the count display is centred)
+                    selectedFirstOffset = startOffset;
+                    selectedLastOffset = endOffset;
+                }
+
+                int selectedFirstX = GetXForDataOffset(selectedFirstOffset, (int)width, totalDataSize);
+                int selectedLastX = GetXForDataOffset(selectedLastOffset + 1, (int)width, totalDataSize);   // last + 1 so right hand side of the bbar
+                int selectedRangeWidth = 1 + (selectedLastX - selectedFirstX);
+
+                int selectedFirstIndex = displayOffset + selectedFirstOffset;
+                int selectedLastIndex = displayOffset + selectedLastOffset;
+
+                string selectionCountText;
+                if (totalSelectedCount != selectedCount)
+                    selectionCountText = string.Format("[{0} of {1}]", selectedCount, totalSelectedCount);
                 else
-                    selectionRangeText = string.Format("{0} [{1}] {2}", selectedFirstIndex, selectedCount, selectedLastIndex);
-            }
-            else
-                selectionRangeText = string.Format("{0} [{1}]", selectedFirstIndex, selectedCount);
-            GUIContent selectionRangeTextContent = new GUIContent(selectionRangeText, string.Format("{0} frames in selection", selectedCount));
-            Vector2 selectionRangeTextSize = GUI.skin.label.CalcSize(selectionRangeTextContent);
-            if (selectedRangeWidth > selectionRangeTextSize.x)
-            {
-                // Selection width is larger than the text so we can split the text 
-                string selectedFirstIndexText = string.Format("{0}", selectedFirstIndex);
-                GUIContent selectedFirstIndexContent = new GUIContent(selectedFirstIndexText);
-                Vector2 selectedFirstIndexSize = GUI.skin.label.CalcSize(selectedFirstIndexContent);
-                if (m_GlobalSettings.showOrderedByFrameDuration)
-                    selectedFirstIndexSize.x = 0;
+                    selectionCountText = string.Format("[{0}]", selectedCount);
 
-                string selectedLastIndexText = string.Format("{0}", selectedLastIndex);
-                GUIContent selectedLastIndexContent = new GUIContent(selectedLastIndexText);
-                Vector2 selectedLastIndexSize = GUI.skin.label.CalcSize(selectedLastIndexContent);
-                if (m_GlobalSettings.showOrderedByFrameDuration)
-                    selectedLastIndexSize.x = 0;
-
-                string selectedCountText = string.Format("[{0}]", selectedCount);
-                GUIContent selectedCountContent = new GUIContent(selectedCountText, string.Format("{0} frames in selection", selectedCount));
-                Vector2 selectedCountSize = GUI.skin.label.CalcSize(selectedCountContent);
-
-                Rect rFirst = new Rect(rect.x + selectedFirstX, y, selectedFirstIndexSize.x, selectedFirstIndexSize.y);
-                GUI.Label(rFirst, selectedFirstIndexContent); 
-
-                Rect rLast = new Rect(rect.x + selectedLastX - selectedLastIndexSize.x, y, selectedLastIndexSize.x, selectedLastIndexSize.y);
-                GUI.Label(rLast, selectedLastIndexContent);
-
-                float mid = selectedFirstX + ((selectedLastX - selectedFirstX) / 2);
-                Rect rCount = new Rect(rect.x + mid - (selectedCountSize.x / 2), y, selectedCountSize.x, selectedCountSize.y);
-                GUI.Label(rCount, selectedCountContent);
-
-                if (selectedFirstX < startIndexSize.x)
+                string selectionRangeText;
+                if (selectedCount > 1)
                 {
-                    // would overlap with start text
-                    drawStart = false;
+                    if (m_GlobalSettings.showOrderedByFrameDuration)
+                        selectionRangeText = selectionCountText;
+                    else
+                        selectionRangeText = string.Format("{0} {1} {2}", selectedFirstIndex, selectionCountText, selectedLastIndex);
                 }
-                if (selectedLastX > ((width - 1) - endIndexSize.x))
+                else
+                    selectionRangeText = string.Format("{0} {1}", selectedFirstIndex, selectionCountText);
+                
+                string tooltip = string.Format("{0} frames in selection", selectedCount);
+                if (totalSelectedCount != selectedCount)
                 {
-                    // would overlap with end text
-                    drawEnd = false;
+                    tooltip = string.Format("{0} frames in zoomed selection\n{1} frames in overall selection", selectedCount, totalSelectedCount);
                 }
-            }
-            else
-            {
-                int mid = (selectedFirstX + (selectedRangeWidth / 2));
-                int selectionTextX = mid - (int)(selectionRangeTextSize.x / 2);
-                selectionTextX = ClampToRange(selectionTextX, 0, (int)((width - 1) - selectionRangeTextSize.x));
 
-                Rect rangeRect = new Rect(rect.x + selectionTextX, y, selectionRangeTextSize.x, selectionRangeTextSize.y);
-                GUI.Label(rangeRect, selectionRangeTextContent);
-
-                if (selectionTextX < startIndexSize.x)
+                GUIContent selectionRangeTextContent = new GUIContent(selectionRangeText, tooltip);
+                Vector2 selectionRangeTextSize = GUI.skin.label.CalcSize(selectionRangeTextContent);
+                if ((selectedRangeWidth > selectionRangeTextSize.x && selectedCount>1) || selectedCount==0)
                 {
-                    // would overlap with start text
-                    drawStart = false;
+                    // Selection width is larger than the text so we can split the text 
+                    string selectedFirstIndexText = string.Format("{0}", selectedFirstIndex);
+                    GUIContent selectedFirstIndexContent = new GUIContent(selectedFirstIndexText);
+                    Vector2 selectedFirstIndexSize = GUI.skin.label.CalcSize(selectedFirstIndexContent);
+                    if (m_GlobalSettings.showOrderedByFrameDuration)
+                        selectedFirstIndexSize.x = 0;
+
+                    string selectedLastIndexText = string.Format("{0}", selectedLastIndex);
+                    GUIContent selectedLastIndexContent = new GUIContent(selectedLastIndexText);
+                    Vector2 selectedLastIndexSize = GUI.skin.label.CalcSize(selectedLastIndexContent);
+                    if (m_GlobalSettings.showOrderedByFrameDuration)
+                        selectedLastIndexSize.x = 0;
+
+                    GUIContent selectedCountContent = new GUIContent(selectionCountText, tooltip);
+                    Vector2 selectedCountSize = GUI.skin.label.CalcSize(selectedCountContent);
+
+                    Rect rFirst = new Rect(rect.x + selectedFirstX, y, selectedFirstIndexSize.x, selectedFirstIndexSize.y);
+                    GUI.Label(rFirst, selectedFirstIndexContent);
+
+                    Rect rLast = new Rect(rect.x + selectedLastX - selectedLastIndexSize.x, y, selectedLastIndexSize.x, selectedLastIndexSize.y);
+                    GUI.Label(rLast, selectedLastIndexContent);
+
+                    float mid = selectedFirstX + ((selectedLastX - selectedFirstX) / 2);
+                    Rect rCount = new Rect(rect.x + mid - (selectedCountSize.x / 2), y, selectedCountSize.x, selectedCountSize.y);
+                    GUI.Label(rCount, selectedCountContent);
+
+                    if (selectedFirstX < startIndexSize.x)
+                    {
+                        // would overlap with start text
+                        drawStart = false;
+                    }
+                    if (selectedLastX > ((width - 1) - endIndexSize.x))
+                    {
+                        // would overlap with end text
+                        drawEnd = false;
+                    }
                 }
-                if ((selectionTextX + selectionRangeTextSize.x) > ((width - 1) - endIndexSize.x))
+                else
                 {
-                    // would overlap with end text
-                    drawEnd = false;
+                    int mid = (selectedFirstX + (selectedRangeWidth / 2));
+                    int selectionTextX = mid - (int)(selectionRangeTextSize.x / 2);
+                    selectionTextX = ClampToRange(selectionTextX, 0, (int)((width - 1) - selectionRangeTextSize.x));
+
+                    Rect rangeRect = new Rect(rect.x + selectionTextX, y, selectionRangeTextSize.x, selectionRangeTextSize.y);
+                    GUI.Label(rangeRect, selectionRangeTextContent);
+
+                    if (selectionTextX < startIndexSize.x)
+                    {
+                        // would overlap with start text
+                        drawStart = false;
+                    }
+                    if ((selectionTextX + selectionRangeTextSize.x) > ((width - 1) - endIndexSize.x))
+                    {
+                        // would overlap with end text
+                        drawEnd = false;
+                    }
                 }
             }
 
@@ -1674,10 +1862,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_PairedWithFrameTimeGraph.SelectMedian(false);
         }
 
-        public void SelectPrevious(int step)
+        public void SelectPrevious(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
 
             if (step > m_CurrentSelectionFirstDataOffset)
             {
@@ -1686,12 +1874,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             CallSetRange(m_CurrentSelectionFirstDataOffset - step, m_CurrentSelectionLastDataOffset - step, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectPrevious(step, false);
         }
 
-        public void SelectNext(int step)
+        public void SelectNext(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
             int dataLength = m_Values.Count;
 
             if (m_CurrentSelectionLastDataOffset + step >= (dataLength - 1))
@@ -1701,42 +1892,52 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             CallSetRange(m_CurrentSelectionFirstDataOffset + step, m_CurrentSelectionLastDataOffset + step, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectNext(step, false);
         }
 
 
-        public void SelectGrow(int step)
+        public void SelectGrow(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
-            int dataLength = m_Values.Count;
+            bool singleClickAction = true;
 
             // Auto clamps
-            CallSetRange(m_CurrentSelectionFirstDataOffset - step, m_CurrentSelectionLastDataOffset + step, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
+            CallSetRange(m_CurrentSelectionFirstDataOffset - step, m_CurrentSelectionLastDataOffset + step, clicks, singleClickAction, FrameTimeGraph.State.None);
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectGrow(step, false);
         }
 
-        public void SelectGrowLeft(int step)
+        public void SelectGrowLeft(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
 
             // Auto clamps
             CallSetRange(m_CurrentSelectionFirstDataOffset - step, m_CurrentSelectionLastDataOffset, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectGrowLeft(step, false);
         }
 
-        public void SelectGrowRight(int step)
+        public void SelectGrowRight(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
-            int dataLength = m_Values.Count;
+            bool singleClickAction = true;
 
             // Auto clamps
             CallSetRange(m_CurrentSelectionFirstDataOffset, m_CurrentSelectionLastDataOffset + step, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectGrowRight(step, false);
         }
 
-        public void SelectShrink(int step)
+        public void SelectShrink(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
 
             if ((m_CurrentSelectionLastDataOffset - m_CurrentSelectionFirstDataOffset) >= (2 * step))
             {
@@ -1749,12 +1950,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 int mid = m_CurrentSelectionFirstDataOffset + (m_CurrentSelectionLastDataOffset - m_CurrentSelectionFirstDataOffset) / 2;
                 CallSetRange(mid, mid, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
             }
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectShrink(step, false);
         }
 
-        public void SelectShrinkLeft(int step)
+        public void SelectShrinkLeft(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
 
             if ((m_CurrentSelectionLastDataOffset - m_CurrentSelectionFirstDataOffset) >= step)
             {
@@ -1765,12 +1969,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 // Just right remains
                 CallSetRange(m_CurrentSelectionLastDataOffset, m_CurrentSelectionLastDataOffset, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
             }
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectShrinkLeft(step, false);
         }
 
-        public void SelectShrinkRight(int step)
+        public void SelectShrinkRight(int step, bool effectPaired = true)
         {
             int clicks = 1;
-            bool singleClickAction = false;
+            bool singleClickAction = true;
 
             if ((m_CurrentSelectionLastDataOffset - m_CurrentSelectionFirstDataOffset) >= step)
             {
@@ -1781,6 +1988,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 // Just left remains
                 CallSetRange(m_CurrentSelectionFirstDataOffset, m_CurrentSelectionFirstDataOffset, clicks, singleClickAction, FrameTimeGraph.State.DragComplete);
             }
+
+            if (m_PairedWithFrameTimeGraph != null && effectPaired)
+                m_PairedWithFrameTimeGraph.SelectShrinkRight(step, false);
         }
 
         public void ToggleShowThreads()

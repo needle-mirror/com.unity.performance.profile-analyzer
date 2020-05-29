@@ -297,5 +297,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ProfilerWindow.Repaint();
             return true;
         }
+
+        public bool IsRecording()
+        {
+            return ProfilerDriver.enabled;
+        }
     }
 }

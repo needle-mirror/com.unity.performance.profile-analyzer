@@ -3,10 +3,11 @@ using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     /// <summary>
     /// Metrics related to an individual frame
     /// </summary>
-    public struct FrameTime : IComparable<FrameTime>
+    internal struct FrameTime : IComparable<FrameTime>
     {
         /// <summary>Duration in the frame in milliseconds</summary>
         public float ms;

@@ -78,9 +78,14 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         var marker = new MarkerData("Test Marker");
         marker.presentOnFrameCount = 1;
 
-        for (int i = 0; i < 10; ++i)
+        int range = 10;
+        float offset = 0.000001f; // Without the offset rounding errors can shift a value into the preceeding bucket
+        for (int i = 0; i <= range; ++i)
         {
-            var frameTime = new FrameTime(i, 0.1f * i, 1);
+            float value = ((float)i / (float)range);
+            if (i!=0 && i!=range)
+                value += offset;
+            var frameTime = new FrameTime(i, value, 1);
             marker.frames.Add(frameTime);
         }
 
@@ -106,8 +111,8 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         Assert.IsTrue(marker.buckets[15] == 0);
         Assert.IsTrue(marker.buckets[16] == 1);
         Assert.IsTrue(marker.buckets[17] == 0);
-        Assert.IsTrue(marker.buckets[18] == 0);
-        Assert.IsTrue(marker.buckets[19] == 1);
+        Assert.IsTrue(marker.buckets[18] == 1);
+        Assert.IsTrue(marker.buckets[19] == 1); // max value would fall into the next bucket but is clamped to here.
     }
 
     [Test]

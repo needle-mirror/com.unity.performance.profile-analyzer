@@ -1,10 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class MarkerData
     {
         public string name;
+        public int nameLowerCaseHash;   // lower case name hash for faster comparisons
+
         public double msTotal;          // total time of this marker on a frame
         public int count;               // total number of marker calls in the timeline (multiple per frame)
         public int countMin;            // min count per frame
@@ -32,6 +36,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int maxFrameIndex;
         public int minDepth;
         public int maxDepth;
+        public List<string> threads;
 
         const int bucketCount = 20;
         public int[] buckets;           // Each bucket contains 'number of frames' for 'sum of markers in the frame' in that range
@@ -43,8 +48,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             buckets = new int[bucketCount];
             countBuckets = new int[bucketCount];
             frames = new List<FrameTime>();
+            threads = new List<string>();
 
             name = markerName;
+            nameLowerCaseHash = markerName.ToLower().GetHashCode();
             msTotal = 0.0;
             count = 0;
             countMin = 0;
@@ -104,16 +111,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 buckets[bucketIndex] = 0;
             }
 
+            float scale = range > 0 ? buckets.Length / range : 0;
             foreach (FrameTime frameTime in frames)
             {
                 var ms = frameTime.ms;
                 //int frameIndex = frameTime.frameIndex;
 
-                int bucketIndex = (range > 0) ? (int)((maxBucketIndex * (ms - first)) / range) : 0;
+                int bucketIndex = (int)((ms - first) * scale);
                 if (bucketIndex < 0 || bucketIndex > maxBucketIndex)
                 {
                     // This can happen if a single marker range is longer than the frame start end (which could occur if running on a separate thread)
+                    // It can also occur for the highest entry in the range (max-min/range) = 1
+                    // if (ms > max)    // Check for the spilling case
                     // Debug.Log(string.Format("Marker {0} : {1}ms exceeds range {2}-{3} on frame {4}", marker.name, ms, first, last, 1+frameIndex));
+
                     if (bucketIndex > maxBucketIndex)
                         bucketIndex = maxBucketIndex;
                     else
@@ -152,6 +163,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        public static string GetFirstThread(MarkerData marker)
+        {
+            return marker != null ? marker.threads[0] : "";
+        }
 
         public static float GetMsMax(MarkerData marker)
         {
@@ -237,10 +252,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return marker != null ? marker.countMean : 0.0f;
         }
-        
+
         public static double GetMsTotal(MarkerData marker)
         {
             return marker != null ? marker.msTotal : 0.0;
+        }
+        public static int GetMinDepth(MarkerData marker)
+        {
+            return marker != null ? marker.minDepth : 0;
+        }
+        public static int GetMaxDepth(MarkerData marker)
+        {
+            return marker != null ? marker.maxDepth : 0;
         }
     }
 }

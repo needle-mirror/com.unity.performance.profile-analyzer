@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class ThreadData
     {
         public string threadNameWithIndex;

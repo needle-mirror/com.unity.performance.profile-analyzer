@@ -58,7 +58,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Top ", GUILayout.Width(30));
-            topNumber = EditorGUILayout.IntPopup(topNumber, topStrings, topValues, GUILayout.Width(30));
+            topNumber = EditorGUILayout.IntPopup(topNumber, topStrings, topValues, GUILayout.Width(40));
             EditorGUILayout.LabelField(m_Units.Units==Units.Count ? Styles.frameCounts : Styles.frameCosts, GUILayout.Width(100));
             EditorGUILayout.EndHorizontal();
 

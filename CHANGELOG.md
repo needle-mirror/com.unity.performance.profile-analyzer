@@ -4,6 +4,78 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.7.0-preview.4] - 2020-05-29
+
+### Changes
+* Thread selection window 
+** Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
+** Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
+** Apply button is now greyed out while analysis is running.
+** Group column enabled and used to split off group from thread name, default to by group first
+** Re sorted when selection changed (so states sort correctly when sorting by state)
+** Sort order preserved when buttons pressed and re-opening
+** Fixed sort order for threads (10 after 9 rather than between 1 and 2)
+* Marker sorting
+** Marker table column filtering now preserved when clicking Analyse or Compare or tab switching.
+** Compare table bars to now sort by bar size (=delta value) rather than the left/right value.
+** Marker table bars now start sorted by descending size which is more common usage.
+* Added depths columns into the comparison table and a 'Depth' option in the Marker Columns dropdown
+* Added thread count into thread summary area
+* Added threads column into marker tables (threads the marker occurs on)
+* Thread summary now contains thread count, unique count per data set and selection count
+* Frame time area now allows adding to the selection by holding CTRL (or COMMAND on Mac)
+* Frame range value now includes tooltip to give more detail about the selection
+* Improved text string for depth filter status on the top marker display
+
+### Fixes
+* Detected and ignored invalid frame markers (duration < 0)
+* Fixed/Removed warnings on loading data in compare view when selection active.
+* Disabled "Analyze" button while analysis is already running
+* Fixed Marker Summary 'Top' dropdown selection text width
+* Fixed thread selection window sort order
+* Fixed tooltip on 'count' bars to be scalar value (not a time unit)
+* Clamped selected region shown when zoomed in on frame time graph
+* Frame Control value no longer overlaps with drop-down list when Units are set to Microseconds
+* Fixed thread count text when analysis completes after swapping single/compare tabs during analysis
+* Fixed Frame View's tooltip "total time" when rapidly changing frames 
+* Fixed overlapping text when selecting single frame when zoomed in
+* Histogram frame count now lists "1 frame" when single frame rather than "1 frames"
+* Mode: text in top bar now same size as rest of text.
+* Clear Selection in marker right click context menu now only shown if a selection has been made
+* Cut/Paste now supported in the include/exclude marker name filter
+* Frame Time graph frame selection grow/shrink now keeps current selection in paired graph
+* Fixed frame start/end display for "Select Frames that contain this marker (within whole data set)"
+* Corrected bucketing of histogram data. Display was fractionally incorrect
+* Histogram now shows non zero height bar if an item in the bucket
+* Fixed right click "Remove from Included Filters" when using (quoted) markers with spaces in names
+* Fixed data auto-load from Single to Compare tab when capturing after entering playmode
+* Fixed auto right calculation to use most common difference
+* Fixed auto right display to show + or - and not both at the same time
+* Fixed infinite analysis loop when auto right calculation was clamping to max depth in the other data set
+* Auto right now clamps to min/max depth rather than reverting to 'all'
+* Fixed thread count bug when using comparison mode and loading data on top of existing data
+* Selected marker refocused in marker list when table is regenerated (e.g. when selecting all frames containing the marker).
+* Column by which the Marker Details is sorted by is now maintained  when entering Play Mode
+* Updated frame time graph context menu to make hotkeys more consistent with out Unity UI layouts
+* Percent symbol no longer cut off in Mean frame contribution when the value is 100% 
+* Frame time graph now scales up when zooming when comparing data with different frame amounts
+* Changing 'Auto Right' tick box no longer causes re-analysis if depth settings unchanged
+* Most tooltips now show values without rounding, so its more obvious when low values give non zero deltas. 
+* Fixed individual max tooltip
+* Disabled 'Pull data' button when Unity profiler is still capturing data (as the pull would not complete).
+* Fixed right frame index in exported comparison CSV file.
+* Frame selection no longer changed when moving the cursor in the Filter text box with arrow keys
+* Help text now continues to be shown after entering play mode, while no data set loaded/pulled
+* Fixed frame index button heights when alternative (Verdana) font used.
+* Fixed cache styles to be updated when changing theme (to fix text colour in filters area)
+* Single click (without drag) now always single frame rather than the group of frames in the pixel wide area.
+* Split frame range into start and end rows to display more information when values large 
+* Marker Summary comparison times are now limited to 5 digits to prevent text clipping off
+
+### Enhancements
+* Optimised filter processing for more responsive scrolling when a large marker filter list is supplied.
+* Optimised thread name summary display
+
 ## [0.6.0-preview.1] - 2020-02-04
 * Fixed a crash with the thread selection API in Unity 2020.1 
 * Fixed marker and thread scroll bars

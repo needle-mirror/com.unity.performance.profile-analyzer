@@ -14,6 +14,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public ProfileAnalysis analysis;
         public List<int> selectedIndices = new List<int> { 0, 0 };
 
+        public bool IsDataValid()
+        {
+            if (data == null)
+                return false;
+
+            if (data.GetFrameCount() == 0)
+                return false;
+
+            return true;
+        }
+
         public bool HasValidSelection()
         {
             if (selectedIndices.Count == 2 && selectedIndices[0] == 0 && selectedIndices[1] == 0)
@@ -22,20 +33,61 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return true;
         }
 
+        public bool HasSelection()
+        {
+            if (selectedIndices.Count == 0)
+                return false;
+            if (selectedIndices.Count == data.GetFrameCount())
+                return false;
+
+            return HasValidSelection();
+        }
+
+        public int GetMaxDepth()
+        {
+            return (analysis == null) ? 1 : analysis.GetFrameSummary().maxMarkerDepth;
+        }
+
+        int Clamp(int value, int min, int max)
+        {
+            if (value < min)
+                value = min;
+            else if (value > max)
+                value = max;
+
+            return value;
+        }
+
+        public int ClampToValidDepthValue(int depthFilter)
+        {
+            // ProfileAnalyzer.kDepthAll is special case that we don't test for here
+
+            // If we have no depth values then return -1 for all (as clamp expects min<max)
+            int maxDepth = GetMaxDepth();
+            if (maxDepth < 1)
+                return ProfileAnalyzer.kDepthAll;
+
+            return Clamp(depthFilter, 1, maxDepth);
+        }
+
         bool SelectAllFramesContainingMarker(string markerName, ProfileAnalysis inAnalysis)
         {
             if (inAnalysis == null)
                 return false;
 
+            selectedIndices.Clear();
+
             MarkerData markerData = inAnalysis.GetMarkerByName(markerName);
             if (markerData == null)
-                return false;
+                return true;
 
-            selectedIndices.Clear();
             foreach (var frameTime in markerData.frames)
             {
                 selectedIndices.Add(frameTime.frameIndex);
             }
+
+            // Order from lowest to highest so the start/end frame display makes sense
+            selectedIndices.Sort();
 
             return true;
         }

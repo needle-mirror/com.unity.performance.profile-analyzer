@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class ProfileAnalysis
     {
         FrameSummary m_FrameSummary = new FrameSummary();
@@ -132,13 +134,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 
                 int unusedIndex;
 
-                marker.msMean = (float)(marker.msTotal / marker.presentOnFrameCount);
+                marker.msMean = marker.presentOnFrameCount > 0 ? (float)(marker.msTotal / marker.presentOnFrameCount) : 0f;
                 marker.frames.Sort(FrameTime.CompareCount);
                 marker.countMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).count;
                 marker.countLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).count;
                 marker.countUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).count;
                 
-                marker.countMean = (float)marker.count / marker.presentOnFrameCount;
+                marker.countMean = marker.presentOnFrameCount > 0 ? (float)marker.count / marker.presentOnFrameCount : 0f;
                 marker.frames.Sort(FrameTime.CompareMs);
                 marker.msMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).ms;
                 marker.msLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).ms;
@@ -193,30 +195,52 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             foreach (var thread in m_Threads)
             {
-                if (thread.frames.Count <= 0)
-                    continue;
+                if (thread.frames.Count > 0)
+                {
+                    thread.frames.Sort();
+                    int unusedIndex;
 
-                thread.frames.Sort();
-                int unusedIndex;
-                thread.msMin = GetThreadPercentageOffset(thread.frames, 0, out thread.minFrameIndex);
-                thread.msLowerQuartile = GetThreadPercentageOffset(thread.frames, 25, out unusedIndex);
-                thread.msMedian = GetThreadPercentageOffset(thread.frames, 50, out thread.medianFrameIndex);
-                thread.msUpperQuartile = GetThreadPercentageOffset(thread.frames, 75, out unusedIndex);
-                thread.msMax = GetThreadPercentageOffset(thread.frames, 100, out thread.maxFrameIndex);
+                    thread.msMin = GetThreadPercentageOffset(thread.frames, 0, out thread.minFrameIndex);
+                    thread.msLowerQuartile = GetThreadPercentageOffset(thread.frames, 25, out unusedIndex);
+                    thread.msMedian = GetThreadPercentageOffset(thread.frames, 50, out thread.medianFrameIndex);
+                    thread.msUpperQuartile = GetThreadPercentageOffset(thread.frames, 75, out unusedIndex);
+                    thread.msMax = GetThreadPercentageOffset(thread.frames, 100, out thread.maxFrameIndex);
 
-                // Put back in order of frames
-                thread.frames.Sort( (a,b) => a.frameIndex.CompareTo(b.frameIndex) );
+                    // Put back in order of frames
+                    thread.frames.Sort((a, b) => a.frameIndex.CompareTo(b.frameIndex));
+                }
+                else
+                {
+                    thread.msMin = 0f;
+                    thread.msLowerQuartile = 0f;
+                    thread.msMedian = 0f;
+                    thread.msUpperQuartile = 0f;
+                    thread.msMax = 0f;
+                }
             }
         }
 
         public void Finalise(float timeScaleMax, int maxMarkerDepth)
         {
-            m_FrameSummary.msMean = (float)(m_FrameSummary.msTotal / m_FrameSummary.count);
-            m_FrameSummary.frames.Sort();
-            m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.medianFrameIndex).ms;
-            int unusedIndex;
-            m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out unusedIndex).ms;
-            m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out unusedIndex).ms;
+            if (m_FrameSummary.frames.Count > 0)
+            {
+                m_FrameSummary.frames.Sort();
+                m_FrameSummary.msMean = (float)(m_FrameSummary.msTotal / m_FrameSummary.count);
+                m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.medianFrameIndex).ms;
+                int unusedIndex;
+                m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out unusedIndex).ms;
+                m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out unusedIndex).ms;
+            }
+            else
+            {
+                m_FrameSummary.msMean = 0f;
+                m_FrameSummary.msMedian = 0f;
+                m_FrameSummary.msLowerQuartile = 0f;
+                m_FrameSummary.msUpperQuartile = 0f;
+
+                // This started as float.MaxValue and won't have been updated
+                m_FrameSummary.msMin = 0f;
+            }
             // No longer need the frame time list ?
             //m_frameSummary.msFrame.Clear();
             m_FrameSummary.maxMarkerDepth = maxMarkerDepth;
@@ -224,6 +248,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (timeScaleMax <= 0.0f)
             {
                 // If max frame time range not specified then use the max frame value found.
+                timeScaleMax = m_FrameSummary.msMax;
+            }
+            else if (timeScaleMax < m_FrameSummary.msMax)
+            {
+                Debug.Log(string.Format("Expanding timeScaleMax {0} to match max value found {1}", timeScaleMax, m_FrameSummary.msMax));
+
+                // If max frame time range too small we must expand it.
                 timeScaleMax = m_FrameSummary.msMax;
             }
 

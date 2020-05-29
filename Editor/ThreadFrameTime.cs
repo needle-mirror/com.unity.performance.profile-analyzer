@@ -2,6 +2,7 @@
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class ThreadFrameTime : IComparable<ThreadFrameTime>
     {
         public int frameIndex;

@@ -1,20 +1,21 @@
-# Workflows
-## Comparing Frames from the Same Data Set
+# Comparing frames from the same data set
+This workflow explains how to compare two frames from the same data set. In this example, it explains how to compare the median and longest frames in a data set. Comparing the median and longest frames is useful to help understand what is happening in the longest frame that is not happening in an average frame, or what is taking longer than average to complete.
 
-This workflow will take you through the steps needed to compare two frames from the same data set, in this case the [median](https://en.wikipedia.org/wiki/Median) and longest frames. Comparing the median and longest frames is often useful to help reason about what could be happening in the longest frame that is not happening in an average frame, or what is taking longer than average to complete.
+## Step 1: Collect performance data to analyze
+Open the Profile Analyzer window (menu: **Window &gt; Analysis &gt; Profile Analyzer**) and collect some profiling data. To pull data from an active profiling session, click the **Pull Data** button. This pulls in the current set of available frames from the Profiler. If you don't have an active profile session, click the **Open Profiler Window** button, then load or record some data. 
 
-### 1. Collect performance data to analyze
-1. Follow the instructions in the [collecting and viewing data](collecting-and-viewing-data.md) workflow.
+For more information on how to collect data, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
 
-2. Switch to the [Compare View](compare-view.md) using the _Compare_ button from the views toolbar.
+## Step 2: Open Compare view  
+Click the **Compare** button in the toolbar to switch to the [Compare View](compare-view.md).
 
-### 2. Selecting the frames of interest
-1. In the upper [Frame Control](frame-range-selection.md), right click to access its context menu and select _Select Median Frame_.
+## Step 3: Select the median and longest frames
 
-2. In the lower Frame Control, right click to access its context menu and select _Select longest Frame_.
+1. In the [Frame Control](frame-range-selection.md) pane, right click on the top graph and choose **Select Median Frame** from the context menu.
+1. Next, right click on the lower graph and choose **Select Longest Frame** in the context menu.
 
-After completing the above steps, the _Compare View_ will now analyze the two frames and show you the data for just the median and longest frames, the resulting UI will look something like this:
+![Frame Control context menu](images/frame-control-context-menu.png)<br/>*The Frame Control context menu*
 
-![FilterSystem.](images/compare-median-and-longest-frames.png)
+The Profile Analyzer then analyzes the two frames and displays the data for the median and longest frames like so: 
 
-[Back to manual](manual.md)
+![Data comparison on same set](images/profile-analyzer-compare-same-data-set.png)<br/>*The Profile Analyzer window with the median and longest frames of the same data set selected*

@@ -10,6 +10,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 {
     internal class ProfileAnalyzer
     {
+        public const int kDepthAll = -1;
+
         int m_Progress = 0;
         ProfilerFrameDataIterator m_frameData;
         List<string> m_threadNames = new List<string>();
@@ -110,6 +112,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         ProfileData GetData(ProfilerFrameDataIterator frameData, int firstFrameIndex, int lastFrameIndex)
         {
+            bool firstError = true;
+
             var data = new ProfileData();
             data.SetFrameIndexOffset(firstFrameIndex);
 
@@ -179,6 +183,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     // So we can infer a parent child relationship
                     while (frameData.Next(enterChildren))
                     {
+                        if (frameData.durationMS < 0)
+                        {
+                            if (firstError)
+                            {
+                                int displayIndex = data.OffsetToDisplayFrame(frameIndex);
+
+                                Debug.LogFormat("Ignoring Invalid marker time found for {0} on frame {1} on thread {2} ({3} < 0) : Instance id : {4}", 
+                                    frameData.name, displayIndex, threadName, frameData.durationMS, frameData.instanceId);
+
+                                firstError = false;
+                            }
+                            continue;
+                        }
                         var markerData = ProfileMarker.Create(frameData);
 
                         data.AddMarkerName(frameData.name, markerData);
@@ -242,7 +259,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             int frameCount = selectionIndices.Count;
-            if (frameCount <= 0)
+            if (frameCount < 0)
             {
                 return null;
             }
@@ -250,7 +267,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             bool processMarkers = (threadFilters != null);
 
             ProfileAnalysis analysis = new ProfileAnalysis();
-            analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count-1]);
+            if (selectionIndices.Count>0)
+                analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count-1]);
+            else
+                analysis.SetRange(0,0);
 
             m_threadNames.Clear();
 
@@ -344,7 +364,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             if (!include)
                                 continue;
 
-                            if (depthFilter >= 0 && markerDepth != depthFilter)
+                            if (depthFilter != kDepthAll && markerDepth != depthFilter)
                                 continue;
 
                             // If only looking for markers below the parent
@@ -377,6 +397,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             if (markers.ContainsKey(markerName))
                             {
                                 marker = markers[markerName];
+                                if (!marker.threads.Contains(threadNameWithIndex))
+                                    marker.threads.Add(threadNameWithIndex);
                             }
                             else
                             {
@@ -384,6 +406,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 marker.firstFrameIndex = frameIndex;
                                 marker.minDepth = markerDepth;
                                 marker.maxDepth = markerDepth;
+                                marker.threads.Add(threadNameWithIndex);
                                 analysis.AddMarker(marker);
                                 markers.Add(markerName, marker);
                             }
@@ -456,7 +479,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         var markerName = markerData.name;
                         var ms = markerData.msFrame;
                         var markerDepth = markerData.depth;
-                        if (depthFilter>=0 && markerDepth != depthFilter)
+                        if (depthFilter != kDepthAll && markerDepth != depthFilter)
                             continue;
 
                         MarkerData marker = markers[markerName];

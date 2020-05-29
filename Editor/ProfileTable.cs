@@ -52,6 +52,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             AtMedian,
             Total,
             TotalBar,
+            Threads,
         }
 
         static int m_MaxColumns;
@@ -70,6 +71,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             FirstFrame,
             AtMedian,
             Total,
+            Threads,
         }
 
         // Sort options per column
@@ -91,6 +93,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.AtMedian,
             SortOption.Total,
             SortOption.Total,
+            SortOption.Threads,
         };
 
         internal static class Styles
@@ -204,6 +207,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         protected virtual void OnVisibleColumnsChanged(MultiColumnHeader multiColumnHeader)
         {
             m_ProfileAnalyzerWindow.SetSingleModeColumns(multiColumnHeader.state.visibleColumns);
+            multiColumnHeader.ResizeToFit();
         }
 
         void SortIfNeeded(IList<TreeViewItem> rows)
@@ -229,6 +233,36 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             Repaint();
+        }
+
+        string GetThreadName(ProfileTreeViewItem item)
+        {
+            return m_ProfileAnalyzerWindow.GetUIThreadName(item.data.threads[0]);
+        }
+
+        string GetThreadNames(ProfileTreeViewItem item)
+        {
+            var uiNames = new List<string>();
+            foreach (string threadNameWithIndex in item.data.threads)
+            {
+                string uiName = m_ProfileAnalyzerWindow.GetUIThreadName(threadNameWithIndex);
+
+                uiNames.Add(uiName);
+            }
+            uiNames.Sort(m_ProfileAnalyzerWindow.CompareUINames);
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            bool first = true;
+            foreach (var uiName in uiNames)
+            { 
+                if (first)
+                    first = false;
+                else
+                    sb.Append(", ");
+                sb.Append(uiName);
+            }
+
+            return sb.ToString();
         }
 
         void SortByMultipleColumns()
@@ -285,6 +319,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     case SortOption.Total:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.msTotal, ascending);
                         break;
+                    case SortOption.Threads:
+                        orderedQuery = orderedQuery.ThenBy(l => l.cachedRowString!=null ? l.cachedRowString[(int)MyColumns.Threads].text : GetThreadNames(l), ascending);
+                        break;
                 }
             }
 
@@ -321,6 +358,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return myTypes.Order(l => l.data.msAtMedian, ascending);
                 case SortOption.Total:
                     return myTypes.Order(l => l.data.msTotal, ascending);
+                case SortOption.Threads:
+                    return myTypes.Order(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.Threads].text : GetThreadNames(l), ascending);
                 default:
                     Assert.IsTrue(false, "Unhandled enum");
                     break;
@@ -345,30 +384,30 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        string ToDisplayUnits(float ms, bool showUnits = false)
+        string ToDisplayUnits(float ms, bool showUnits = false, bool showFullValueWhenBelowZero = false)
         {
-            return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0);
+            return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0, showFullValueWhenBelowZero);
         }
 
         GUIContent ToDisplayUnitsWithTooltips(float ms, bool showUnits = false, int onFrame=-1)
         {
             if (onFrame >= 0)
-                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true), onFrame));
+                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero), onFrame));
 
-            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true));
+            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero));
         }
 
-        string ToDisplayUnits(double ms, bool showUnits = false)
+        string ToDisplayUnits(double ms, bool showUnits = false, bool showFullValueWhenBelowZero = false)
         {
-            return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0);
+            return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0, showFullValueWhenBelowZero);
         }
 
         GUIContent ToDisplayUnitsWithTooltips(double ms, bool showUnits = false, int onFrame = -1)
         {
             if (onFrame >= 0)
-                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true), onFrame));
+                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero), onFrame));
 
-            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true));
+            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero));
         }
 
         void CopyToClipboard(Event current, string text)
@@ -385,7 +424,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, false));
                 menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, true));
-                menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+                if (m_ProfileAnalyzerWindow.HasSelection())
+                    menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+                else
+                    menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+
                 menu.AddSeparator("");
                 if (!m_ProfileAnalyzerWindow.GetNameFilters().Contains(markerName))
                     menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(markerName));
@@ -428,7 +471,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             item.cachedRowString[(int)MyColumns.Mean] = ToDisplayUnitsWithTooltips(item.data.msMean, false);
             item.cachedRowString[(int)MyColumns.Depth] = (item.data.minDepth == item.data.maxDepth) ? new GUIContent(string.Format("{0}", item.data.minDepth), "") : new GUIContent(string.Format("{0}-{1}", item.data.minDepth, item.data.maxDepth), "");
             item.cachedRowString[(int)MyColumns.Median] = ToDisplayUnitsWithTooltips(item.data.msMedian, false, item.data.medianFrameIndex);
-            item.cachedRowString[(int)MyColumns.MedianBar] = new GUIContent("", string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msMedian, true), item.data.medianFrameIndex));
+            string tooltip = string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msMedian, true, DisplayUnits.kShowFullValueWhenBelowZero), item.data.medianFrameIndex);
+            if (DisplayUnits.kShowFullValueWhenBelowZero)
+                tooltip += string.Format("\n\n{0}\nRounded", ToDisplayUnits(item.data.msMedian, true));
+            item.cachedRowString[(int)MyColumns.MedianBar] = new GUIContent("", tooltip);
             item.cachedRowString[(int)MyColumns.Min] = ToDisplayUnitsWithTooltips(item.data.msMin, false, item.data.minFrameIndex);
             item.cachedRowString[(int)MyColumns.Max] = ToDisplayUnitsWithTooltips(item.data.msMax, false, item.data.maxFrameIndex);
             item.cachedRowString[(int)MyColumns.Range] = ToDisplayUnitsWithTooltips(item.data.msMax - item.data.msMin);
@@ -439,7 +485,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             item.cachedRowString[(int)MyColumns.FirstFrame] = new GUIContent(item.data.firstFrameIndex.ToString());
             item.cachedRowString[(int)MyColumns.AtMedian] = ToDisplayUnitsWithTooltips(item.data.msAtMedian, false, m_Model.GetFrameSummary().medianFrameIndex);
             item.cachedRowString[(int)MyColumns.Total] = ToDisplayUnitsWithTooltips(item.data.msTotal);
-            item.cachedRowString[(int)MyColumns.TotalBar] = new GUIContent("", string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msTotal, true), item.data.medianFrameIndex));
+            tooltip = string.Format("{0} on frame {1}", ToDisplayUnits(item.data.msTotal, true), item.data.medianFrameIndex, DisplayUnits.kShowFullValueWhenBelowZero);
+            if (DisplayUnits.kShowFullValueWhenBelowZero)
+                tooltip += string.Format("\n\n{0}\nRounded", ToDisplayUnits(item.data.msTotal, true));
+            item.cachedRowString[(int)MyColumns.TotalBar] = new GUIContent("", tooltip);
+
+            string threadNames = GetThreadNames(item);
+            item.cachedRowString[(int)MyColumns.Threads] = new GUIContent(threadNames, threadNames);
         }
 
         void ShowBar(Rect rect, float ms, float range, GUIContent content)
@@ -483,6 +535,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case MyColumns.CountMean:
                 case MyColumns.AtMedian:
                 case MyColumns.Total:
+                case MyColumns.Threads:
                     ShowText(cellRect, content);
                     break;
                 case MyColumns.MedianBar:
@@ -524,19 +577,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         struct HeaderData
         {
-            public GUIContent content;
-            public float width;
-            public float minWidth;
-            public bool autoResize;
-            public bool allowToggleVisibility;
+            public readonly GUIContent content;
+            public readonly float width;
+            public readonly float minWidth;
+            public readonly bool autoResize;
+            public readonly bool allowToggleVisibility;
+            public readonly bool ascending;
 
-            public HeaderData(string name, string tooltip = "", float _width = 50, float _minWidth = 30, bool _autoResize = true, bool _allowToggleVisibility = true)
+            public HeaderData(string name, string tooltip = "", float width = 50, float minWidth = 30, bool autoResize = true, bool allowToggleVisibility = true, bool ascending = false)
             {
                 content = new GUIContent(name, tooltip);
-                width = _width;
-                minWidth = _minWidth;
-                autoResize = _autoResize;
-                allowToggleVisibility = _allowToggleVisibility;
+                this.width = width;
+                this.minWidth = minWidth;
+                this.autoResize = autoResize;
+                this.allowToggleVisibility = allowToggleVisibility;
+                this.ascending = ascending;
             }
         }
 
@@ -545,22 +600,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             var columnList = new List<MultiColumnHeaderState.Column>();
             HeaderData[] headerData = new HeaderData[]
             {
-                new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", 300, 100, false, false),
+                new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width : 300, minWidth : 100, autoResize : false, allowToggleVisibility : false, ascending : true),
                 new HeaderData("Depth", "Marker depth in marker hierarchy\n\nMay appear at multiple levels"),
                 new HeaderData("Median", "Central marker time over all selected frames\n\nAlways present in data set\n1st of 2 central values for even frame count"),
-                new HeaderData("Median Bar", "Central marker time over all selected frames", 50),
+                new HeaderData("Median Bar", "Central marker time over all selected frames", width : 50),
                 new HeaderData("Mean", "Per frame marker time / number of non zero frames"),
                 new HeaderData("Min", "Minimum marker time"),
                 new HeaderData("Max", "Maximum marker time"),
                 new HeaderData("Range", "Difference between maximum and minimum"),
                 new HeaderData("Count", "Marker count over all selected frames\n\nMultiple can occur per frame"),
                 new HeaderData("Count Bar", "Marker count over all selected frames\n\nMultiple can occur per frame"),
-                new HeaderData("Count Frame", "Average number of markers per frame\n\ntotal count / number of non zero frames",70,50),
-                new HeaderData("Count Frame Bar", "Average number of markers per frame\n\ntotal count / number of non zero frames",70,50),
+                new HeaderData("Count Frame", "Average number of markers per frame\n\ntotal count / number of non zero frames", width : 70, minWidth : 50),
+                new HeaderData("Count Frame Bar", "Average number of markers per frame\n\ntotal count / number of non zero frames", width : 70, minWidth : 50),
                 new HeaderData("1st", "First frame index that the marker appears on"),
-                new HeaderData("At Median Frame", "Marker time on the median frame\n\nI.e. Marker total duration on the average frame",90,50),
+                new HeaderData("At Median Frame", "Marker time on the median frame\n\nI.e. Marker total duration on the average frame", width : 90, minWidth : 50),
                 new HeaderData("Total", "Marker total time over all selected frames"),
                 new HeaderData("Total Bar", "Marker total time over all selected frames"),
+                new HeaderData("Threads", "Threads the marker occurs on (with filtering applied)"),
             };
             foreach (var header in headerData)
             {
@@ -568,7 +624,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     headerContent = header.content,
                     headerTextAlignment = TextAlignment.Left,
-                    sortedAscending = true,
+                    sortedAscending = header.ascending,
                     sortingArrowAlignment = TextAlignment.Left,
                     width = header.width,
                     minWidth = header.minWidth,
@@ -665,6 +721,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.Depth,
                         (int)MyColumns.CountMean,
                         (int)MyColumns.CountMeanBar,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.Depth:
+                    visibleColumns = new int[] {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Depth,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.Threads:
+                    visibleColumns = new int[] {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Threads,
                     };
                     break;
             }

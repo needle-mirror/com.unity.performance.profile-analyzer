@@ -5,7 +5,7 @@ using UnityEngine;
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     /// <summary>Unit type identifier</summary>
-    public enum Units
+    internal enum Units
     {
         /// <summary>Time in milliseconds</summary>
         Milliseconds,
@@ -27,6 +27,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public static readonly int[] UnitValues = (int[]) Enum.GetValues(typeof(Units));
         
         public readonly Units Units;
+
+        public static bool kShowFullValueWhenBelowZero = true;
 
         public DisplayUnits(Units units)
         {
@@ -59,25 +61,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return value;
         }
 
-        public string ToString(float ms, bool showUnits, int limitToNDigits)
+        public string ToString(float ms, bool showUnits, int limitToNDigits, bool showFullValueWhenBelowZero = false)
         {
             float value = ms;
             int unitPower = -3;
 
             int maxDecimalPlaces = 0;
+            float minValueShownWhenUsingLimitedDecimalPlaces = 0.5f;
             switch (Units)
             {
                 default:
                 case Units.Milliseconds:
                     maxDecimalPlaces = 2;
+                    minValueShownWhenUsingLimitedDecimalPlaces = 0.005f;
                     break;
                 case Units.Microseconds:
-                    maxDecimalPlaces = 0;
                     value *= 1000f;
                     unitPower -= 3;
+                    maxDecimalPlaces = 0;
+                    minValueShownWhenUsingLimitedDecimalPlaces = 0.5f;
                     break;
                 case Units.Count:
-                    maxDecimalPlaces = 0;
                     showUnits = false;
                     break;
             }
@@ -86,7 +90,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int numberOfDecimalPlaces = maxDecimalPlaces;
             int unitsTextLength = showUnits ? 2 : 0;
 
-            if (limitToNDigits>0)
+            if (limitToNDigits > 0)
             {
                 int originalUnitPower = unitPower;
 
@@ -102,7 +106,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
 
                 if (unitPower != originalUnitPower)
+                {
                     showUnits = true;
+                    unitsTextLength = 2;
+                }
             
                 int numberOfSignificantFigures = limitToNDigits - unitsTextLength;
                 int numberOfDigitsBeforeDecimalPoint = 1 + Math.Max(0, (int)Math.Log10((int)value));
@@ -111,8 +118,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             string siUnitString = showUnits ? GetSIUnitString(unitPower) + "s" : "";
 
-            string formatString = string.Concat("{0:f", numberOfDecimalPlaces, "}{1}");
-
+            bool valueWouldBeShownAsZero = value < minValueShownWhenUsingLimitedDecimalPlaces;
+            string formatString = (showFullValueWhenBelowZero && valueWouldBeShownAsZero) ? string.Concat("{0}{1}") : string.Concat("{0:f", numberOfDecimalPlaces, "}{1}");
             return string.Format(formatString, value, siUnitString);
         }
 
@@ -143,9 +150,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public GUIContent ToGUIContentWithTooltips(float ms, bool showUnits = false, int limitToNDigits = 5, int frameIndex = -1)
         {
             if (frameIndex>=0)
-                return new GUIContent(ToString(ms, showUnits, limitToNDigits), string.Format("{0} on frame {1}", ToString(ms, true, 0), frameIndex));
+                return new GUIContent(ToString(ms, showUnits, limitToNDigits), string.Format("{0} on frame {1}", ToString(ms, true, 0, kShowFullValueWhenBelowZero), frameIndex));
 
-            return new GUIContent(ToString(ms, showUnits, limitToNDigits), ToString(ms, true, 0));
+            return new GUIContent(ToString(ms, showUnits, limitToNDigits), ToString(ms, true, 0, kShowFullValueWhenBelowZero));
         }
     }
 }

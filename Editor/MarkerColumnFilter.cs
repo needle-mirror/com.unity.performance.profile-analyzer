@@ -13,6 +13,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             TimeWithTotals,
             CountTotals,
             CountPerFrame,
+            Depth,
+            Threads,
             Custom,
         };
 
@@ -24,6 +26,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             "Time With Totals",
             "Count Totals",
             "Count Per Frame",
+            "Depths",
+            "Threads",
             "Custom",
         };
         public static readonly int[] ModeValues = (int[]) Enum.GetValues(typeof(Mode));
