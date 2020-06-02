@@ -6,9 +6,50 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 {
     internal class ProfileAnalyzerExportWindow : EditorWindow
     {
+        internal static class Styles
+        {
+            public static readonly GUIContent markerTable = new GUIContent("Marker table", "Export data from the single view marker table");
+            public static readonly GUIContent singleFrameTimes = new GUIContent("Single Frame Times", "Export frame time data from the single view");
+            public static readonly GUIContent comparisonFrameTimes = new GUIContent("Comparison Frame Times", "Export frame time data from the comparison view");
+        }
+
         ProfileDataView m_ProfileDataView;
         ProfileDataView m_LeftDataView;
         ProfileDataView m_RightDataView;
+
+        static public ProfileAnalyzerExportWindow FindOpenWindow()
+        {
+            UnityEngine.Object[] windows = Resources.FindObjectsOfTypeAll(typeof(ProfileAnalyzerExportWindow));
+            if (windows != null && windows.Length > 0)
+                return windows[0] as ProfileAnalyzerExportWindow;
+
+            return null;
+        }
+
+        static public bool IsOpen()
+        {
+            if (FindOpenWindow()!=null)
+                return true;
+
+            return false;
+        }
+
+        static public ProfileAnalyzerExportWindow Open(float screenX, float screenY, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView)
+        {
+            ProfileAnalyzerExportWindow window = GetWindow<ProfileAnalyzerExportWindow>("Export");
+            window.minSize = new Vector2(200, 140);
+            window.position = new Rect(screenX, screenY, 200, 140);
+            window.SetData(profileSingleView, profileLeftView, profileRightView);
+            window.Show();
+
+            return window;
+        }
+
+        static public void CloseAll()
+        {
+            ProfileAnalyzerExportWindow window = GetWindow<ProfileAnalyzerExportWindow>("Export");
+            window.Close();
+        }
 
         public void SetData(ProfileDataView profileDataView, ProfileDataView leftDataView, ProfileDataView rightDataView)
         {
@@ -21,24 +62,30 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
             GUILayout.Label("Export as CSV:");
+            GUILayout.Label("");
 
-            if (m_ProfileDataView != null && m_ProfileDataView.analysis != null)
-            {
-                if (GUILayout.Button("Marker table"))
-                    SaveMarkerTableCSV();
-            }
+            GUILayout.Label("Single View");
 
-            if (m_ProfileDataView != null && m_ProfileDataView.IsDataValid())
-            {
-                if (GUILayout.Button("Single Frame Times"))
-                    SaveFrameTimesCSV();
-            }
+            bool enabled = GUI.enabled;
+            if (m_ProfileDataView == null || !m_ProfileDataView.IsDataValid())
+                GUI.enabled = false;
+            if (GUILayout.Button(Styles.markerTable))
+                SaveMarkerTableCSV();
+            GUI.enabled = enabled;
 
-            if (m_LeftDataView != null && m_LeftDataView.IsDataValid() && m_RightDataView != null && m_RightDataView.IsDataValid())
-            {
-                if (GUILayout.Button("Comparison Frame Times"))
-                    SaveComparisonFrameTimesCSV();
-            }
+            if (m_ProfileDataView == null || m_ProfileDataView.analysis == null)
+                GUI.enabled = false;
+            if (GUILayout.Button(Styles.singleFrameTimes))
+                SaveFrameTimesCSV();
+            GUI.enabled = enabled;
+
+            GUILayout.Label("Comparison View");
+
+            if (m_LeftDataView == null || !m_LeftDataView.IsDataValid() || m_RightDataView == null || !m_RightDataView.IsDataValid())
+                GUI.enabled = false;
+            if (GUILayout.Button(Styles.comparisonFrameTimes))
+                SaveComparisonFrameTimesCSV();
+            GUI.enabled = enabled;
 
             EditorGUILayout.EndVertical();
         }

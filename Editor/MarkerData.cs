@@ -132,6 +132,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
                 buckets[bucketIndex] += 1;
             }
+
+            if (range==0)
+            {
+                // All buckets will be the same
+                for (int bucketIndex = 1; bucketIndex < buckets.Length; bucketIndex++)
+                {
+                    buckets[bucketIndex] = buckets[0];
+                }
+            }
         }
         
         public void ComputeCountBuckets(int min, int max)

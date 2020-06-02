@@ -132,13 +132,9 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 
         var summary = analysis.GetFrameSummary();
 
-        Assert.IsTrue(2 == summary.buckets[0]);
-
-        for (int i = 1; i < summary.buckets.Length-1 ; ++i)
+        for (int i = 0; i < summary.buckets.Length ; ++i)
         {
             Assert.IsTrue(1 == summary.buckets[i]);
         }
-
-        Assert.IsTrue(0 == summary.buckets[19]);
     }
 }

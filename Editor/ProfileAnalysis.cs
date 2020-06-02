@@ -170,24 +170,41 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             float first = 0;
             float last = timeScaleMax;
             float range = last - first;
+
             int maxBucketIndex = m_FrameSummary.buckets.Length - 1;
 
+            for (int bucketIndex = 0; bucketIndex < m_FrameSummary.buckets.Length; bucketIndex++)
+            {
+                m_FrameSummary.buckets[bucketIndex] = 0;
+            }
+
+            float scale = range > 0 ? m_FrameSummary.buckets.Length / range : 0;
             foreach (var frameData in m_FrameSummary.frames)
             {
                 var msFrame = frameData.ms;
-                var frameIndex = frameData.frameIndex;
+                //var frameIndex = frameData.frameIndex;
 
-                int bucketIndex = (range > 0) ? (int)((maxBucketIndex * (msFrame - first)) / range) : 0;
+                int bucketIndex = (int)((msFrame - first) * scale);
                 if (bucketIndex < 0 || bucketIndex > maxBucketIndex)
                 {
-                    // This should never happen
-                    Debug.Log(string.Format("Frame {0}ms exceeds range {1}-{2} on frame {3}", msFrame, first, last, frameIndex));
+                    // It can occur for the highest entry in the range (max-min/range) = 1
+                    // if (ms > max)    // Check for the spilling case
+                    // Debug.Log(string.Format("Frame {0}ms exceeds range {1}-{2} on frame {3}", msFrame, first, last, frameIndex));
                     if (bucketIndex > maxBucketIndex)
                         bucketIndex = maxBucketIndex;
                     else
                         bucketIndex = 0;
                 }
                 m_FrameSummary.buckets[bucketIndex] += 1;
+            }
+
+            if (range == 0)
+            {
+                // All buckets will be the same
+                for (int bucketIndex = 1; bucketIndex < m_FrameSummary.buckets.Length; bucketIndex++)
+                {
+                    m_FrameSummary.buckets[bucketIndex] = m_FrameSummary.buckets[0];
+                }
             }
         }
 

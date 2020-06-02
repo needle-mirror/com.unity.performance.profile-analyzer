@@ -292,7 +292,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (!m_ProfilerWindow)
                 return false;
-            
+
+            if (index - 1 < ProfilerDriver.firstFrameIndex)
+                return false;
+            if (index - 1 > ProfilerDriver.lastFrameIndex)
+                return false;
+
             m_CurrentFrameFieldInfo.SetValue(m_ProfilerWindow, index - 1);
             m_ProfilerWindow.Repaint();
             return true;

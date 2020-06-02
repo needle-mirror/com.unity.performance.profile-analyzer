@@ -43,6 +43,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return HasValidSelection();
         }
 
+        public bool AllSelected()
+        {
+            if (selectedIndices.Count != data.GetFrameCount())
+                return false;
+
+            return true;
+        }
+
         public int GetMaxDepth()
         {
             return (analysis == null) ? 1 : analysis.GetFrameSummary().maxMarkerDepth;
@@ -105,6 +113,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 value = max;
 
             return value;
+        }
+
+        public void ClearSelection()
+        {
+            selectedIndices.Clear();
         }
 
         public void SelectFullRange()

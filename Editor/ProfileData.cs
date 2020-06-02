@@ -93,6 +93,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return frames[offset];
         }
 
+        public List<string> GetMarkerNames()
+        {
+            return markerNames;
+        }
+
         public List<string> GetThreadNames()
         {
             return threadNames;

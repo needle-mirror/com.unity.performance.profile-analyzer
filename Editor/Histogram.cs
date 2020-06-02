@@ -13,9 +13,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_Units.Postfix();
         }
 
-        string ToDisplayUnits(float ms, bool showUnits = false)
+        string ToDisplayUnits(float ms, bool showUnits = false, int limitToNDigits = 5, bool showFullValueWhenBelowZero = false)
         {
-            return m_Units.ToString(ms, showUnits, 5);
+            return m_Units.ToString(ms, showUnits, limitToNDigits, showFullValueWhenBelowZero);
         }
 
         public void SetUnits(Units units)
@@ -63,8 +63,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             EditorGUILayout.EndHorizontal();
         }
 
-        public void DrawBackground(float width, float height, int bucketCount, float spacing)
+        public void DrawBackground(float width, float height, int bucketCount, float min, float max, float spacing)
         {
+            float range = max - min;
+            //bucketCount = (range == 0f) ? 1 : bucketCount;
+
             float x = (spacing / 2);
             float y = 0;
             float w = ((width + spacing) / bucketCount) - spacing;
@@ -80,13 +83,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void DrawData(float width, float height, int[] buckets, int totalFrameCount, float min, float max, Color barColor, float spacing)
         {
+            float range = max - min;
+
+            //int bucketCount = (range == 0f) ? 1 : buckets.Length;
+            int bucketCount = buckets.Length;
+
             float x = (spacing / 2);
             float y = 0;
-            float w = ((width + spacing) / buckets.Length) - spacing;
+            float w = ((width + spacing) / bucketCount) - spacing;
             float h = height;
 
-            int bucketCount = buckets.Length;
-            float bucketWidth = ((max - min) / bucketCount);
+            float bucketWidth = (range / bucketCount);
             Rect rect = GUILayoutUtility.GetLastRect();
             for (int bucketAt = 0; bucketAt < bucketCount; bucketAt++)
             {
@@ -100,11 +107,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float bucketStart = min + (bucketAt * bucketWidth);
                 float bucketEnd = bucketStart + bucketWidth;
 
-                var tooltip = string.Format("{0}-{1}\n{2} {3}",
+                var tooltip = string.Format("{0}-{1}\n{2} {3}\n\nBar width: {4}",
                         ToDisplayUnits(bucketStart),
                         ToDisplayUnits(bucketEnd, true),
                         count,
-                        count == 1 ? "frame" : "frames");
+                        count == 1 ? "frame" : "frames",
+                        ToDisplayUnits(bucketWidth, true, 5, true)
+                        );
 
                 var content = new GUIContent("", tooltip);
                 GUI.Label(new Rect(rect.x + x, rect.y + y, w, h), content);
@@ -122,7 +131,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (m_2D.DrawStart(width, height, Draw2D.Origin.BottomLeft))
             {
-                DrawBackground(width, height, buckets.Length, spacing);
+                DrawBackground(width, height, buckets.Length, min, max, spacing);
                 DrawData(width, height, buckets, totalFrameCount, min, max, barColor, spacing);
                 m_2D.DrawEnd();
             }

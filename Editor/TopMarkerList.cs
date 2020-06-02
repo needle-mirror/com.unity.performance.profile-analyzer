@@ -11,7 +11,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent frameCounts = new GUIContent(" by frame counts", "Contains marker count within the frame");
         }
 
-        public delegate void DrawFrameIndexButton(int index);
+        public delegate float DrawFrameIndexButton(int index);
 
         DrawFrameIndexButton m_DrawFrameIndexButton;
         Draw2D m_2D;
@@ -19,11 +19,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int m_WidthColumn0;
         int m_WidthColumn1;
         int m_WidthColumn2;
+        int m_WidthColumn3;
         Color colorBar;
         Color colorBarBackground;
         
         public TopMarkerList(Draw2D draw2D, Units units, 
-            int widthColumn0, int widthColumn1, int widthColumn2,
+            int widthColumn0, int widthColumn1, int widthColumn2, int widthColumn3,
             Color colorBar, Color colorBarBackground, DrawFrameIndexButton drawFrameIndexButton)
         {
             m_2D = draw2D;
@@ -31,6 +32,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_WidthColumn0 = widthColumn0;
             m_WidthColumn1 = widthColumn1;
             m_WidthColumn2 = widthColumn2;
+            m_WidthColumn3 = widthColumn3;
             this.colorBar= colorBar;
             this.colorBarBackground = colorBarBackground;
             m_DrawFrameIndexButton = drawFrameIndexButton;
@@ -73,7 +75,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             float ySpacing = 2;
             float barHeight = h - ySpacing;
 
-            EditorGUILayout.BeginVertical(GUILayout.Width(w + m_WidthColumn1 + m_WidthColumn2));
+            EditorGUILayout.BeginVertical(GUILayout.Width(w + m_WidthColumn1 + m_WidthColumn2 + m_WidthColumn3));
 
             topNumber = DrawTopNumber(topNumber, topStrings, topValues);
 
@@ -119,6 +121,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (m_DrawFrameIndexButton!=null)
                         m_DrawFrameIndexButton(marker.frames[index].frameIndex);
                 }
+                GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
 
                 index--;

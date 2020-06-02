@@ -288,7 +288,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             public static readonly GUIContent menuItemSelectFramesInAll = new GUIContent("Select Frames that contain this marker (within whole data set)", "");
             public static readonly GUIContent menuItemSelectFramesInCurrent = new GUIContent("Select Frames that contain this marker (within current selection)", "");
-            public static readonly GUIContent menuItemSelectFramesAll = new GUIContent("Clear Selection", "");
+            //public static readonly GUIContent menuItemClearSelection = new GUIContent("Clear Selection");
+            public static readonly GUIContent menuItemSelectFramesAll = new GUIContent("Select All");
             public static readonly GUIContent menuItemAddToIncludeFilter = new GUIContent("Add to Include Filter", "");
             public static readonly GUIContent menuItemAddToExcludeFilter = new GUIContent("Add to Exclude Filter", "");
             public static readonly GUIContent menuItemRemoveFromIncludeFilter = new GUIContent("Remove from Include Filter", "");
@@ -505,12 +506,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return;
 
             Profiler.BeginSample("DrawHeader");
-            // Start by adding frame link button for median frame 
-            int buttonWidth = 50;
-            int buttonWidthWithoutMargins = buttonWidth - 4;
-            Rect buttonRect = new Rect(rect.x, rect.y, buttonWidthWithoutMargins, rect.height);
-            if (frameSummary.count > 0)
-                m_ProfileAnalyzerWindow.DrawFrameIndexButton(buttonRect, frameSummary.medianFrameIndex);
 
             // After the marker graph we want an indication of the time range
             int rangeLabelWidth = 60;
@@ -522,8 +517,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 GUI.Label(rangeLabelRect, new GUIContent(timeRangeString, timeRangeTooltip) );
 
             // Reduce the size of the marker graph for the button/label we just added
-            rect.x += buttonWidth;
-            rect.width -= (buttonWidth + rangeLabelWidth);
+            rect.width -= rangeLabelWidth;
 
             // Show marker graph
             float y = 0;
@@ -627,10 +621,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                             menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(name, false));
                             menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(name, true));
-                            if (m_ProfileAnalyzerWindow.HasSelection())
-                                menu.AddItem(Styles.menuItemSelectFramesAll, false, m_ProfileAnalyzerWindow.SelectAllFrames);
-                            else
+
+                            if (m_ProfileAnalyzerWindow.AllSelected())
                                 menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+                            else
+                                menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+
+                            /*
+                            if (m_ProfileAnalyzerWindow.AllSelected() || m_ProfileAnalyzerWindow.HasSelection())
+                                menu.AddItem(Styles.menuItemClearSelection, false, () => m_ProfileAnalyzerWindow.ClearSelection());
+                            else
+                                menu.AddDisabledItem(Styles.menuItemClearSelection);
+                            */
+
                             menu.AddSeparator("");
                             if (!m_NameFilters.Contains(name))
                                 menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(name));

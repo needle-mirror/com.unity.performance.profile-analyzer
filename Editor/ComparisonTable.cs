@@ -143,7 +143,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             public static readonly GUIContent menuItemSelectFramesInAll = new GUIContent("Select Frames that contain this marker (within whole data set)", "");
             public static readonly GUIContent menuItemSelectFramesInCurrent = new GUIContent("Select Frames that contain this marker (within current selection)", "");
-            public static readonly GUIContent menuItemSelectFramesAll = new GUIContent("Clear Selection", "");
+            //public static readonly GUIContent menuItemClearSelection = new GUIContent("Clear Selection");
+            public static readonly GUIContent menuItemSelectFramesAll = new GUIContent("Select All");
             public static readonly GUIContent menuItemAddToIncludeFilter = new GUIContent("Add to Include Filter", "");
             public static readonly GUIContent menuItemAddToExcludeFilter = new GUIContent("Add to Exclude Filter", "");
             public static readonly GUIContent menuItemRemoveFromIncludeFilter = new GUIContent("Remove from Include Filter", "");
@@ -699,10 +700,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, false));
                 menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, true));
-                if (m_ProfileAnalyzerWindow.HasSelection())
-                    menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
-                else
+                if (m_ProfileAnalyzerWindow.AllSelected())
                     menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+                else
+                    menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+
+                /*
+                if (m_ProfileAnalyzerWindow.AllSelected() || m_ProfileAnalyzerWindow.HasSelection())
+                    menu.AddItem(Styles.menuItemClearSelection, false, () => m_ProfileAnalyzerWindow.ClearSelection());
+                else
+                    menu.AddDisabledItem(Styles.menuItemClearSelection);
+                */
+
                 menu.AddSeparator("");
                 if (!m_ProfileAnalyzerWindow.GetNameFilters().Contains(markerName))
                     menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(markerName));

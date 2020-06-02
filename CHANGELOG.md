@@ -4,6 +4,21 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2020-06-02
+
+### Changes
+* Export window updates. Includes tooltips, better on screen positioning. 
+** If opened and then new data set loaded. New data set now correctly exported.
+* Frame Time graph now shows border when selected
+** Keys 1 and 2 select the first or second frame time graph to take keyboard focus
+* Frame Time graph now shows highlighted when all frames selected, un highlighted when no frames selected.
+
+### Fixes
+* Improved histogram display when 0 range.
+* Widened frame index buttons when frame value large
+* 'total number of markers' value in Compare tab now corrected to use unfiltered count
+* Improved error messages when jumpping to frame when profiler data doesn't match profile analyzer data
+
 ## [0.7.0-preview.4] - 2020-05-29
 
 ### Changes

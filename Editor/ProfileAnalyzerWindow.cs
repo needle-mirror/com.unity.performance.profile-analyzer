@@ -69,7 +69,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent export = new GUIContent("Export", "Export profiler data as CSV files");
             public static readonly GUIContent pullOpen = new GUIContent("Pull Data", "Pull data from Unity profiler.\nFirst you must open Unity profiler to pull data from it");
             public static readonly GUIContent pullRange = new GUIContent("Pull Data", "Pull data from Unity profiler.\nFirst you must use the Unity profiler to capture data from application");
-            public static readonly GUIContent pullRecording = new GUIContent("Pull Data", "Pull data from Unity profiler.\nStop Unity profiler recording to enabled pulling data");
+            public static readonly GUIContent pullRecording = new GUIContent("Pull Data", "Pull data from Unity profiler.\nStop Unity profiler recording to enable pulling data");
             public static readonly GUIContent pull = new GUIContent("Pull Data", "Pull data from Unity profiler");
             public static readonly GUIContent nameFilter = new GUIContent("Name Filter : ", "Only show markers containing the strings");
             public static readonly GUIContent nameExclude = new GUIContent("Exclude Names : ", "Excludes markers containing the strings");
@@ -281,9 +281,11 @@ To compare two data sets:
 
 
         List<MarkerPairing> m_PairingsNew;
+        int m_TotalCombinedMarkerCountNew;
 
         [SerializeField]
         List<MarkerPairing> m_Pairings = new List<MarkerPairing>();
+        int m_TotalCombinedMarkerCount = 0;
 
         [SerializeField]
         int m_SelectedPairing = 0;
@@ -443,12 +445,15 @@ To compare two data sets:
 
             m_2D = new Draw2D("Unlit/ProfileAnalyzerShader");
             FrameTimeGraph.SetGlobalSettings(m_FrameTimeGraphGlobalSettings);
-            m_FrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.bar, UIColor.barSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
+            m_FrameTimeGraph = new FrameTimeGraph(0, m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.bar, UIColor.barSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_FrameTimeGraph.SetRangeCallback(SetRange);
-            m_LeftFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.left, UIColor.leftSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
+            m_FrameTimeGraph.SetActiveCallback(GraphActive);
+            m_LeftFrameTimeGraph = new FrameTimeGraph(1, m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.left, UIColor.leftSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_LeftFrameTimeGraph.SetRangeCallback(SetLeftRange);
-            m_RightFrameTimeGraph = new FrameTimeGraph(m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.right, UIColor.rightSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
+            m_LeftFrameTimeGraph.SetActiveCallback(GraphActive);
+            m_RightFrameTimeGraph = new FrameTimeGraph(2, m_2D, m_DisplayUnits.Units, UIColor.barBackground, UIColor.barBackgroundSelected, UIColor.right, UIColor.rightSelected, UIColor.marker, UIColor.markerSelected, UIColor.thread, UIColor.threadSelected, UIColor.gridLines);
             m_RightFrameTimeGraph.SetRangeCallback(SetRightRange);
+            m_RightFrameTimeGraph.SetActiveCallback(GraphActive);
             m_LeftFrameTimeGraph.PairWith(m_FrameTimeGraphsPaired ? m_RightFrameTimeGraph : null);
 
             m_TopMarkers = new TopMarkers(this, m_2D, UIColor.barBackground, UIColor.textTopMarkers);
@@ -494,6 +499,12 @@ To compare two data sets:
 
             // Mouse movement calls OnGui
             wantsMouseMove = true;
+        }
+
+        void OnDisable()
+        {
+            if (ProfileAnalyzerExportWindow.IsOpen())
+                ProfileAnalyzerExportWindow.CloseAll();
         }
 
         bool DisplayCount()
@@ -544,6 +555,13 @@ To compare two data sets:
 
             graph.Reset();
             graph.SetData(GetFrameTimeData(dst.data));
+
+            // One of the views changed so make sure the export window knows if its open
+            ProfileAnalyzerExportWindow exportWindow = ProfileAnalyzerExportWindow.FindOpenWindow();
+            if (exportWindow!=null)
+            {
+                exportWindow.SetData(m_ProfileSingleView, m_ProfileLeftView, m_ProfileRightView);
+            }
         }
 
         void SetView(ProfileDataView dst, ProfileDataView src, FrameTimeGraph graph)
@@ -722,6 +740,35 @@ To compare two data sets:
                     m_RequestCompare = true;
                     break;
             }
+
+            if (Event.current.isKey && Event.current.type == EventType.KeyDown)
+            {
+                switch (Event.current.keyCode)
+                {
+                    case KeyCode.Alpha1:
+                        if (m_ActiveTab == ActiveTab.Summary)
+                        {
+                            m_FrameTimeGraph.MakeActiveGraph();
+                            GUI.FocusControl("FrameTimeGraph");
+                        }
+                        else if (m_ActiveTab == ActiveTab.Compare)
+                        {
+                            m_LeftFrameTimeGraph.MakeActiveGraph();
+                            GUI.FocusControl("LeftFrameTimeGraph");
+                        }
+                        
+                        m_RequestRepaint = true;
+                        break;
+                    case KeyCode.Alpha2:
+                        if (m_ActiveTab == ActiveTab.Compare)
+                        {
+                            m_RightFrameTimeGraph.MakeActiveGraph();
+                            GUI.FocusControl("RightFrameTimeGraph");
+                        }
+                        m_RequestRepaint = true;
+                        break;
+                }
+            }
         }
 
         void Update()
@@ -822,6 +869,7 @@ To compare two data sets:
                     UpdateAnalysisFromAsyncProcessing(m_ProfileRightView, m_FullCompareRequired);
                     m_FullCompareRequired = false;
                     m_Pairings = m_PairingsNew;
+                    m_TotalCombinedMarkerCount = m_TotalCombinedMarkerCountNew;
 
                     UpdateThreadNames();
 
@@ -979,6 +1027,39 @@ To compare two data sets:
                     UpdateMatchingProfileData(m_ProfileSingleView.data, ref m_ProfileSingleView.path, m_ProfileSingleView.analysis, newPath);
                 }
             }
+        }
+
+        int GetTotalCombinedMarkerCount(ProfileData left, ProfileData right)
+        {
+            if (left == null)
+                return 0;
+            if (right == null)
+                return 0;
+            List<string> leftMarkers = left.GetMarkerNames();
+            if (leftMarkers == null)
+                return 0;
+            List<string> rightMarkers = right.GetMarkerNames();
+            if (rightMarkers == null)
+                return 0;
+
+            HashSet<string> markerPairs = new HashSet<string>();
+            for (int index = 0; index < leftMarkers.Count; index++)
+            {
+                string markerName = leftMarkers[index];
+
+                 markerPairs.Add(markerName);
+            }
+            for (int index = 0; index < rightMarkers.Count; index++)
+            {
+                string markerName = rightMarkers[index];
+
+                if (!markerPairs.Contains(markerName))
+                {
+                    markerPairs.Add(markerName);
+                }
+            }
+
+            return markerPairs.Count;
         }
 
         List<MarkerPairing> GeneratePairings(ProfileAnalysis leftAnalysis, ProfileAnalysis rightAnalysis)
@@ -1297,6 +1378,7 @@ To compare two data sets:
 
             m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthFilter2, selfTimes, m_ParentMarker, timeScaleMax);
 
+            m_TotalCombinedMarkerCountNew = GetTotalCombinedMarkerCount(m_ProfileLeftView.data, m_ProfileRightView.data);
             m_PairingsNew = GeneratePairings(m_ProfileLeftView.analysisNew, m_ProfileRightView.analysisNew);
 
             CalculatePairingbuckets(m_ProfileLeftView.analysisNew, m_ProfileRightView.analysisNew, m_PairingsNew);
@@ -1797,6 +1879,11 @@ To compare two data sets:
             return value;
         }
 
+        void GraphActive()
+        {
+            RequestRepaint();
+        }
+
         void SetRange(List<int> selectedOffsets, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus)
         {
             if (inputStatus == FrameTimeGraph.State.Dragging)
@@ -1818,6 +1905,23 @@ To compare two data sets:
                 m_ProfileSingleView.selectedIndices.Sort();
 
                 m_RequestAnalysis = true;
+            }
+        }
+
+        internal void ClearSelection()
+        {
+            if (m_ActiveTab == ActiveTab.Summary)
+            {
+                m_ProfileSingleView.ClearSelection();
+
+                m_RequestAnalysis = true;
+            }
+            if (m_ActiveTab == ActiveTab.Compare)
+            {
+                m_ProfileLeftView.ClearSelection();
+                m_ProfileRightView.ClearSelection();
+
+                m_RequestCompare = true;
             }
         }
 
@@ -2133,6 +2237,22 @@ To compare two data sets:
             }
         }
                 
+
+        internal bool AllSelected()
+        {
+            if (m_ActiveTab == ActiveTab.Summary)
+            {
+                if (m_ProfileSingleView.AllSelected())
+                    return true;
+            }
+            if (m_ActiveTab == ActiveTab.Compare)
+            {
+                if (m_ProfileLeftView.AllSelected() && m_ProfileRightView.AllSelected())
+                    return true;
+            }
+
+            return false;
+        }
 
         internal bool HasSelection()
         {
@@ -2851,7 +2971,7 @@ To compare two data sets:
             }
             if (m_ActiveTab == ActiveTab.Compare)
             {
-                int markersCount = m_Pairings.Count;
+                int markersCount = m_TotalCombinedMarkerCount;
                 int filteredMarkersCount = (m_ComparisonTable != null) ? m_ComparisonTable.GetRows().Count : 0;
 
                 var content = new GUIContent(
@@ -3179,9 +3299,18 @@ To compare two data sets:
                         m_TopMarkers.SetData(m_ProfileSingleView.analysis, m_DepthFilter, GetNameFilters(), GetNameExcludes());
 
                         EditorGUILayout.BeginVertical(GUILayout.Height(20));
+
+                        EditorGUILayout.BeginHorizontal();
+                        FrameSummary frameSummary = m_ProfileSingleView.analysis.GetFrameSummary();
+                        if (frameSummary.count > 0)
+                            DrawFrameIndexButton(frameSummary.medianFrameIndex);
+                        else
+                            GUILayout.Label("", GUILayout.MinWidth(50));
+
                         Rect rect = EditorGUILayout.GetControlRect(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         float range = m_TopMarkers.GetTopMarkerTimeRange();
                         m_TopMarkers.Draw(rect, UIColor.bar, m_TopNBars, range, UIColor.barBackground, Color.black, Color.white, true, true);
+                        EditorGUILayout.EndHorizontal();
                         EditorGUILayout.EndVertical();
 
                         EditorGUILayout.BeginVertical(GUILayout.Height(20));
@@ -3469,6 +3598,9 @@ To compare two data sets:
             float max = maxValue;
             float spacing = 2;
 
+            float range = max - min;
+            // bucketCount = (range == 0f) ? 1 : bucketCount;
+
             float x = (spacing / 2);
             float y = 0;
             float w = ((width + spacing) / bucketCount) - spacing;
@@ -3478,10 +3610,10 @@ To compare two data sets:
 
             if (m_2D.DrawStart(width, height, Draw2D.Origin.BottomLeft))
             {
-                float bucketWidth = ((max - min) / bucketCount);
+                float bucketWidth = (range / bucketCount);
                 Rect rect = GUILayoutUtility.GetLastRect();
 
-                histogram.DrawBackground(width, height, bucketCount, spacing);
+                histogram.DrawBackground(width, height, bucketCount, min, max, spacing);
 
                 if (!IsAnalysisRunning())
                 {
@@ -3516,11 +3648,12 @@ To compare two data sets:
                         float bucketEnd = bucketStart + bucketWidth;
 
                         string tooltip = string.Format(
-                            "{0}-{1}\nLeft: {2} {3}\nRight: {4} {5}",
+                            "{0}-{1}\nLeft: {2} {3}\nRight: {4} {5}\n\nBar width: {6}",
                             displayUnits.ToString(bucketStart, false, 5),
                             displayUnits.ToString(bucketEnd, true, 5),
                             leftBarCount, leftBarCount == 1 ? "frame" : "frames",
-                            rightBarCount, rightBarCount == 1 ? "frame" : "frames");
+                            rightBarCount, rightBarCount == 1 ? "frame" : "frames",
+                            displayUnits.ToString(bucketWidth, true, 5, true));
                         GUI.Label(new Rect(rect.x + x, rect.y + y, w, h),
                                     new GUIContent("", tooltip)
                                     );
@@ -3890,6 +4023,7 @@ To compare two data sets:
                         m_TopMarkersLeft.SetData(m_ProfileLeftView.analysis, m_DepthFilter1, nameFilters, nameExcludes);
                         m_TopMarkersRight.SetData(m_ProfileRightView.analysis, m_DepthFilter2, nameFilters, nameExcludes);
 
+                        
                         float leftRange = m_TopMarkersLeft.GetTopMarkerTimeRange();
                         float rightRange = m_TopMarkersRight.GetTopMarkerTimeRange();
                         if (m_TopTenDisplay == TopTenDisplay.LongestTime)
@@ -3899,8 +4033,43 @@ To compare two data sets:
                             rightRange = max;
                         }
 
+                        int leftMedian = 0;
+                        int rightMedian = 0;
+                        if (m_ProfileLeftView.analysis != null)
+                        {
+                            FrameSummary frameSummary = m_ProfileLeftView.analysis.GetFrameSummary();
+                            if (frameSummary.count > 0)
+                                leftMedian = frameSummary.medianFrameIndex;
+                        }
+                        if (m_ProfileRightView.analysis != null)
+                        {
+                            FrameSummary frameSummary = m_ProfileRightView.analysis.GetFrameSummary();
+                            if (frameSummary.count > 0)
+                                rightMedian = frameSummary.medianFrameIndex;
+                        }
+                        int maxMedian = Math.Max(leftMedian, rightMedian);
+
+                        Rect frameIndexRect = new Rect(rect);
+                        Vector2 size = GUI.skin.button.CalcSize(new GUIContent(string.Format("{0}", maxMedian)));
+                        frameIndexRect.width = Math.Max(size.x, 50);    // DrawFrameIndexButton should always be at least 50 wide
+
+                        if (leftMedian!=0f)
+                            DrawFrameIndexButton(frameIndexRect, leftMedian);
+                        else
+                            GUI.Label(frameIndexRect,"");
+
+                        float padding = 2;
+                        rect.x += frameIndexRect.width + padding;
+                        rect.width -= frameIndexRect.width;
                         m_TopMarkersLeft.Draw(rect, UIColor.left, m_TopNBars, leftRange, UIColor.barBackground, Color.black, Color.white, true, true);
                         rect.y += rect.height;
+
+                        frameIndexRect.y += rect.height;
+                        if (rightMedian != 0f)
+                            DrawFrameIndexButton(frameIndexRect, rightMedian);
+                        else
+                            GUI.Label(frameIndexRect, "");
+
                         m_TopMarkersRight.Draw(rect, UIColor.right, m_TopNBars, rightRange, UIColor.barBackground, Color.black, Color.white, true, true);
                         EditorGUILayout.EndVertical();
 
@@ -4096,8 +4265,23 @@ To compare two data sets:
 
                             DisplayUnits displayUnits = new DisplayUnits(units);
 
-                            float minValue = Math.Min(leftMin, rightMin);
-                            float maxValue = Math.Max(leftMax, rightMax);
+                            float minValue;
+                            float maxValue;
+                            if (leftMarker != null && rightMarker != null)
+                            {
+                                minValue = Math.Min(leftMin, rightMin);
+                                maxValue = Math.Max(leftMax, rightMax);
+                            }
+                            else if (leftMarker != null)
+                            {
+                                minValue = leftMin;
+                                maxValue = leftMax;
+                            }
+                            else // Either valid or 0
+                            {
+                                minValue = rightMin;
+                                maxValue = rightMax;
+                            }
 
                             if (leftBucketCount > 0 && rightBucketCount > 0 && leftBucketCount != rightBucketCount)
                             {
@@ -4186,11 +4370,10 @@ To compare two data sets:
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.export, EditorStyles.toolbarButton, GUILayout.Width(50)))
             {
-                var window = GetWindow<ProfileAnalyzerExportWindow>("Export");
-                window.SetData(m_ProfileSingleView, m_ProfileLeftView, m_ProfileRightView);
-                window.minSize = new Vector2(220, 100);
-                window.position.size.Set(220, 100);
-                window.Show();
+                Vector2 windowPosition = new Vector2(Event.current.mousePosition.x, Event.current.mousePosition.y + GUI.skin.label.lineHeight);
+                Vector2 screenPosition = GUIUtility.GUIToScreenPoint(windowPosition);
+
+                ProfileAnalyzerExportWindow.Open(screenPosition.x, screenPosition.y, m_ProfileSingleView, m_ProfileLeftView, m_ProfileRightView);
             }
             GUI.enabled = lastEnabled;
 
@@ -4226,7 +4409,7 @@ To compare two data sets:
         {
             if (!m_StylesSetup)
             {
-                m_StyleMiddleRight = GUI.skin.label;
+                m_StyleMiddleRight = new GUIStyle(GUI.skin.label);
                 m_StyleMiddleRight.alignment = TextAnchor.MiddleRight;
 
                 m_StylesSetup = true;
@@ -4818,7 +5001,7 @@ To compare two data sets:
             float msProfiler = m_ProfilerWindowInterface.GetFrameTime(frameIndex - 1); // Convert from user facing index to zero based index into profiler data
             if (msData != msProfiler)
             {
-                message = string.Format("Timing data in profiler doesn't match for frame {0} : {1:f2}!={2:f2}",
+                message = string.Format("Timing data in profiler doesn't match for frame {0} : Expected {1:f2}ms but frame is {2:f2}ms",
                                         frameIndex, msData, msProfiler);
                 return false;
             }
@@ -4827,40 +5010,54 @@ To compare two data sets:
             return true;
         }
 
-        internal void JumpToFrame(int frameindex, bool reportErrors = true)
+        internal void JumpToFrame(int frameIndex, bool reportErrors = true)
         {
-            if (m_ProfilerWindowInterface.JumpToFrame(frameindex))
+            if (!m_ProfilerWindowInterface.IsReady())
+                return;
+
+            
+            var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+
+            string message;
+            if (!m_ProfilerWindowInterface.JumpToFrame(frameIndex))
             {
-                var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+                message = string.Format("Timing data in profiler doesn't match : Frame {0} does not exist", frameIndex);
+                Debug.Log(message);
+            }
+            else
+            {
                 ProfileData data = m_ProfileSingleView.data;
-                string message;
-                bool dataMatch = DataMatchesProfiler(data, frameindex, out message);
+                bool dataMatch = DataMatchesProfiler(data, frameIndex, out message);
                 if (!dataMatch && reportErrors)
                 {
                     Debug.Log(message);
                 }
-                ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.JumpToFrame, analytic);
             }
+            ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.JumpToFrame, analytic);
         }
 
-        internal void DrawFrameIndexButton(int index)
+        internal float DrawFrameIndexButton(int index)
         {
+            float defaultWidth = 50f;
             if (index < 0)
-                return;
+                return defaultWidth;
 
             bool enabled = GUI.enabled;
             if (!IsProfilerWindowOpen())
                 GUI.enabled = false;
 
             var content = new GUIContent(string.Format("{0}", index), string.Format("Jump to frame {0} in the Unity Profiler", index));
-            //Vector2 size = GUI.skin.button.CalcSize(content);
+            Vector2 size = GUI.skin.button.CalcSize(content);
             //float height = size.y;
-            if (GUILayout.Button(content, GUILayout.Width(50)))
+            float maxWidth = Math.Max(defaultWidth, size.x);
+            if (GUILayout.Button(content, GUILayout.MinWidth(defaultWidth), GUILayout.MaxWidth(maxWidth)))
             {
                 JumpToFrame(index);
             }
 
             GUI.enabled = enabled;
+
+            return maxWidth;
         }
 
         internal void DrawFrameIndexButton(Rect rect, int index)
@@ -5132,7 +5329,7 @@ To compare two data sets:
             DisplayUnits displayUnits = new DisplayUnits(units);
 
             TopMarkerList topMarkerList = new TopMarkerList(m_2D, units,
-                LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2,
+                LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3,
                 UIColor.bar, UIColor.barBackground, DrawFrameIndexButton);
             m_TopNumber = topMarkerList.DrawTopNumber(m_TopNumber, m_TopStrings, m_TopValues);
 
@@ -5262,7 +5459,7 @@ To compare two data sets:
                             }
 
                             TopMarkerList topMarkerList = new TopMarkerList(m_2D, units,
-                                LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2,
+                                LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3,
                                 UIColor.bar, UIColor.barBackground, DrawFrameIndexButton);
                             m_TopNumber = topMarkerList.Draw(marker, m_TopNumber, m_TopStrings, m_TopValues);
 
