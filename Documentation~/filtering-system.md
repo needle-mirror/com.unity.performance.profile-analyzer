@@ -19,6 +19,7 @@ The pane has the following controls:
 |**Marker Columns**|Select a layout for the **Marker Details/Comparison** pane. For more information on the columns in this pane, see the documentation on [Single view Marker Details list](single-view.html#marker-details-list) and [Compare view Marker Comparison list](compare-view.html#marker-comparison-list).|
 
 ## Thread window
+
 By default, the Profile Analyzer displays the markers on the main thread in the **Marker Details/Comparison** pane. To analyze the markers on other threads, under **Threads**, click the **Select** button, and the Threads window opens.
 
 ![Thread window](images/profile-analyzer-filter-threads-window.png)<br/>*The Thread window*
@@ -28,6 +29,7 @@ To add more threads to the analysis, enable the checkboxes next to their names, 
 Click the **Clear** button to clear all of the threads you've selected, and **Reset** to reset the selection back to the previous thread set. 
 
 ## Depth Slice
+
 When you select a **Depth Slice** level in the dropdown, it corresponds to the level of the marker within the hierarchy of the thread. You can visualize this in the Profiler window as follows:
 
 ![Depth Slice](images/filters-depth-slice-comparison.png)<br/>*Top, the Profile Analyzer in the Single view with a Depth Slice of 3 selected in the Filters pane. Bottom, the Profiler window with the CPU Usage module selected, in Timeline view. Note that the markers in the Marker Details list correspond to the markers in the third level of the Main Thread's hierarchy.*
@@ -37,6 +39,7 @@ In the Compare view, the Profile Analyzer automatically aligns the depth of the 
 To override the automatic depth alignment, disable the **Auto Right** checkbox and then manually set the depth levels for the left (blue) and right (orange) sets. This is useful if you're comparing data sets from different versions of Unity. 
 
 ## Parent Marker
+
 To filter the dataset by a specific marker and its children, right click on the marker in the **Marker Details/Comparison** pane and then select **Set As Parent Marker Filter**. You can visualize this in the Profiler window as follows: 
 
 ![Parent marker](images/filters-parent-marker-comparison.png)<br/> *Top, the Profile Analyzer in the Single view with the data filtered by the parent marker of Gfx.WaitForPresentOnGfxThread. Bottom, the same frame opened in the Profiler window, with this thread highlighted. Note that the markers in the Timeline view correspond to those filtered in the Profile Analyzer.*

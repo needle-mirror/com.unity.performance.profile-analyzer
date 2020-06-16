@@ -305,7 +305,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public bool IsRecording()
         {
+#if UNITY_2017_4_OR_NEWER
             return ProfilerDriver.enabled;
+#else
+            return false;
+#endif
         }
     }
 }

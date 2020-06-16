@@ -1,7 +1,7 @@
-﻿
-using UnityEngine;
+﻿using UnityEngine;
 using System;
 using System.Collections.Generic;
+using UnityEngine.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -37,7 +37,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         };
 
         public delegate void SetRange(List<int> selected, int clickCount, bool singleControlAction, FrameTimeGraph.State inputStatus);
-        public delegate void SetActive();
+        public delegate void SetActive(bool active);
 
         public enum State
         {
@@ -155,6 +155,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int m_GraphId;
         int m_ControlID;
         static int s_LastSelectedGraphId = -1;
+        static int s_CurrentSelectedGraphId = -1;
 
         bool m_Enabled;
 
@@ -230,17 +231,58 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_MaxFrames = -1;
         }
 
-        public void MakeActiveGraph()
+        public void MakeGraphActive(bool activate)
         {
-            s_LastSelectedGraphId = m_GraphId;
-            GUIUtility.hotControl = m_ControlID;
+            if (activate)
+            {
+                if (s_CurrentSelectedGraphId != m_GraphId)
+                {
+                    s_LastSelectedGraphId = m_GraphId;
+                    s_CurrentSelectedGraphId = m_GraphId;
 
-            m_SetActive();
+                    // Make sure we are not still selecting another graph
+                    GUIUtility.hotControl = 0;
+
+                    m_SetActive(true);
+                }
+
+                if (GUI.GetNameOfFocusedControl() != "FrameTimeGraph")
+                {
+                    // Take focus away from any other control
+                    // Doesn't really matter what the name is here
+                    GUI.FocusControl("FrameTimeGraph");
+                }
+            }
+            else
+            {
+                if (s_CurrentSelectedGraphId == m_GraphId)
+                {
+                    s_CurrentSelectedGraphId = -1;
+
+                    // Remember this was the active control
+                    // Before this point one of the inner labels would have been active
+                    // GUIUtility.hotControl = m_ControlID;
+
+                    m_SetActive(false);
+                }
+            }
+        }
+
+        public bool IsGraphActive()
+        {
+            if (s_CurrentSelectedGraphId == m_GraphId)
+                return true;
+
+            if (s_LastSelectedGraphId == m_GraphId && GUIUtility.hotControl == m_ControlID)
+                return true;
+
+            return false;
         }
 
         public FrameTimeGraph(int graphID, Draw2D draw2D, Units units, Color background, Color backgroundSelected, Color barColor, Color barSelected, Color barMarker, Color barMarkerSelected, Color barThreads, Color barThreadsSelected, Color colorGridlines)
         {
             m_GraphId = graphID;
+            m_ControlID = 0;
 
             m_2D = draw2D;
             SetUnits(units);
@@ -491,12 +533,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (Event.current.isKey && Event.current.type==EventType.KeyDown && !m_Dragging && !m_MouseReleased)
             {
-                if (s_LastSelectedGraphId == m_GraphId)
-                    MakeActiveGraph();
-
-                if (GUIUtility.hotControl == m_ControlID)
+                if (IsGraphActive())
                 {
-
                     int step = Event.current.shift ? 10 : 1;
                     switch (Event.current.keyCode)
                     {
@@ -619,59 +657,61 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
                 else
                 {
-                    if (e.mousePosition.x >= xStart && e.mousePosition.x <= (xStart + width) &&
-                        e.mousePosition.y >= rect.y && e.mousePosition.y < rect.yMax)
+                    if (e.mousePosition.x >= rect.x && e.mousePosition.x <= rect.xMax &&
+                        e.mousePosition.y >= rect.y && e.mousePosition.y <= rect.yMax)
                     {
-                        MakeActiveGraph();
-
-                        if (GUI.GetNameOfFocusedControl() != "FrameTimeGraph")
+                        if (e.mousePosition.x >= xStart && e.mousePosition.x <= (xStart + width) &&
+                            e.mousePosition.y >= rect.y && e.mousePosition.y < rect.yMax)
                         {
-                            // Take focus away from any other control
-                            // Doesn't really matter what the name is here
-                            GUI.FocusControl("FrameTimeGraph");
-                        }
+                            MakeGraphActive(true);
 
-                        if (e.type == EventType.MouseDown && e.button == 0)
-                        {
-                            // Drag start (must be within the bounds of the control)
-                            // Might be single or double click
-                            m_LastClickTime = EditorApplication.timeSinceStartup;
-                            m_ClickCount = e.clickCount;
-
-                            m_Dragging = true;
-                            m_Moving = false;
-
-                            if (currentSelectionFirstDataOffset != 0 || currentSelectionLastDataOffset != dataLength - 1)
+                            if (e.type == EventType.MouseDown && e.button == 0)
                             {
-                                // Selection is valid
-                                if (e.shift && dataOffset >= currentSelectionFirstDataOffset && frameOffsetBeforeNext <= currentSelectionLastDataOffset)
+                                // Drag start (must be within the bounds of the control)
+                                // Might be single or double click
+                                m_LastClickTime = EditorApplication.timeSinceStartup;
+                                m_ClickCount = e.clickCount;
+
+                                m_Dragging = true;
+                                m_Moving = false;
+
+                                if (currentSelectionFirstDataOffset != 0 || currentSelectionLastDataOffset != dataLength - 1)
                                 {
-                                    // Moving if shift held and we are inside the current selection range
-                                    m_Moving = true;
+                                    // Selection is valid
+                                    if (e.shift && dataOffset >= currentSelectionFirstDataOffset && frameOffsetBeforeNext <= currentSelectionLastDataOffset)
+                                    {
+                                        // Moving if shift held and we are inside the current selection range
+                                        m_Moving = true;
+                                    }
                                 }
+
+                                if (m_PairedWithFrameTimeGraph != null)
+                                    m_SingleControlAction = e.alt;  // Record if we are acting only on this control rather than the paired one too
+                                else
+                                    m_SingleControlAction = true;
+
+                                if (m_Moving)
+                                {
+                                    m_MoveHandleOffset = dataOffset - currentSelectionFirstDataOffset;
+
+                                    SetDragMovement(currentSelectionFirstDataOffset, currentSelectionLastDataOffset, currentSelectionFirstDataOffset, currentSelectionLastDataOffset);
+                                }
+                                else
+                                {
+                                    //SetDragSelection(dataOffset, frameOffsetBeforeNext, DragDirection.Start);
+
+                                    // Select just 1 frame
+                                    SetDragSelection(dataOffset, dataOffset, DragDirection.Start);
+                                }
+                                CallSetRange(m_DragFirstOffset, m_DragLastOffset, m_ClickCount, m_SingleControlAction, FrameTimeGraph.State.Dragging);
+                                return State.Dragging;
                             }
-
-                            if (m_PairedWithFrameTimeGraph != null)
-                                m_SingleControlAction = e.alt;  // Record if we are acting only on this control rather than the paired one too
-                            else
-                                m_SingleControlAction = true;
-
-                            if (m_Moving)
-                            {
-                                m_MoveHandleOffset = dataOffset - currentSelectionFirstDataOffset;
-
-                                SetDragMovement(currentSelectionFirstDataOffset, currentSelectionLastDataOffset, currentSelectionFirstDataOffset, currentSelectionLastDataOffset);
-                            }
-                            else
-                            {
-                                //SetDragSelection(dataOffset, frameOffsetBeforeNext, DragDirection.Start);
-
-                                // Select just 1 frame
-                                SetDragSelection(dataOffset, dataOffset, DragDirection.Start);
-                            }
-                            CallSetRange(m_DragFirstOffset, m_DragLastOffset, m_ClickCount, m_SingleControlAction, FrameTimeGraph.State.Dragging);
-                            return State.Dragging;
                         }
+                    }
+                    else
+                    {
+                        // Left this graph area
+                        MakeGraphActive(false);
                     }
                 }
             }
@@ -1033,11 +1073,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void Draw(Rect rect, ProfileAnalysis analysis, List<int> selectedFrameOffsets, float yMax, int displayOffset, string selectedMarkerName, int maxFrames = 0, ProfileAnalysis fullAnalysis = null)
         {
+            Profiler.BeginSample("FrameTimeGraph.Draw");
+
+            // Must be outside repaint to make sure next controls work correctly (specifically marker name filter)
             int controlID = GUIUtility.GetControlID(FocusType.Keyboard);
-            m_ControlID = controlID;
 
             if (Event.current.type == EventType.Repaint)
+            {
                 m_LastRect = rect;
+
+                // Control id would change during non repaint phase if tooltips displayed if we update this outside the repaint
+                m_ControlID = controlID;
+            }
 
             m_MaxFrames = maxFrames;
 
@@ -1173,10 +1220,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (m_2D.DrawStart(rect, Draw2D.Origin.BottomLeft))
             {
+                float totalMs;
+                if (HasDragRegion())
+                {
+                    totalMs = GetTotalSelectionTime(selectedFirstOffset, selectedLastOffset);
+                }
+                else
+                {
+                    totalMs = GetTotalSelectionTime(selectedFrameOffsets);
+                }
+
+                string timeForSelectedFrames = ToDisplayUnits(totalMs, true, 0);
+                string timeForSelectedFramesClamped = ToDisplayUnits(totalMs, true, 1);
+                string selectionAreaString = string.Format("\n\nTotal time for {0} selected frames\n{1} ({2})", selectedCount, timeForSelectedFrames, timeForSelectedFramesClamped);
+
                 Color selectedControl = GUI.skin.settings.selectionColor;
 
-                if (GUIUtility.hotControl == m_ControlID)
+                if (IsGraphActive())
+                {
                     m_2D.DrawBox(xStart, yStart, width, height, selectedControl);
+                }
 
                 //xStart -= 1f;
                 yStart += 1f;
@@ -1209,22 +1272,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     full = true;
                 }
 
-
-                float totalMs;
-                if (HasDragRegion())
-                {
-                    totalMs = GetTotalSelectionTime(selectedFirstOffset, selectedLastOffset);
-                }
-                else
-                {
-                    totalMs = GetTotalSelectionTime(selectedFrameOffsets);
-                }
-
-                string timeForSelectedFrames = ToDisplayUnits(totalMs, true, 0);
-                string timeForSelectedFramesClamped = ToDisplayUnits(totalMs, true, 1);
-                string selectionAreaString = string.Format("\n\nTotal time for {0} selected frames\n{1} ({2})", selectedCount, timeForSelectedFrames, timeForSelectedFramesClamped);
-
-                MarkerData selectedMarker = (m_GlobalSettings.showSelectedMarker && analysisData!=null) ? analysisData.GetMarkerByName(selectedMarkerName) : null;
+                MarkerData selectedMarker = (m_GlobalSettings.showSelectedMarker && analysisData != null) ? analysisData.GetMarkerByName(selectedMarkerName) : null;
                 foreach (BarData bar in m_Bars)
                 {
                     bool inSelectionRegion = InSelectedRegion(bar.startDataOffset, bar.endDataOffset, selectedFirstOffset, selectedLastOffset, frameOffsetToSelectionIndex, subsetSelected);
@@ -1249,9 +1297,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         // Analysis is just on the subset
                         if (m_GlobalSettings.showThreads)
                         {
+                            Profiler.BeginSample("FrameTimeGraph.ShowThreads");
                             ShowThreads(height, yRange, bar, full,
                                 analysisData.GetThreads(), subsetSelected, selectedFirstOffset, selectedLastOffset,
                                 displayOffset, frameOffsetToSelectionIndex);
+                            Profiler.EndSample();
                         }
 
                         if (m_GlobalSettings.showSelectedMarker)
@@ -1261,6 +1311,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 displayOffset, frameOffsetToSelectionIndex);
                         }
                     }
+                }
+
+                m_2D.DrawEnd();
+
+                if (m_GlobalSettings.showFrameLines && m_GlobalSettings.showFrameLineText)
+                {
+                    ShowFrameLinesText(rect, xStart, yStart, yRange, width, height, subsetSelected, selectedFirstOffset, selectedLastOffset);
+                }
+
+                foreach (BarData bar in m_Bars)
+                {
+                    bool inSelectionRegion = InSelectedRegion(bar.startDataOffset, bar.endDataOffset, selectedFirstOffset, selectedLastOffset, frameOffsetToSelectionIndex, subsetSelected);
 
                     // Draw tooltip for bar (or 1 pixel segment of bar)
                     {
@@ -1277,14 +1339,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         GUI.Label(new Rect(rect.x + bar.x, rect.y + 5, bar.w, height), new GUIContent("", tooltip));
                     }
                 }
-
-                m_2D.DrawEnd();
-
-                if (m_GlobalSettings.showFrameLines && m_GlobalSettings.showFrameLineText)
-                {
-                    ShowFrameLinesText(rect, xStart, yStart, yRange, width, height, subsetSelected, selectedFirstOffset, selectedLastOffset);
-                }
             }
+
             GUI.enabled = lastEnabled;
 
             if (showAxis)
@@ -1336,6 +1392,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.FrameTimeContextMenu, analytic.GetDurationInSeconds(), true);
             }
             GUI.enabled = lastEnabled;
+
+            Profiler.EndSample();
         }
 
         void ShowThreads(float height, float yRange, BarData bar, bool full, 

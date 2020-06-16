@@ -36,30 +36,78 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             count = t.count;
         }
 
-        /// <summary>Compare the time duration between the frames and check which is larger</summary>
+        /// <summary>Compare the time duration between the frames. Used for sorting in ascending order</summary>
         /// <param name="other"> The other FrameTime to compare </param>
         /// <returns>-1 if this is smaller, 0 if the same, 1 if this is larger</returns>
         public int CompareTo(FrameTime other)
         {
+            if (ms == other.ms)
+            {
+                // secondary sort by frame index order
+                return frameIndex.CompareTo(other.frameIndex);
+            }
+
             return ms.CompareTo(other.ms);
         }
 
-        /// <summary>Compare the time duration between two FrameTimes and check which is larger</summary>
+        /// <summary>Compare the time duration between two FrameTimes. Used for sorting in ascending order</summary>
         /// <param name="a"> The first FrameTime to compare </param>
         /// <param name="b"> The second FrameTime to compare </param>
         /// <returns>-1 if a is smaller, 0 if the same, 1 if a is larger</returns>
         public static int CompareMs(FrameTime a, FrameTime b)
         {
+            if (a.ms == b.ms)
+            {
+                // secondary sort by frame index order
+                return a.frameIndex.CompareTo(b.frameIndex);
+            }
+
             return a.ms.CompareTo(b.ms);
         }
 
-        /// <summary>Compare the instance count between two FrameTimes and check which is larger</summary>
+        /// <summary>Compare the instance count between two FrameTimes. Used for sorting in ascending order</summary>
         /// <param name="a"> The first FrameTime to compare </param>
         /// <param name="b"> The second FrameTime to compare </param>
         /// <returns>-1 if a is smaller, 0 if the same, 1 if a is larger</returns>
         public static int CompareCount(FrameTime a, FrameTime b)
         {
+            if (a.count == b.count)
+            {
+                // secondary sort by frame index order
+                return a.frameIndex.CompareTo(b.frameIndex);
+            }
+
             return a.count.CompareTo(b.count);
+        }
+
+        /// <summary>Compare the time duration between two FrameTimes. Used for sorting in descending order</summary>
+        /// <param name="a"> The first FrameTime to compare </param>
+        /// <param name="b"> The second FrameTime to compare </param>
+        /// <returns>-1 if a is larger, 0 if the same, 1 if a is smaller</returns>
+        public static int CompareMsDescending(FrameTime a, FrameTime b)
+        {
+            if (a.ms == b.ms)
+            {
+                // secondary sort by frame index order
+                return a.frameIndex.CompareTo(b.frameIndex);
+            }
+
+            return -a.ms.CompareTo(b.ms);
+        }
+
+        /// <summary>Compare the instance count between two FrameTimes. Used for sorting in descending order</summary>
+        /// <param name="a"> The first FrameTime to compare </param>
+        /// <param name="b"> The second FrameTime to compare </param>
+        /// <returns>-1 if a is larger, 0 if the same, 1 if a is smaller</returns>
+        public static int CompareCountDescending(FrameTime a, FrameTime b)
+        {
+            if (a.count == b.count)
+            {
+                // secondary sort by frame index order
+                return a.frameIndex.CompareTo(b.frameIndex);
+            }
+
+            return -a.count.CompareTo(b.count);
         }
     }
 }

@@ -243,16 +243,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         internal struct MarkerSummaryEntry
         {
             public readonly string name;
-            public readonly float ms;
+            public readonly float msAtMedian;   // At the median frame (Miliseconds)
+            public readonly float msMedian;     // median value for marker over all frames (Miliseconds) on frame medianFrameIndex
             public readonly float x;
             public readonly float w;
             public readonly int medianFrameIndex;
             public readonly SummaryType summaryType;
 
-            public MarkerSummaryEntry( string name, float ms, float x, float w, int medianFrameIndex, SummaryType summaryType)
+            public MarkerSummaryEntry(string name, float msAtMedian, float msMedian, float x, float w, int medianFrameIndex, SummaryType summaryType)
             {
                 this.name = name;
-                this.ms = ms;
+                this.msAtMedian = msAtMedian;
+                this.msMedian = msMedian;
                 this.x = x;
                 this.w = w;
                 this.medianFrameIndex = medianFrameIndex;
@@ -421,8 +423,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             foreach (var marker in markers)
             {
-                float ms = MarkerData.GetMsAtMedian(marker);
-                totalMarkerTime += ms;
+                float msAtMedian = MarkerData.GetMsAtMedian(marker);
+                totalMarkerTime += msAtMedian;
 
                 if (depthFilter != ProfileAnalyzer.kDepthAll && marker.minDepth != depthFilter)
                 {
@@ -442,14 +444,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (at < max)
                 {
-                    float w = CaculateWidth(x, ms, msToWidth, width);
-                    markerSummary.entry.Add(new MarkerSummaryEntry(marker.name, ms, x, w, marker.medianFrameIndex, SummaryType.Marker));
+                    float w = CaculateWidth(x, msAtMedian, msToWidth, width);
+                    float msMedian = MarkerData.GetMsMedian(marker);
+                    markerSummary.entry.Add(new MarkerSummaryEntry(marker.name, msAtMedian, msMedian, x, w, marker.medianFrameIndex, SummaryType.Marker));
 
                     x += w;
                 }
                 else
                 {
-                    other += ms;
+                    other += msAtMedian;
                     if (!includeOthers)
                         break;
                 }
@@ -460,14 +463,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (includeOthers && other > 0.0f)
             {
                 float w = CaculateWidth(x, other, msToWidth, width);
-                markerSummary.entry.Add(new MarkerSummaryEntry("Other", other, x, w, -1, SummaryType.Other));
+                markerSummary.entry.Add(new MarkerSummaryEntry("Other", other, 0f, x, w, -1, SummaryType.Other));
                 x += w;
             }
             if (includeUnaccounted && totalMarkerTime < frameSummary.msMedian)
             {
                 float unaccounted = frameSummary.msMedian - totalMarkerTime;
                 float w = CaculateWidth(x, unaccounted, msToWidth, width);
-                markerSummary.entry.Add(new MarkerSummaryEntry("Unaccounted", unaccounted, x, w, -1, SummaryType.Unaccounted));
+                markerSummary.entry.Add(new MarkerSummaryEntry("Unaccounted", unaccounted, 0f, x, w, -1, SummaryType.Unaccounted));
                 x += w;
             }
 
@@ -583,7 +586,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 float x = entry.x * width;
                 float w = entry.w * width;
-                float ms = entry.ms;
+                float msAtMedian = entry.msAtMedian;
 
                 if (entry.summaryType==SummaryType.Marker)
                 {
@@ -601,11 +604,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             style = leftAlignStyle;
                         }
                     }
-                    float percentAtMedian = ms * 100 / timeRange;
+                    float percentAtMedian = msAtMedian * 100 / timeRange;
                     string tooltip = string.Format("{0}\n{1:f2}% ({2} on median frame {3})\n\nMedian marker time (in currently selected frames)\n{4} on frame {5}",
                         name,
-                        percentAtMedian, ToDisplayUnits(ms, true, 0), frameSummary.medianFrameIndex,
-                        ToDisplayUnits(ms, true, 0), entry.medianFrameIndex);
+                        percentAtMedian, ToDisplayUnits(msAtMedian, true, 0), frameSummary.medianFrameIndex,
+                        ToDisplayUnits(entry.msMedian, true, 0), entry.medianFrameIndex);
                     if (name == selectedPairingMarkerName)
                         style.normal.textColor = selectedText;
                     else
@@ -662,7 +665,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
                 else
                 {
-                    DrawBarText(rect, x, w, ms, name, timeRange, leftAlignStyle, frameSummary.medianFrameIndex);
+                    DrawBarText(rect, x, w, msAtMedian, name, timeRange, leftAlignStyle, frameSummary.medianFrameIndex);
                 }
             }
 

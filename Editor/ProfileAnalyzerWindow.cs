@@ -374,6 +374,7 @@ To compare two data sets:
         ActiveTab m_ScreenSizeChangedTab;
 
         GUIStyle m_StyleMiddleRight;
+        GUIStyle m_StyleUpperLeft;
         bool m_StylesSetup = false;
 
         static Regex quotedStringWithoutQuotes = new Regex("\"([^\"]*)\"");
@@ -748,12 +749,12 @@ To compare two data sets:
                     case KeyCode.Alpha1:
                         if (m_ActiveTab == ActiveTab.Summary)
                         {
-                            m_FrameTimeGraph.MakeActiveGraph();
+                            m_FrameTimeGraph.MakeGraphActive(true);
                             GUI.FocusControl("FrameTimeGraph");
                         }
                         else if (m_ActiveTab == ActiveTab.Compare)
                         {
-                            m_LeftFrameTimeGraph.MakeActiveGraph();
+                            m_LeftFrameTimeGraph.MakeGraphActive(true);
                             GUI.FocusControl("LeftFrameTimeGraph");
                         }
                         
@@ -762,7 +763,7 @@ To compare two data sets:
                     case KeyCode.Alpha2:
                         if (m_ActiveTab == ActiveTab.Compare)
                         {
-                            m_RightFrameTimeGraph.MakeActiveGraph();
+                            m_RightFrameTimeGraph.MakeGraphActive(true);
                             GUI.FocusControl("RightFrameTimeGraph");
                         }
                         m_RequestRepaint = true;
@@ -1879,7 +1880,7 @@ To compare two data sets:
             return value;
         }
 
-        void GraphActive()
+        void GraphActive(bool active)
         {
             RequestRepaint();
         }
@@ -2307,7 +2308,7 @@ To compare two data sets:
             }
             else
             {
-                GUI.Label(rect, Styles.dataMissing);
+                GUI.Label(rect, Styles.dataMissing, m_StyleUpperLeft);
             }
 
             Profiler.EndSample();
@@ -2675,6 +2676,9 @@ To compare two data sets:
 
         void DrawSelectedText(string text)
         {
+            if (text == null)
+                return;
+
 #if UNITY_2019_1_OR_NEWER
             GUIStyle treeViewSelectionStyle = "TV Selection";
             GUIStyle backgroundStyle = new GUIStyle(treeViewSelectionStyle);
@@ -3541,7 +3545,7 @@ To compare two data sets:
             }
             else
             {
-                GUI.Label(rect, Styles.comparisonDataMissing);
+                GUI.Label(rect, Styles.comparisonDataMissing, m_StyleUpperLeft);
             }
 
             GUI.SetNextControlName("RightFrameTimeGraph");
@@ -3565,7 +3569,7 @@ To compare two data sets:
             }
             else
             {
-                GUI.Label(rect, Styles.comparisonDataMissing);
+                GUI.Label(rect, Styles.comparisonDataMissing, m_StyleUpperLeft);
             }
 
             EditorGUILayout.BeginHorizontal();
@@ -3579,11 +3583,10 @@ To compare two data sets:
                 bool paired = EditorGUILayout.ToggleLeft(Styles.graphPairing, m_FrameTimeGraphsPaired, style, GUILayout.MaxWidth(200));
                 GUI.enabled = lastEnabled;
                 SetFrameTimeGraphPairing(paired);
+
+                GUILayout.FlexibleSpace();
+                ShowSelectedMarker();
             }
-            GUILayout.FlexibleSpace();
-
-
-            ShowSelectedMarker();
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
@@ -4411,6 +4414,9 @@ To compare two data sets:
             {
                 m_StyleMiddleRight = new GUIStyle(GUI.skin.label);
                 m_StyleMiddleRight.alignment = TextAnchor.MiddleRight;
+
+                m_StyleUpperLeft = new GUIStyle(GUI.skin.label);
+                m_StyleUpperLeft.alignment = TextAnchor.UpperLeft;
 
                 m_StylesSetup = true;
             }
@@ -5315,12 +5321,13 @@ To compare two data sets:
             float barHeight = (h - ySpacing) / 2;
 
             EditorGUILayout.BeginVertical(GUILayout.Width(w + LayoutSize.WidthColumn1 + LayoutSize.WidthColumn2));
+            bool showCount = DisplayCount();
 
             float leftMax = MarkerData.GetMsMax(leftMarker);
             float rightMax = MarkerData.GetMsMax(rightMarker);
 
             Units units = m_DisplayUnits.Units;
-            if (DisplayCount())
+            if (showCount)
             {
                 units = Units.Count;
                 leftMax = MarkerData.GetCountMax(leftMarker);
@@ -5335,21 +5342,19 @@ To compare two data sets:
 
             float barMax = Math.Max(leftMax, rightMax);
 
-            int leftIndex = leftMarker != null ? leftMarker.frames.Count - 1 : -1;
-            int rightIndex = rightMarker != null ? rightMarker.frames.Count - 1 : -1;
+            List<FrameTime> leftFrames = leftMarker!=null ? topMarkerList.GetTopN(leftMarker, m_TopNumber, showCount) : new List<FrameTime>();
+            List<FrameTime> rightFrames = rightMarker!=null ? topMarkerList.GetTopN(rightMarker, m_TopNumber, showCount) : new List<FrameTime>();
+
             FrameTime zeroFrameTime = new FrameTime(-1, 0.0f, 0);
             for (int i = 0; i < m_TopNumber; i++)
             {
-                FrameTime leftFrameTime = leftIndex >= 0 ? leftMarker.frames[leftIndex] : zeroFrameTime;
-                FrameTime rightFrameTime = rightIndex >= 0 ? rightMarker.frames[rightIndex] : zeroFrameTime;
+                bool leftValid = i < leftFrames.Count;
+                bool rightValid = i < rightFrames.Count;
+                FrameTime leftFrameTime = leftValid ? leftFrames[i] : zeroFrameTime;
+                FrameTime rightFrameTime = rightValid ? rightFrames[i] : zeroFrameTime;
 
-                float leftBarValue = leftFrameTime.ms;
-                float rightBarValue = rightFrameTime.ms;
-                if (DisplayCount())
-                {
-                    leftBarValue = leftFrameTime.count;
-                    rightBarValue = rightFrameTime.count;
-                }
+                float leftBarValue = showCount ? leftFrameTime.count : leftFrameTime.ms;
+                float rightBarValue = showCount ? rightFrameTime.count : rightFrameTime.ms;
 
                 float leftBarLength = Math.Min((w * leftBarValue) / barMax, w);
                 float rightBarLength = Math.Min((w * rightBarValue) / barMax, w);
@@ -5357,7 +5362,7 @@ To compare two data sets:
                 EditorGUILayout.BeginHorizontal();
                 if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
                 {
-                    if (leftIndex >= 0 || rightIndex >= 0)
+                    if (leftValid || rightValid)
                     {
                         m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, UIColor.barBackground);
 
@@ -5367,19 +5372,16 @@ To compare two data sets:
                     m_2D.DrawEnd();
 
                     Rect rect = GUILayoutUtility.GetLastRect();
-                    string leftContent = leftIndex >= 0 ? string.Format("{0} on frame {1}", displayUnits.ToString(leftBarValue, true, 5), leftFrameTime.frameIndex) : "None";
-                    string rightContent = rightIndex >= 0 ? string.Format("{0} on frame {1}", displayUnits.ToString(rightBarValue, true, 5), rightFrameTime.frameIndex) : "None";
+                    string leftContent = leftValid ? string.Format("{0} on frame {1}", displayUnits.ToString(leftBarValue, true, 5), leftFrameTime.frameIndex) : "None";
+                    string rightContent = rightValid ? string.Format("{0} on frame {1}", displayUnits.ToString(rightBarValue, true, 5), rightFrameTime.frameIndex) : "None";
                     GUI.Label(rect, new GUIContent("", string.Format("Left:\t{0}\nRight:\t{1}", leftContent, rightContent)));
                 }
 
-                EditorGUILayout.LabelField(leftIndex >= 0 ? displayUnits.ToGUIContentWithTooltips(leftBarValue, frameIndex: leftFrameTime.frameIndex) : Styles.emptyString, GUILayout.Width(LayoutSize.WidthColumn1));
-                EditorGUILayout.LabelField(rightIndex >= 0 ? displayUnits.ToGUIContentWithTooltips(rightBarValue, frameIndex: rightFrameTime.frameIndex) : Styles.emptyString, GUILayout.Width(LayoutSize.WidthColumn2));
-                if (leftIndex >= 0 && rightIndex >= 0)
+                EditorGUILayout.LabelField(leftValid ? displayUnits.ToGUIContentWithTooltips(leftBarValue, frameIndex: leftFrameTime.frameIndex) : Styles.emptyString, GUILayout.Width(LayoutSize.WidthColumn1));
+                EditorGUILayout.LabelField(rightValid ? displayUnits.ToGUIContentWithTooltips(rightBarValue, frameIndex: rightFrameTime.frameIndex) : Styles.emptyString, GUILayout.Width(LayoutSize.WidthColumn2));
+                if (leftValid || rightValid)
                     EditorGUILayout.LabelField(displayUnits.ToGUIContentWithTooltips(rightBarValue - leftBarValue), GUILayout.Width(LayoutSize.WidthColumn3));
                 EditorGUILayout.EndHorizontal();
-
-                leftIndex--;
-                rightIndex--;
             }
 
             EditorGUILayout.EndVertical();

@@ -12,13 +12,15 @@ You can use the **Frame Control** pane in both the [Single](single-view.md) and 
 |**D:** Pair Graph Selection<br/>*(Compare view only)*| When you enable this checkbox, the Profile Analyzer reflects any changes you make in the range selection of a data set in both data sets. This is important to ensure you compare the exact same number of frames in both data sets and get an accurate comparison. |
 
 ## Selecting a frame range
+
 The Profile Analyzer uses all the frames in the data sets unless you select a sub-range. When you select a sub-range, it limits the analysis to just those frames which lets you focus on a specific frame or set of frames. To select a range of frames, click and drag on the Frame Control graph. To clear the selection, right click on the Frame Control graph and select **Clear Selection**.
 
-To help visualize which frames are in the current selection, the start and end frame number, plus the frame count in square brackets appears on the x-axis of the graph. 
+To help visualize which frames are in the current selection, the start and end frame number, plus the frame count in square brackets appears on the x-axis of the graph.
 
 ![Frame Control pane with selected item](images/profile-analyzer-frame-control-selection.png)<br/>*The Frame Control in the Single view (top), with 204 frames selected, starting on frame 115 and ending on frame 318. The  Compare view (bottom) has Pair Graph Selection enabled, with the same 237 frames selected on both graphs, starting on frame 135 and ending on frame 371.*
 
 ## Frame range controls
+
 You can control the selection of data in both the **Single** and **Compare** views by using the following shortcuts, or by right-clicking and selecting an option from the context menu.
 
 >[!NOTE]
@@ -33,10 +35,10 @@ You can control the selection of data in both the **Single** and **Compare** vie
 |**Ctrl + click**<br/>(**Command + click** on macOS)| Selects multiple parts of the data set. Hold down the Ctrl key (Command key on macOS) while making a selection and then click, and optionally drag, on different sections of the chart to select multiple parts of the data set.|
 |**Equals (=)**| Extend the selection by one frame on each end of the selection.|
 |**Alt+Equals**<br/>(**&#8997; + Equals** on macOS)|Reduce the selection by one frame on each end of the selection.|
-|**Shift+Equals**| Extend the selection by 10 frames on each end of the selection.| 
+|**Shift+Equals**| Extend the selection by 10 frames on each end of the selection.|
 |**Hyphen (-)**|Reduce the selection by one frame on each end of the selection.|
 |**Alt+Hyphen**<br/>(**&#8997; + Hyphen** on macOS)|Extend the selection by one frame on each end of the selection.|
-|**Shift+Hyphen**| Reduce the selection by 10 frames on each end of the selection.| 
+|**Shift+Hyphen**| Reduce the selection by 10 frames on each end of the selection.|
 |**Comma (,)**| Extend the start of the selection by one frame.|
 |**Alt+Comma**<br/>(**&#8997; + Comma**) on macOS|Reduce the start of the selection by one frame.|
 |**Shift+Comma**|Extend the start of the selection by 10 frames.|
@@ -45,6 +47,7 @@ You can control the selection of data in both the **Single** and **Compare** vie
 |**Shift+Period**|Extend the end of the selection by 10 frames.|
 
 ### Context menu commands
+
 Right click on the Frame Control graph to bring up the context menu.
 
 ![Frame Control context menu](images/frame-control-context-menu.png)<br/>*Frame Control context menu*

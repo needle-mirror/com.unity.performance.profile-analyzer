@@ -4,6 +4,9 @@
     * [Compare view](compare-view.md)
     * [Frame Control pane](frame-range-selection.md)
     * [Filters pane](filtering-system.md)
+    * [Frame Summary](frame-summary.md)
+    * [Thread Summary](thread-summary.md)
+    * [Marker Summary](marker-summary.md)
     * [Statistics in the Profile Analyzer](statistics.md)
 * Workflows
     * [Collecting and viewing data](collecting-and-viewing-data.md)

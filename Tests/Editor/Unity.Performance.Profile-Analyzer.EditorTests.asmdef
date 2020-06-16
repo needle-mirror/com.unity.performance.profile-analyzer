@@ -9,6 +9,9 @@
     "includePlatforms": [
         "Editor"
     ],
+	"defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

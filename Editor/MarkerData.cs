@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
-    internal class MarkerData
+    internal class MarkerData : IComparable<MarkerData>
     {
         public string name;
         public int nameLowerCaseHash;   // lower case name hash for faster comparisons
@@ -87,6 +87,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        /// <summary>Compare the time duration between the marker median times. Used for sorting in descending order</summary>
+        /// <param name="other"> The other MarkerData to compare </param>
+        /// <returns>-1 if this is larger, 0 if the same, 1 if this is smaller</returns>
+        public int CompareTo(MarkerData other)
+        {
+            if (msMedian == other.msMedian)
+            {
+                if (medianFrameIndex == other.medianFrameIndex)
+                {
+                    // Tertiary sort by name order
+                    return name.CompareTo(other.name);
+                }
+
+                // Secondary sort by frame index order
+                return medianFrameIndex.CompareTo(other.medianFrameIndex);
+            }
+
+            return -msMedian.CompareTo(other.msMedian);
+        }
+
         public float GetFrameMs(int frameIndex)
         {
             foreach (var frameData in frames)
@@ -156,11 +176,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 countBuckets[bucketIndex] = 0;
             }
 
+            float scale = range > 0 ? countBuckets.Length / range : 0;
             foreach (FrameTime frameTime in frames)
             {
                 var count = frameTime.count;
 
-                int bucketIndex = (range > 0) ? (int)((maxBucketIndex * (count - first)) / range) : 0;
+                int bucketIndex = (int)((count - first) * scale);
                 if (bucketIndex < 0 || bucketIndex > maxBucketIndex)
                 {
                     if (bucketIndex > maxBucketIndex)
@@ -169,6 +190,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         bucketIndex = 0;
                 }
                 countBuckets[bucketIndex] += 1;
+            }
+
+            if (range == 0)
+            {
+                // All buckets will be the same
+                for (int bucketIndex = 1; bucketIndex < countBuckets.Length; bucketIndex++)
+                {
+                    countBuckets[bucketIndex] = countBuckets[0];
+                }
             }
         }
 

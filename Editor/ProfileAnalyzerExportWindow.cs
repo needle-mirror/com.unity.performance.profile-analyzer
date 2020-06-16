@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.IO;
 using System;
+using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -114,7 +115,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     file.Write("Min Individual Frame, Max Individual Frame, ");
                     file.WriteLine("Time at Median Frame");
 
-                    foreach (MarkerData marker in m_ProfileDataView.analysis.GetMarkers())
+                    List<MarkerData> markerData = m_ProfileDataView.analysis.GetMarkers();
+                    markerData.Sort();
+                    foreach (MarkerData marker in markerData)
                     {
                         file.Write("{0},", marker.name);
                         file.Write("{0},{1},{2},",

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -67,6 +68,41 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return topNumber;
         }
 
+        public List<FrameTime> GetTopNByCount(MarkerData marker, int n)
+        {
+            if (marker.frames.Count <= 0)
+                return new List<FrameTime>();
+
+            List<FrameTime> sortedFrames = new List<FrameTime>(marker.frames);
+            sortedFrames.Sort(FrameTime.CompareCountDescending);
+
+            var frameTimes = new List<FrameTime>();
+            for (int i = 0; i < Math.Min(n, sortedFrames.Count); i++)
+                frameTimes.Add(sortedFrames[i]);
+
+            return frameTimes;
+        }
+
+        public List<FrameTime> GetTopNByTime(MarkerData marker, int n)
+        {
+            if (marker.frames.Count <= 0)
+                return new List<FrameTime>();
+
+            List<FrameTime> sortedFrames = new List<FrameTime>(marker.frames);
+            sortedFrames.Sort(FrameTime.CompareMsDescending);
+
+            var frameTimes = new List<FrameTime>();
+            for (int i = 0; i < Math.Min(n, sortedFrames.Count); i++)
+                frameTimes.Add(sortedFrames[i]);
+
+            return frameTimes;
+        }
+
+        public List<FrameTime> GetTopN(MarkerData marker, int n, bool showCount)
+        {
+            return showCount ? GetTopNByCount(marker, n) : GetTopNByTime(marker, n);
+        }
+
         public int Draw(MarkerData marker, int topNumber, string[] topStrings, int[] topValues)
         {
             GUIStyle style = GUI.skin.label;
@@ -93,38 +129,43 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 barMax = marker.countMax;
             }
-            FrameTime zeroTime = new FrameTime(0,0.0f,0);
 
-            int index = marker.frames.Count - 1;
-            for (int i = 0; i < topNumber; i++)
+            // Marker frames are ordered by frame time
+            // If we are sorting by count then we need to apply a sort
+            bool showCount = m_Units.Units == Units.Count;
+            List<FrameTime> frames = GetTopN(marker, topNumber, showCount);
+
+            foreach (FrameTime frameTime in frames)
             {
-                FrameTime frameTime = new FrameTime((index >= 0 ) ? marker.frames[index] : zeroTime);
                 float barValue = (m_Units.Units == Units.Count) ? frameTime.count : frameTime.ms;
                 float barLength = Math.Min((w * barValue) / barMax, w);
 
                 EditorGUILayout.BeginHorizontal();
                 if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
                 {
-                    if (i < marker.frames.Count)
-                    {
-                        m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, colorBar);
-                        m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, colorBarBackground);
-                    }
+                    m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, colorBar);
+                    m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, colorBarBackground);
                     m_2D.DrawEnd();
 
                     Rect rect = GUILayoutUtility.GetLastRect();
                     GUI.Label(rect, new GUIContent("", m_Units.ToString(barValue, true, 5)));
                 }
-                if (i < marker.frames.Count)
-                { 
-                    EditorGUILayout.LabelField(ToDisplayUnitsWithTooltips(barValue,true), GUILayout.Width(m_WidthColumn2));
-                    if (m_DrawFrameIndexButton!=null)
-                        m_DrawFrameIndexButton(marker.frames[index].frameIndex);
-                }
+                EditorGUILayout.LabelField(ToDisplayUnitsWithTooltips(barValue,true), GUILayout.Width(m_WidthColumn2));
+                if (m_DrawFrameIndexButton!=null)
+                    m_DrawFrameIndexButton(frameTime.frameIndex);
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
+            }
 
-                index--;
+            // Show blank space for missing frames
+            var content = new GUIContent("","");
+            Vector2 size = GUI.skin.button.CalcSize(content);
+            h = Math.Max(barHeight, size.y);
+            for (int i = frames.Count; i<topNumber; i++)
+            {
+                EditorGUILayout.BeginHorizontal();
+                GUILayout.Label("",GUILayout.Height(h));
+                EditorGUILayout.EndHorizontal();
             }
 
             EditorGUILayout.EndVertical();

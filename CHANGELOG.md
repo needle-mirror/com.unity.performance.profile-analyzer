@@ -4,13 +4,27 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2020-06-16
+
+### Fixes
+
+* Fixed "median marker time (in currently selected frames)" in tooltip for 'Top 10 markers'. 
+* Fixed profile analyzer 5.6 support
+* Fixed minor visual artefact when no marker selection 
+* Fixed issue where frame time graph tooltips were not always appearing when hovering
+* Marker Summary - Count Values are now correctly sorted in descending order
+* Hiding selected marker in comparison view if lacking 2 valid data sets
+* Corrected bucketing of histogram data for counts. Display was fractionally incorrect
+* Fixed sorting of frames (by time/count) to be more stable by providing a secondary sort by frame index
+* Marker table export now orders by descending median time (to match the default UI sort option).
+
 ## [1.0.0] - 2020-06-02
 
 ### Changes
 * Export window updates. Includes tooltips, better on screen positioning. 
-** If opened and then new data set loaded. New data set now correctly exported.
+	* If opened and then new data set loaded. New data set now correctly exported.
 * Frame Time graph now shows border when selected
-** Keys 1 and 2 select the first or second frame time graph to take keyboard focus
+	* Keys 1 and 2 select the first or second frame time graph to take keyboard focus
 * Frame Time graph now shows highlighted when all frames selected, un highlighted when no frames selected.
 
 ### Fixes
@@ -23,17 +37,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changes
 * Thread selection window 
-** Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
-** Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
-** Apply button is now greyed out while analysis is running.
-** Group column enabled and used to split off group from thread name, default to by group first
-** Re sorted when selection changed (so states sort correctly when sorting by state)
-** Sort order preserved when buttons pressed and re-opening
-** Fixed sort order for threads (10 after 9 rather than between 1 and 2)
+	* Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
+	* Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
+	* Apply button is now greyed out while analysis is running.
+	* Group column enabled and used to split off group from thread name, default to by group first
+	* Re sorted when selection changed (so states sort correctly when sorting by state)
+	* Sort order preserved when buttons pressed and re-opening
+	* Fixed sort order for threads (10 after 9 rather than between 1 and 2)
 * Marker sorting
-** Marker table column filtering now preserved when clicking Analyse or Compare or tab switching.
-** Compare table bars to now sort by bar size (=delta value) rather than the left/right value.
-** Marker table bars now start sorted by descending size which is more common usage.
+	* Marker table column filtering now preserved when clicking Analyse or Compare or tab switching.
+	* Compare table bars to now sort by bar size (=delta value) rather than the left/right value.
+	* Marker table bars now start sorted by descending size which is more common usage.
 * Added depths columns into the comparison table and a 'Depth' option in the Marker Columns dropdown
 * Added thread count into thread summary area
 * Added threads column into marker tables (threads the marker occurs on)

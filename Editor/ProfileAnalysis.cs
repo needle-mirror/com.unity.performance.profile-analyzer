@@ -287,6 +287,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         int SortByAtMedian(MarkerData a, MarkerData b)
         {
+            if (a.msAtMedian == b.msAtMedian)
+                return -a.medianFrameIndex.CompareTo(b.medianFrameIndex);
+
             return -a.msAtMedian.CompareTo(b.msAtMedian);
         }
 
