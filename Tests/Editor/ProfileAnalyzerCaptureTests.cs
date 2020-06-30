@@ -23,7 +23,7 @@ public class ProfileAnalyzerCaptureTests : ProfileAnalyzerBaseTest
         yield return null;
 
         //analyze the data
-        m_setupData.profileData = m_setupData.analyzer.PullFromProfiler(m_setupData.firstFrame, m_setupData.lastFrame);
+        m_setupData.profileData = m_setupData.profilerWindowInterface.PullFromProfiler(m_setupData.firstFrame, m_setupData.lastFrame);
         var analysis = GetAnalysisFromFrameData(m_setupData.profileData);
         
         var analysisMarkers = analysis.GetMarkers();

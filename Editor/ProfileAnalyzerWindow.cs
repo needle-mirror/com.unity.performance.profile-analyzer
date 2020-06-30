@@ -429,17 +429,15 @@ To compare two data sets:
 
             ProfileAnalyzerAnalytics.EnableAnalytics();
 
-            m_ProfilerWindowInterface = new ProfilerWindowInterface();
+            m_ProgressBar = new ProgressBarDisplay();
+
+            m_ProfilerWindowInterface = new ProfilerWindowInterface(m_ProgressBar);
             if (!m_ProfilerWindowInterface.IsReady())
             {
-                if (m_ProfilerWindowInterface.IsProfilerWindowOpen())
-                {
-                    m_ProfilerWindowInterface.OpenProfilerOrUseExisting();
-                }
+                m_ProfilerWindowInterface.GetProfilerWindowHandle();
             }
 
-            m_ProgressBar = new ProgressBarDisplay();
-            m_ProfileAnalyzer = new ProfileAnalyzer(m_ProgressBar);
+            m_ProfileAnalyzer = new ProfileAnalyzer();
 
             ThreadIdentifier mainThreadSelection = new ThreadIdentifier("Main Thread", 1);
             m_ThreadSelection.Set(mainThreadSelection.threadNameWithIndex);
@@ -518,14 +516,6 @@ To compare two data sets:
                 default:
                     return false;
             }
-        }
-
-        void OpenProfilerOrUseExisting()
-        {
-            m_ProfilerWindowInterface.OpenProfilerOrUseExisting();
-            m_ProfilerWindowInterface.GetFrameRangeFromProfiler(out m_ProfilerFirstFrameIndex, out m_ProfilerLastFrameIndex);
-            m_PullFirstFrameindex = m_ProfilerFirstFrameIndex;
-            m_PullLastFrameindex = m_ProfilerLastFrameIndex;
         }
 
         void OnGUI()
@@ -803,10 +793,7 @@ To compare two data sets:
             }
             else
             {
-                if (m_ProfilerWindowInterface.IsProfilerWindowOpen())
-                {
-                    m_ProfilerWindowInterface.OpenProfilerOrUseExisting();
-                }
+                m_ProfilerWindowInterface.GetProfilerWindowHandle();
             }
 
             // Deferred to here so drawing isn't messed up by changing tab half way through a function rendering the old tab
@@ -1448,7 +1435,7 @@ To compare two data sets:
             m_ProgressBar.InitProgressBar("Pulling Frames from Profiler", "Please wait...", lastFrame - firstFrame);
 
             var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
-            ProfileData newProfileData = m_ProfileAnalyzer.PullFromProfiler(firstFrame, lastFrame);
+            ProfileData newProfileData = m_ProfilerWindowInterface.PullFromProfiler(firstFrame, lastFrame);
             ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.Pull, analytic);
 
             frameTimeGraph.Reset();
@@ -3202,11 +3189,14 @@ To compare two data sets:
                 content = Styles.pullRange;
                 GUI.enabled = false;
             }
+            /*
+            // Commented out so we can capture even if recording            
             else if (m_ProfilerWindowInterface.IsRecording())
             {
                 content = Styles.pullRecording;
                 GUI.enabled = false;
             }
+            */
             else
             {
                 content = Styles.pull;

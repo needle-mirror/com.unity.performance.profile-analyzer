@@ -18,7 +18,7 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
     public void ProfileAnalyzer_EmptyData_IsEmpty()
     {
         var analyzer = m_setupData.analyzer;
-        var profileData = analyzer.PullFromProfiler(0, 300);
+        var profileData = m_setupData.profilerWindowInterface.PullFromProfiler(0, 300);
         var depthFilter = m_setupData.depthFilter;
         var threadFilters = m_setupData.threadFilters;
 

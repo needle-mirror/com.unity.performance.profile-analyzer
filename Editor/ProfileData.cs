@@ -377,18 +377,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return true;
         }
 
-        void PushMarker(List<ProfileMarker> markerStack, ProfileMarker markerData)
+        void PushMarker(Stack<ProfileMarker> markerStack, ProfileMarker markerData)
         {
             Debug.Assert(markerData.depth == markerStack.Count + 1);
-            markerStack.Add(markerData);
+            markerStack.Push(markerData);
         }
 
-        ProfileMarker PopMarkerAndRecordTimeInParent(List<ProfileMarker> markerStack)
+        ProfileMarker PopMarkerAndRecordTimeInParent(Stack<ProfileMarker> markerStack)
         {
-            ProfileMarker child = markerStack[markerStack.Count - 1];
-            markerStack.RemoveAt(markerStack.Count - 1);
+            ProfileMarker child = markerStack.Pop();
 
-            ProfileMarker parentMarker = (markerStack.Count > 0) ? markerStack[markerStack.Count - 1] : null;
+            ProfileMarker parentMarker = (markerStack.Count > 0) ? markerStack.Peek() : null;
 
             // Record the last markers time in its parent
             if (parentMarker != null)
@@ -405,7 +404,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         void CalculateMarkerChildTimes()
         {
-            var markerStack = new List<ProfileMarker>();
+            var markerStack = new Stack<ProfileMarker>();
 
             for (int frameOffset = 0; frameOffset <= frames.Count; ++frameOffset)
             {
@@ -467,6 +466,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public ProfileFrame()
         {
+            msStartTime = 0.0;
+            msFrame = 0f;
         }
 
         public bool IsSame(ProfileFrame otherFrame)
@@ -572,16 +573,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
         }
 
-        public static ProfileMarker Create(ProfilerFrameDataIterator frameData)
+        public static ProfileMarker Create(float durationMS, int depth)
         {
             var item = new ProfileMarker
             {
-                msMarkerTotal = frameData.durationMS,
-                depth = frameData.depth,
+                msMarkerTotal = durationMS,
+                depth = depth,
                 msChildren = 0.0f
             };
 
             return item;
+        }
+
+        public static ProfileMarker Create(ProfilerFrameDataIterator frameData)
+        {
+            return Create(frameData.durationMS, frameData.depth);
         }
 
         public void Write(BinaryWriter writer)

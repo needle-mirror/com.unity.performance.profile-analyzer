@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System;
 using System.Text;
 using UnityEngine.Profiling;
+using UnityEditor.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -16,11 +17,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         ProfilerFrameDataIterator m_frameData;
         List<string> m_threadNames = new List<string>();
         ProfileAnalysis m_analysis;
-        ProgressBarDisplay m_progressBar;
 
-        public ProfileAnalyzer(ProgressBarDisplay progressBar)
+        public ProfileAnalyzer()
         {
-            m_progressBar = progressBar;
         }
 
         public void QuickScan()
@@ -58,18 +57,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public List<string> GetThreadNames()
         {
             return m_threadNames;
-        }
-
-        public ProfileData PullFromProfiler(int firstFrameDisplayIndex, int lastFrameDisplayIndex)
-        {
-            Profiler.BeginSample("ProfileAnalyzer.PullFromProfiler");
-            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
-            int firstFrameIndex = firstFrameDisplayIndex - 1;
-            int lastFrameIndex = lastFrameDisplayIndex - 1;
-            ProfileData profileData = GetData(frameData, firstFrameIndex, lastFrameIndex);
-            frameData.Dispose();
-            Profiler.EndSample();
-            return profileData;
         }
 
         void CalculateFrameTimeStats(ProfileData data, out float median, out float mean, out float standardDeviation)
@@ -110,104 +97,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        ProfileData GetData(ProfilerFrameDataIterator frameData, int firstFrameIndex, int lastFrameIndex)
-        {
-            bool firstError = true;
-
-            var data = new ProfileData();
-            data.SetFrameIndexOffset(firstFrameIndex);
-
-            Dictionary<string, int> threadNameCount = new Dictionary<string, int>();
-            for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
-            {
-                m_progressBar.AdvanceProgressBar();
-
-                int threadCount = frameData.GetThreadCount(frameIndex);
-                frameData.SetRoot(frameIndex, 0);
-
-                var msFrame = frameData.frameTimeMS;
-
-                /*
-                if (frameIndex == lastFrameIndex)
-                {
-                    // Check if last frame appears to be invalid data
-                    float median;
-                    float mean;
-                    float standardDeviation;
-                    CalculateFrameTimeStats(data, out median, out mean, out standardDeviation);
-                    float execessiveDeviation = (3f * standardDeviation);
-                    if (msFrame > (median + execessiveDeviation))
-                    {
-                        Debug.LogFormat("Dropping last frame as it is significantly larger than the median of the rest of the data set {0} > {1} (median {2} + 3 * standard deviation {3})", msFrame, median + execessiveDeviation, median, standardDeviation);
-                        break;
-                    }
-                    if (msFrame < (median - execessiveDeviation))
-                    {
-                        Debug.LogFormat("Dropping last frame as it is significantly smaller than the median of the rest of the data set {0} < {1} (median {2} - 3 * standard deviation {3})", msFrame, median - execessiveDeviation, median, standardDeviation);
-                        break;
-                    }
-                }
-                */
-
-                ProfileFrame frame = new ProfileFrame();
-                frame.msStartTime = 1000.0 * frameData.GetFrameStartS(frameIndex);
-                frame.msFrame = msFrame;
-                data.Add(frame);
-
-                threadNameCount.Clear();
-                for (int threadIndex = 0; threadIndex < threadCount; ++threadIndex)
-                {
-                    frameData.SetRoot(frameIndex, threadIndex);
-
-                    var threadName = frameData.GetThreadName();
-                    if (threadName.Trim() == "")
-                    {
-                        Debug.Log(string.Format("Warning: Unnamed thread found on frame {0}. Corrupted data suspected, ignoring frame", frameIndex));
-                        continue;
-                    }
-
-                    var groupName = frameData.GetGroupName();
-                    threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
-
-                    ProfileThread thread = new ProfileThread();
-                    frame.Add(thread);
-
-                    int nameCount = 0;
-                    threadNameCount.TryGetValue(threadName, out nameCount);
-                    threadNameCount[threadName] = nameCount + 1;
-
-                    data.AddThreadName(ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName), thread);
-
-                    const bool enterChildren = true;
-                    // The markers are in depth first order and the depth is known
-                    // So we can infer a parent child relationship
-                    while (frameData.Next(enterChildren))
-                    {
-                        if (frameData.durationMS < 0)
-                        {
-                            if (firstError)
-                            {
-                                int displayIndex = data.OffsetToDisplayFrame(frameIndex);
-
-                                Debug.LogFormat("Ignoring Invalid marker time found for {0} on frame {1} on thread {2} ({3} < 0) : Instance id : {4}", 
-                                    frameData.name, displayIndex, threadName, frameData.durationMS, frameData.instanceId);
-
-                                firstError = false;
-                            }
-                            continue;
-                        }
-                        var markerData = ProfileMarker.Create(frameData);
-
-                        data.AddMarkerName(frameData.name, markerData);
-                        thread.Add(markerData);
-                    }
-                }
-            }
-
-            data.Finalise();
-
-            return data;
-        }
 
         int GetClampedOffsetToFrame(ProfileData profileData, int frameIndex)
         {

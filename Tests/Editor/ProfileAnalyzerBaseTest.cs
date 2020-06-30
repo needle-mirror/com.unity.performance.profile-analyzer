@@ -10,6 +10,7 @@ public class ProfileAnalyzerBaseTest
     {
         internal ProgressBarDisplay progressBar;
         internal ProfileAnalyzer analyzer;
+        internal ProfilerWindowInterface profilerWindowInterface;
         internal ProfileData profileData;
         internal int depthFilter;
         internal List<string> threadFilters;
@@ -20,8 +21,9 @@ public class ProfileAnalyzerBaseTest
             progressBar = new ProgressBarDisplay();
             firstFrame = minFrame;
             lastFrame = maxFrame;
-            analyzer = new ProfileAnalyzer(progressBar);
-            profileData = analyzer.PullFromProfiler(minFrame, maxFrame);
+            analyzer = new ProfileAnalyzer();
+            profilerWindowInterface = new ProfilerWindowInterface(progressBar);
+            profileData = profilerWindowInterface.PullFromProfiler(minFrame, maxFrame);
             depthFilter = filterDepth;
             threadFilters = filterThreads;
         }

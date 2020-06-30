@@ -325,10 +325,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => l.data.name, ascending);
                         break;
                     case SortOption.LeftMedian:
-                        orderedQuery = orderedQuery.ThenBy(l => LeftMedian(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => LeftMedianSorting(l), ascending);
                         break;
                     case SortOption.RightMedian:
-                        orderedQuery = orderedQuery.ThenBy(l => RightMedian(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => RightMedianSorting(l), ascending);
                         break;
                     case SortOption.Diff:
                         orderedQuery = orderedQuery.ThenBy(l => Diff(l), ascending);
@@ -476,6 +476,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
 
 
+        float LeftMedianSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            if (marker == null)
+                return -1f;
+            return MarkerData.GetMsMedian(marker);
+        }
+
         float LeftMedian(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMsMedian(GetLeftMarker(item));
@@ -484,6 +492,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int LeftMedianFrameIndex(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMedianFrameIndex(GetLeftMarker(item));
+        }
+
+        float RightMedianSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            if (marker == null)
+                return -1f;
+            return MarkerData.GetMsMedian(marker);
         }
 
         float RightMedian(ComparisonTreeViewItem item)
@@ -588,9 +604,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.Name:
                     return myTypes.Order(l => l.data.name, ascending);
                 case SortOption.LeftMedian:
-                    return myTypes.Order(l => LeftMedian(l), ascending);
+                    return myTypes.Order(l => LeftMedianSorting(l), ascending);
                 case SortOption.RightMedian:
-                    return myTypes.Order(l => RightMedian(l), ascending);
+                    return myTypes.Order(l => RightMedianSorting(l), ascending);
                 case SortOption.Diff:
                     return myTypes.Order(l => Diff(l), ascending);
                 case SortOption.ReverseDiff:

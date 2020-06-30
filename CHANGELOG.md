@@ -4,6 +4,15 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2020-06-30
+
+### Fixes
+
+* Fixed issue where second profiler instance could appear after entering play mode when profile analyzer is open
+* Improved performance of pulling data from Unity profiler
+* Pull Data button now enabled when profiler is recording. This will stop the recording for the duration of the action of pulling of data.
+* Fixed Median sorting in Comparison mode when value missing from one data set, Missing values always sorted before 0 values.
+
 ## [1.0.1] - 2020-06-16
 
 ### Fixes

@@ -12,7 +12,7 @@ To install this package into versions of Unity that support the package manager 
 
 ### Earlier versions of Unity
 
-For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.0.1.tgz) and place the contents into your Project's Assets folder.
+For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.0.2.tgz) and place the contents into your Project's Assets folder.
 
 ## Requirements
 

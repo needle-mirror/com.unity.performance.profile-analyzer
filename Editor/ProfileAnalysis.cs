@@ -88,7 +88,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             int countMax = 0;
             float countMaxMean = 0.0f;
-            
+
             foreach (MarkerData marker in m_Markers)
             {
                 marker.msAtMedian = 0.0f;
@@ -118,7 +118,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     if (frameIndex == m_FrameSummary.medianFrameIndex)
                         marker.msAtMedian = ms;
-                    
+
                     var count = frameTime.count;
 
                     // count for marker over frame
@@ -131,7 +131,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         marker.countMax = count;
                     }
                 }
-                
+
                 int unusedIndex;
 
                 marker.msMean = marker.presentOnFrameCount > 0 ? (float)(marker.msTotal / marker.presentOnFrameCount) : 0f;
@@ -139,7 +139,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 marker.countMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).count;
                 marker.countLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).count;
                 marker.countUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).count;
-                
+
                 marker.countMean = marker.presentOnFrameCount > 0 ? (float)marker.count / marker.presentOnFrameCount : 0f;
                 marker.frames.Sort(FrameTime.CompareMs);
                 marker.msMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).ms;
