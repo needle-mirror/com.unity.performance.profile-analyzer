@@ -65,7 +65,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void DrawBackground(float width, float height, int bucketCount, float min, float max, float spacing)
         {
-            float range = max - min;
             //bucketCount = (range == 0f) ? 1 : bucketCount;
 
             float x = (spacing / 2);

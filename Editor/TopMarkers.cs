@@ -377,7 +377,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (frameSummary == null)
                 return 0.0f;
 
-            var markers = m_Analysis.GetMarkers();
+            m_Analysis.GetMarkers();
 
             RangeSettings currentRangeSettings = new RangeSettings(m_Analysis, m_DepthFilter, m_NameFilters, m_NameExcludes);
             if (currentRangeSettings != m_LastRangeSettings)

@@ -12,8 +12,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     {
 #if UNITY_2020_1_OR_NEWER
         bool s_UseRawIterator = true;
-#else
-        bool s_UseRawIterator = false;
 #endif        
         ProgressBarDisplay m_progressBar;
 

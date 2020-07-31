@@ -380,7 +380,9 @@ To compare two data sets:
         static Regex quotedStringWithoutQuotes = new Regex("\"([^\"]*)\"");
         static Regex quotedString = new Regex("(\"[^\"]*\")");
         static Regex stringWithoutWhiteSpace = new Regex("([^ \t]+)");
+/*
         static Regex lastSpace = new Regex("(.+)[ ]([^ ]*)");
+*/
 
 #if UNITY_2018_1_OR_NEWER
         [MenuItem("Window/Analysis/Profile Analyzer")]
