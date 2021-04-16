@@ -1,4 +1,4 @@
-﻿# About the Profile Analyzer package
+# About the Profile Analyzer package
 
 The Profile Analyzer aggregates and visualizes frame and marker data from a set of [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) frames to help you understand their behavior. You can use the Profile Analyzer to compare two sets of data side-by-side, which complements the single frame analysis already available in the Unity Profiler.
 
@@ -12,7 +12,7 @@ To install this package into versions of Unity that support the package manager 
 
 ### Earlier versions of Unity
 
-For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.0.3.tgz) and place the contents into your Project's Assets folder.
+For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.0.4.tgz) and place the contents into your Project's Assets folder.
 
 ## Requirements
 
@@ -26,3 +26,4 @@ The Profile Analyzer has the following known limitations:
 
 * The original Profile data is not saved in the Profile Analyzer .pdata file. Therefore, you should store both the Unity Profiler .data file (or the .raw file exported from a stand alone player) along with the .pdata file.
 * When you click on a marker, the Profile Analyzer attempts to jump to the same marker in the Unity Profiler if the same data is loaded. You must make a selection in the Unity Profiler beforehand for this to work. In the Unity Profiler in the UI view, the vertical height is not correct.
+* On Unity 5.6 and 2017.4, the Thread Select Window allows you to collapse the 'All' threads item, which has no purpose.

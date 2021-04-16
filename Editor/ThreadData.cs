@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -42,15 +43,30 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             maxFrameIndex = -1;
         }
 
-        public ThreadFrameTime GetFrame(int frameIndex)
+        struct ThreadFrameTimeFrameComparer : IComparer<ThreadFrameTime>
         {
-            foreach (var frame in frames)
+#if UNITY_2017_OR_NEWER
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#else
+            [MethodImpl(256)]
+#endif
+            public int Compare(ThreadFrameTime x, ThreadFrameTime y)
             {
-                if (frame.frameIndex == frameIndex)
-                    return frame;
+                if (x.frameIndex == y.frameIndex)
+                    return 0;
+                return x.frameIndex > y.frameIndex ? 1 : -1;
             }
+        }
 
-            return null;
+#if UNITY_2017_OR_NEWER
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#else
+        [MethodImpl(256)]
+#endif
+        public ThreadFrameTime? GetFrame(int frameIndex)
+        {
+            var index = frames.BinarySearch(new ThreadFrameTime(frameIndex, 0, 0), new ThreadFrameTimeFrameComparer());
+            return index >= 0 ? (ThreadFrameTime?)frames[index] : null;
         }
     }
 }

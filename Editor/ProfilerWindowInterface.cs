@@ -1,20 +1,38 @@
-﻿using UnityEditorInternal;
+using UnityEditorInternal;
 using System.Reflection;
 using System;
+using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine.Profiling;
+#if UNITY_2020_1_OR_NEWER
 using UnityEditor.Profiling;
+#endif
+#if UNITY_2021_2_OR_NEWER
+using Unity.Profiling.Editor;
+// stub so that ProfilerWindow can be moved to this namespace in trunk without a need to change PA
+namespace Unity.Profiling.Editor { }
+#endif
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     internal class ProfilerWindowInterface
     {
+        bool m_ProfilerWindowInitialized = false;
+        const float k_NsToMs = 1000000;
 #if UNITY_2020_1_OR_NEWER
         bool s_UseRawIterator = true;
-#endif        
+#endif
         ProgressBarDisplay m_progressBar;
 
+        [NonSerialized] bool m_SendingSelectionEventToProfilerWindowInProgress = false;
+        [NonSerialized] int m_LastSelectedFrameInProfilerWindow = 0;
+
+#if UNITY_2021_1_OR_NEWER
+        [NonSerialized] ProfilerWindow m_ProfilerWindow;
+        [NonSerialized] IProfilerFrameTimeViewSampleSelectionController m_CpuProfilerModule;
+#else
         Type m_ProfilerWindowType;
         EditorWindow m_ProfilerWindow;
         FieldInfo m_CurrentFrameFieldInfo;
@@ -26,16 +44,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         FieldInfo m_SelectedInstanceIdFieldInfo;
         FieldInfo m_SelectedInstanceCountFieldInfo;
         FieldInfo m_SelectedFrameIdFieldInfo;
-        FieldInfo m_SelectedThreadIdFieldInfo;
+        FieldInfo m_SelectedThreadIndexFieldInfo;
         FieldInfo m_SelectedNativeIndexFieldInfo;
 
         MethodInfo m_GetProfilerModuleInfo;
         Type m_CPUProfilerModuleType;
+#endif
 
         public ProfilerWindowInterface(ProgressBarDisplay progressBar)
         {
             m_progressBar = progressBar;
 
+#if !UNITY_2021_1_OR_NEWER
             Assembly assem = typeof(Editor).Assembly;
             m_ProfilerWindowType = assem.GetType("UnityEditor.ProfilerWindow");
             m_CurrentFrameFieldInfo = m_ProfilerWindowType.GetField("m_CurrentFrame", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -68,33 +88,49 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_SelectedInstanceIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedInstanceCountFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedFrameIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("frameId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                m_SelectedThreadIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                // confusingly this is called threadId but is the thread _index_
+                m_SelectedThreadIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedNativeIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("nativeIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             }
-
+#endif
         }
-
-        /*
-        public EditorWindow GetProfileWindow()
-        {
-            return m_profilerWindow;
-        }
-        */
 
         public bool IsReady()
         {
-            if (m_ProfilerWindow != null)
-                return true;
-
-            return false;
+            return m_ProfilerWindow != null && m_ProfilerWindowInitialized;
         }
 
         public void GetProfilerWindowHandle()
         {
             Profiler.BeginSample("GetProfilerWindowHandle");
+#if UNITY_2021_1_OR_NEWER
+            if (m_CpuProfilerModule != null)
+            {
+                m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
+                m_CpuProfilerModule = null;
+            }
+
+            var windows = Resources.FindObjectsOfTypeAll<ProfilerWindow>();
+            if (windows != null && windows.Length > 0)
+                m_ProfilerWindow = windows[0];
+            if (m_ProfilerWindow != null)
+            {
+                m_CpuProfilerModule =
+                    m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
+                m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
+                m_CpuProfilerModule.selectionChanged += OnSelectionChangedInCpuProfilerModule;
+
+                m_ProfilerWindow.Repaint();
+                m_ProfilerWindowInitialized = false;
+                // wait a frame for the Profiler to get Repainted
+                EditorApplication.delayCall += () => m_ProfilerWindowInitialized = true;
+            }
+#else
             UnityEngine.Object[] windows = Resources.FindObjectsOfTypeAll(m_ProfilerWindowType);
             if (windows != null && windows.Length > 0)
                 m_ProfilerWindow = (EditorWindow)windows[0];
+            m_ProfilerWindowInitialized = true;
+#endif
             Profiler.EndSample();
         }
 
@@ -102,23 +138,32 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             // Note we use existing if possible to fix a bug after domain reload
             // Where calling EditorWindow.GetWindow directly causes a second window to open
-            if (!m_ProfilerWindow)
-            { 
+            if (m_ProfilerWindow == null)
+            {
+#if UNITY_2021_1_OR_NEWER
+                m_ProfilerWindow = EditorWindow.GetWindow<ProfilerWindow>();
+                m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
+                m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
+                m_CpuProfilerModule.selectionChanged += OnSelectionChangedInCpuProfilerModule;
+#else
                 // Create new
                 m_ProfilerWindow = EditorWindow.GetWindow(m_ProfilerWindowType);
+#endif
             }
         }
 
         public bool GetFrameRangeFromProfiler(out int first, out int last)
         {
-            if (m_ProfilerWindow)
-            //if (ProfilerDriver.enabled)
+            if (m_ProfilerWindow != null)
             {
                 first = 1 + ProfilerDriver.firstFrameIndex;
                 last = 1 + ProfilerDriver.lastFrameIndex;
-                // Clip to the visible frames in the profile which indents 1 in from end
+#if !UNITY_2018_4_OR_NEWER
+                //Prior to 18.4 we need to clip to the visible frames in the profile which indents 1 in from end
+                //as the last frame is not visible and sometimes still being processed
                 if (first < last)
                     last--;
+#endif
                 return true;
             }
 
@@ -129,11 +174,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void CloseProfiler()
         {
-            if (m_ProfilerWindow)
+            if (m_ProfilerWindow != null)
                 m_ProfilerWindow.Close();
         }
 
-        public object GetTimeLineGUI()
+#if !UNITY_2021_1_OR_NEWER
+        object GetTimeLineGUI()
         {
             object timeLineGUI = null;
 
@@ -152,10 +198,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return timeLineGUI;
         }
+#endif
 
-        public string GetProfilerWindowMarkerName()
+
+#if UNITY_2021_1_OR_NEWER
+        private void OnSelectionChangedInCpuProfilerModule(IProfilerFrameTimeViewSampleSelectionController controller, ProfilerTimeSampleSelection selection)
         {
-            if (m_ProfilerWindow!=null)
+            if (controller == m_CpuProfilerModule && !m_SendingSelectionEventToProfilerWindowInProgress)
+            {
+                if (selection != null && selection.markerNamePath != null && selection.markerNamePath.Count > 0)
+                {
+                    selectedMarkerChanged(selection.markerNamePath[selection.markerNamePath.Count - 1], selection.threadGroupName, selection.threadName);
+                }
+            }
+        }
+#endif
+
+        public event Action<string, string, string> selectedMarkerChanged = delegate {  };
+
+        public void PollProfilerWindowMarkerName()
+        {
+#if !UNITY_2021_1_OR_NEWER
+            if (m_ProfilerWindow != null)
             {
                 var timeLineGUI = GetTimeLineGUI();
                 if (timeLineGUI != null && m_SelectedEntryFieldInfo != null)
@@ -163,17 +227,32 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     var selectedEntry = m_SelectedEntryFieldInfo.GetValue(timeLineGUI);
                     if (selectedEntry != null && m_SelectedNameFieldInfo != null)
                     {
-                        return m_SelectedNameFieldInfo.GetValue(selectedEntry).ToString();
+                        string threadGroupName = null;
+                        string threadName = null;
+#if UNITY_2020_1_OR_NEWER
+                        if(m_SelectedFrameIdFieldInfo != null && m_SelectedThreadIndexFieldInfo != null)
+                        {
+                            using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView( (int)m_SelectedFrameIdFieldInfo.GetValue(selectedEntry), (int)m_SelectedThreadIndexFieldInfo.GetValue(selectedEntry)))
+                            {
+                                if (frameData != null && frameData.valid)
+                                {
+                                    threadGroupName = frameData.threadGroupName;
+                                    threadName = frameData.threadName;
+                                }
+                            }
+                        }
+#endif
+                        selectedMarkerChanged(m_SelectedNameFieldInfo.GetValue(selectedEntry).ToString(), threadGroupName, threadName);
                     }
                 }
             }
-
-            return null;
+#endif
         }
+
         public ProfileData PullFromProfiler(int firstFrameDisplayIndex, int lastFrameDisplayIndex)
         {
             Profiler.BeginSample("ProfilerWindowInterface.PullFromProfiler");
-            
+
             bool recording = IsRecording();
             if (recording)
                 StopRecording();
@@ -189,29 +268,58 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return profileData;
         }
 
+        public int GetThreadCountForFrame(int frameIndex)
+        {
+            if (!IsReady())
+                return 0;
+
+            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
+            frameData.SetRoot(frameIndex, 0);
+            return frameData.GetThreadCount(frameIndex);
+        }
+
+        public ProfileFrame GetProfileFrameForThread(int frameIndex, int threadIndex)
+        {
+            if (!IsReady())
+                return null;
+
+            var frame = new ProfileFrame();
 #if UNITY_2020_1_OR_NEWER
-        ProfileData GetDataRaw(int firstFrameIndex, int lastFrameIndex)
+            using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView(frameIndex, threadIndex))
+            {
+                frame.msStartTime = frameData.frameStartTimeMs;
+                frame.msFrame = frameData.frameTimeMs;
+            }
+#else
+            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
+            frameData.SetRoot(frameIndex, threadIndex);
+            frame.msStartTime = 1000.0 * frameData.GetFrameStartS(frameIndex);
+            frame.msFrame = frameData.frameTimeMS;
+#endif
+            return frame;
+        }
+
+#if UNITY_2020_1_OR_NEWER
+        ProfileData GetDataRaw(ProfileData data, int firstFrameIndex, int lastFrameIndex)
         {
             bool firstError = true;
 
-            var data = new ProfileData();
             data.SetFrameIndexOffset(firstFrameIndex);
 
             var depthStack = new Stack<int>();
 
             var threadNameCount = new Dictionary<string, int>();
-            var threadIdMapping = new Dictionary<ulong, string>();
             var markerIdToNameIndex = new Dictionary<int, int>();
+
             for (int frameIndex = firstFrameIndex; frameIndex <= lastFrameIndex; ++frameIndex)
             {
                 m_progressBar.AdvanceProgressBar();
 
                 int threadIndex = 0;
 
-                bool threadValid = true;
                 threadNameCount.Clear();
                 ProfileFrame frame = null;
-                while (threadValid)
+                while (true)
                 {
                     using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView(frameIndex, threadIndex))
                     {
@@ -229,39 +337,29 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         if (!frameData.valid)
                             break;
 
-                        string threadNameWithIndex;
-
-                        if (threadIdMapping.ContainsKey(frameData.threadId))
+                        string threadNameWithIndex = null;
+                        string threadName = frameData.threadName;
+                        if (threadName.Trim() == "")
                         {
-                            threadNameWithIndex = threadIdMapping[frameData.threadId];
+                            Debug.Log(string.Format("Warning: Unnamed thread found on frame {0}. Corrupted data suspected, ignoring frame", frameIndex));
+                            threadIndex++;
+                            continue;
                         }
-                        else
-                        {
-                            string threadName = frameData.threadName;
-                            if (threadName.Trim() == "")
-                            {
-                                Debug.Log(string.Format("Warning: Unnamed thread found on frame {0}. Corrupted data suspected, ignoring frame", frameIndex));
-                                threadIndex++;
-                                continue;
-                            }
-                            var groupName = frameData.threadGroupName;
-                            threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
+                        var groupName = frameData.threadGroupName;
+                        threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
 
-                            int nameCount = 0;
-                            threadNameCount.TryGetValue(threadName, out nameCount);
-                            threadNameCount[threadName] = nameCount + 1;
+                        int nameCount = 0;
+                        threadNameCount.TryGetValue(threadName, out nameCount);
+                        threadNameCount[threadName] = nameCount + 1;
 
-                            threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
-
-                            threadIdMapping[frameData.threadId] = threadNameWithIndex;
-                        }
+                        threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
 
                         var thread = new ProfileThread();
                         data.AddThreadName(threadNameWithIndex, thread);
 
                         frame.Add(thread);
 
-                        // The markers are in depth first order 
+                        // The markers are in depth first order
                         depthStack.Clear();
                         // first sample is the thread name
                         for (int i = 1; i < frameData.sampleCount; i++)
@@ -273,11 +371,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 if (firstError)
                                 {
                                     int displayIndex = data.OffsetToDisplayFrame(frameIndex);
-                                    string threadName = frameData.threadName;
 
                                     string name = frameData.GetSampleName(i);
                                     Debug.LogFormat("Ignoring Invalid marker time found for {0} on frame {1} on thread {2} ({3} < 0)",
-                                            name, displayIndex, threadName, durationMS);
+                                        name, displayIndex, threadName, durationMS);
 
                                     firstError = false;
                                 }
@@ -299,8 +396,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                     data.AddMarkerName(name, markerData);
                                     markerIdToNameIndex[markerId] = markerData.nameIndex;
                                 }
-                                
-                                thread.Add(markerData);
+
+                                thread.AddMarker(markerData);
                             }
 
                             int childrenCount = frameData.GetSampleChildrenCount(i);
@@ -330,14 +427,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return data;
         }
+
 #endif
 
-        ProfileData GetDataOriginal(int firstFrameIndex, int lastFrameIndex)
+        ProfileData GetDataOriginal(ProfileData data, int firstFrameIndex, int lastFrameIndex)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
             bool firstError = true;
 
-            var data = new ProfileData();
             data.SetFrameIndexOffset(firstFrameIndex);
 
             Dictionary<string, int> threadNameCount = new Dictionary<string, int>();
@@ -422,7 +519,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         var markerData = ProfileMarker.Create(frameData);
 
                         data.AddMarkerName(frameData.name, markerData);
-                        thread.Add(markerData);
+                        thread.AddMarker(markerData);
                     }
                 }
             }
@@ -433,29 +530,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return data;
         }
 
-
         ProfileData GetData(int firstFrameIndex, int lastFrameIndex)
         {
-            //s_UseRawIterator ^= true;
-
-            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-            stopwatch.Start();
-
-            ProfileData data;
+            ProfileData data = new ProfileData(ProfileAnalyzerWindow.TmpPath);
 #if UNITY_2020_1_OR_NEWER
-            if (s_UseRawIterator)
-            {
-                data = GetDataRaw(firstFrameIndex, lastFrameIndex);
-            }
-            else
+            GetDataRaw(data, firstFrameIndex, lastFrameIndex);
+#else
+            GetDataOriginal(data, firstFrameIndex, lastFrameIndex);
 #endif
-            {
-                data = GetDataOriginal(firstFrameIndex, lastFrameIndex);
-            }
-
-            stopwatch.Stop();
-            //Debug.LogFormat("Pull time {0}ms ({1})", stopwatch.ElapsedMilliseconds, s_UseRawIterator ? "Raw" : "Standard");
-           
+            data.Write();
             return data;
         }
 
@@ -470,6 +553,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return frameData.frameTimeMs;
             }
         }
+
 #endif
 
 
@@ -488,15 +572,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return ms;
         }
 
-        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
+        struct ThreadIndexIterator
+        {
+            public ProfilerFrameDataIterator frameData;
+            public int threadIndex;
+        }
+
+        IEnumerator<ThreadIndexIterator> GetNextThreadIndexFittingThreadFilters(int frameIndex, List<string> threadFilters)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
-
-            outThreadIndex = 0;
-            time = 0.0f;
-            duration = 0.0f;
-            instanceId = 0;
-            bool found = false;
 
             int threadCount = frameData.GetThreadCount(frameIndex);
             Dictionary<string, int> threadNameCount = new Dictionary<string, int>();
@@ -518,25 +602,41 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 // To compare on the filter we need to remove the postfix on the thread name
                 // "3:Worker Thread 0" -> "1:Worker Thread"
-                // The index of the thread (0) is used +1 as a prefix 
+                // The index of the thread (0) is used +1 as a prefix
                 // The preceding number (3) is the count of number of threads with this name
                 // Unfortunately multiple threads can have the same name
                 threadNameWithIndex = ProfileData.CorrectThreadName(threadNameWithIndex);
 
                 if (threadFilters.Contains(threadNameWithIndex))
                 {
-                    const bool enterChildren = true;
-                    while (frameData.Next(enterChildren))
+                    yield return new ThreadIndexIterator{frameData = frameData, threadIndex = threadIndex};
+                }
+            }
+            frameData.Dispose();
+        }
+
+        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
+        {
+            outThreadIndex = 0;
+            time = 0.0f;
+            duration = 0.0f;
+            instanceId = 0;
+            bool found = false;
+
+            var iterator = GetNextThreadIndexFittingThreadFilters(frameIndex, threadFilters);
+            while (iterator.MoveNext())
+            {
+                const bool enterChildren = true;
+                while (iterator.Current.frameData.Next(enterChildren))
+                {
+                    if (iterator.Current.frameData.name == markerName)
                     {
-                        if (frameData.name == markerName)
-                        {
-                            time = frameData.startTimeMS;
-                            duration = frameData.durationMS;
-                            instanceId = frameData.instanceId;
-                            outThreadIndex = threadIndex;
-                            found = true;
-                            break;
-                        }
+                        time = iterator.Current.frameData.startTimeMS;
+                        duration = iterator.Current.frameData.durationMS;
+                        instanceId = iterator.Current.frameData.instanceId;
+                        outThreadIndex = iterator.Current.threadIndex;
+                        found = true;
+                        break;
                     }
                 }
 
@@ -544,18 +644,48 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     break;
             }
 
-            frameData.Dispose();
             return found;
         }
 
-        public void SetProfilerWindowMarkerName(string markerName, List<string> threadFilters)
+        public bool SetProfilerWindowMarkerName(string markerName, List<string> threadFilters)
         {
+            m_SendingSelectionEventToProfilerWindowInProgress = true;
             if (m_ProfilerWindow == null)
-                return;
+                return false;
+#if UNITY_2021_1_OR_NEWER
+            m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
+            if (m_CpuProfilerModule != null && m_ProfilerWindow.selectedModuleName == ProfilerWindow.cpuModuleName
+                                            && m_ProfilerWindow.firstAvailableFrameIndex >= 0)
+            {
+                // Read profiler data direct from profile to find time/duration
+                int currentFrameIndex = (int)m_ProfilerWindow.selectedFrameIndex;
 
+                var iterator = GetNextThreadIndexFittingThreadFilters(currentFrameIndex, threadFilters);
+                while (iterator.MoveNext())
+                {
+                    using (var rawFrameDataView = ProfilerDriver.GetRawFrameDataView(currentFrameIndex, iterator.Current.threadIndex))
+                    {
+                        if (m_CpuProfilerModule.SetSelection(currentFrameIndex,
+                            rawFrameDataView.threadGroupName, rawFrameDataView.threadName, markerName,
+                            threadId: rawFrameDataView.threadId))
+                        {
+                            m_ProfilerWindow.Repaint();
+                            m_SendingSelectionEventToProfilerWindowInProgress = false;
+                            return true; // setting the selection was successful, nothing more to do here.
+                        }
+                    }
+                }
+                // selection couldn't be found, so clear the current one to avoid confusion
+                m_CpuProfilerModule.ClearSelection();
+                m_ProfilerWindow.Repaint();
+            }
+#else
             var timeLineGUI = GetTimeLineGUI();
-            if (timeLineGUI==null)
-                return;
+            if (timeLineGUI == null)
+            {
+                m_SendingSelectionEventToProfilerWindowInProgress = false;
+                return false;
+            }
 
             if (m_SelectedEntryFieldInfo != null)
             {
@@ -571,10 +701,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out time, out duration, out instanceId))
                     {
                         /*
-                        Debug.Log(string.Format("Setting profiler to {0} on {1} at frame {2} at {3}ms for {4}ms ({5})", 
+                        Debug.Log(string.Format("Setting profiler to {0} on {1} at frame {2} at {3}ms for {4}ms ({5})",
                                                 markerName, currentFrameIndex, threadFilter, time, duration, instanceId));
                          */
-                        
+
                         if (m_SelectedNameFieldInfo != null)
                             m_SelectedNameFieldInfo.SetValue(selectedEntry, markerName);
                         if (m_SelectedTimeFieldInfo != null)
@@ -585,9 +715,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             m_SelectedInstanceIdFieldInfo.SetValue(selectedEntry, instanceId);
                         if (m_SelectedFrameIdFieldInfo != null)
                             m_SelectedFrameIdFieldInfo.SetValue(selectedEntry, currentFrameIndex);
-                        if (m_SelectedThreadIdFieldInfo != null)
-                            m_SelectedThreadIdFieldInfo.SetValue(selectedEntry, threadIndex);
-                        
+                        if (m_SelectedThreadIndexFieldInfo != null)
+                            m_SelectedThreadIndexFieldInfo.SetValue(selectedEntry, threadIndex);
+
                         // TODO : Update to fill in the total and number of instances.
                         // For now we force Instance count to 1 to avoid the incorrect info showing.
                         if (m_SelectedInstanceCountFieldInfo != null)
@@ -598,17 +728,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             m_SelectedNativeIndexFieldInfo.SetValue(selectedEntry, currentFrameIndex);
 
                         m_ProfilerWindow.Repaint();
+                        m_SendingSelectionEventToProfilerWindowInProgress = false;
+                        return true;
                     }
                 }
             }
+#endif
+            m_SendingSelectionEventToProfilerWindowInProgress = false;
+            return false;
         }
 
         public bool JumpToFrame(int index)
         {
-            //if (!ProfilerDriver.enabled)
-            //    return;
-
-            if (!m_ProfilerWindow)
+            if (m_ProfilerWindow == null)
                 return false;
 
             if (index - 1 < ProfilerDriver.firstFrameIndex)
@@ -616,9 +748,39 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (index - 1 > ProfilerDriver.lastFrameIndex)
                 return false;
 
+#if UNITY_2021_1_OR_NEWER
+            m_ProfilerWindow.selectedFrameIndex = index - 1;
+#else
             m_CurrentFrameFieldInfo.SetValue(m_ProfilerWindow, index - 1);
+#endif
             m_ProfilerWindow.Repaint();
             return true;
+        }
+
+        public int selectedFrame
+        {
+            get
+            {
+                if (m_ProfilerWindow == null)
+                    return 0;
+#if UNITY_2021_1_OR_NEWER
+                return (int)m_ProfilerWindow.selectedFrameIndex + 1;
+#else
+                return (int)m_CurrentFrameFieldInfo.GetValue(m_ProfilerWindow) + 1;
+#endif
+            }
+        }
+
+        public event Action<int> selectedFrameChanged = delegate {  };
+
+        public void PollSelectedFrameChanges()
+        {
+            var currentlySelectedFrame = selectedFrame;
+            if (m_LastSelectedFrameInProfilerWindow != currentlySelectedFrame && !m_SendingSelectionEventToProfilerWindowInProgress)
+            {
+                m_LastSelectedFrameInProfilerWindow = currentlySelectedFrame;
+                selectedFrameChanged(currentlySelectedFrame);
+            }
         }
 
         public bool IsRecording()
@@ -643,6 +805,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 #if UNITY_2017_4_OR_NEWER
             // Stop recording first
             ProfilerDriver.enabled = true;
+#endif
+        }
+
+        public void OnDisable()
+        {
+            if (m_ProfilerWindow != null)
+            {
+                m_ProfilerWindow = null;
+            }
+
+#if UNITY_2021_1_OR_NEWER
+            if (m_CpuProfilerModule != null)
+            {
+                m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
+                m_CpuProfilerModule = null;
+            }
 #endif
         }
     }

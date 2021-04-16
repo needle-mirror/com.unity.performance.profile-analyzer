@@ -1,18 +1,18 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 
 public class ProfileAnalyzerAPITests : ProfileAnalyzerBaseTest
 {
     [Test]
     public void ProfileAnalyzer_EmptyAnalysis_HasNoThreads()
     {
-        var analyzer = m_setupData.analyzer;
+        var analyzer = m_SetupData.analyzer;
         Assert.IsTrue(0 == analyzer.GetThreadNames().Count);
     }
 
     [Test]
     public void ProfileAnalyzer_EmptyAnalysis_HasNoProgress()
     {
-        var analyzer = m_setupData.analyzer;
+        var analyzer = m_SetupData.analyzer;
         Assert.IsTrue(0 == analyzer.GetProgress());
     }
 
@@ -22,5 +22,4 @@ public class ProfileAnalyzerAPITests : ProfileAnalyzerBaseTest
         var analysis = GetAnalysisFromFrameData(null);
         Assert.IsNull(analysis);
     }
-
 }

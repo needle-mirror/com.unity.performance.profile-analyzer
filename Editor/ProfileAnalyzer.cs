@@ -1,11 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditorInternal;
 using System.Text.RegularExpressions;
 using System;
-using System.Text;
-using UnityEngine.Profiling;
-using UnityEditor.Profiling;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -66,7 +63,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 var frame = data.GetFrame(frameIndex);
                 float msFrame = frame.msFrame;
-                frameTimes.Add(msFrame); 
+                frameTimes.Add(msFrame);
             }
             frameTimes.Sort();
             median = frameTimes[frameTimes.Count / 2];
@@ -97,7 +94,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-
         int GetClampedOffsetToFrame(ProfileData profileData, int frameIndex)
         {
             int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
@@ -117,7 +113,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public static bool MatchThreadFilter(string threadNameWithIndex, List<string> threadFilters)
         {
-            if (threadFilters == null || threadFilters.Count==0)
+            if (threadFilters == null || threadFilters.Count == 0)
                 return false;
 
             if (threadFilters.Contains(threadNameWithIndex))
@@ -129,7 +125,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public bool IsNullOrWhiteSpace(string s)
         {
             // return string.IsNullOrWhiteSpace(parentMarker);
-            if (s == null || Regex.IsMatch(s,@"^[\s]*$"))
+            if (s == null || Regex.IsMatch(s, @"^[\s]*$"))
                 return true;
 
             return false;
@@ -142,7 +138,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 return null;
             }
-            if (profileData.GetFrameCount()<=0)
+            if (profileData.GetFrameCount() <= 0)
             {
                 return null;
             }
@@ -153,13 +149,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return null;
             }
 
+            if (profileData.HasFrames && !profileData.HasThreads)
+            {
+                if (!ProfileData.Load(profileData.FilePath, out profileData))
+                {
+                    return null;
+                }
+            }
+
             bool processMarkers = (threadFilters != null);
 
             ProfileAnalysis analysis = new ProfileAnalysis();
-            if (selectionIndices.Count>0)
-                analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count-1]);
+            if (selectionIndices.Count > 0)
+                analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count - 1]);
             else
-                analysis.SetRange(0,0);
+                analysis.SetRange(0, 0);
 
             m_threadNames.Clear();
 
@@ -179,7 +183,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             int at = 0;
-            foreach (int frameIndex in selectionIndices) 
+            foreach (int frameIndex in selectionIndices)
             {
                 int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
                 var frameData = profileData.GetFrame(frameOffset);
@@ -191,6 +195,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (processMarkers)
                 {
+                    // get the file reader in case we need to rebuild the markers rather than opening
+                    // the file for every marker
                     for (int threadIndex = 0; threadIndex < frameData.threads.Count; threadIndex++)
                     {
                         float msTimeOfMinDepthMarkers = 0.0f;
@@ -214,7 +220,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             {
                                 if (threadAt == thread)
                                     continue;
-                                
+
                                 if (thread.threadGroupName == threadAt.threadGroupName)
                                 {
                                     threadAt.threadsInGroup += 1;
@@ -230,6 +236,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         bool include = MatchThreadFilter(threadNameWithIndex, threadFilters);
 
                         int parentMarkerDepth = -1;
+
+                        if (threadData.markers.Count != threadData.markerCount)
+                        {
+                            if (!threadData.ReadMarkers(profileData.FilePath))
+                            {
+                                Debug.LogError("failed to read markers");
+                            }
+                        }
+
                         foreach (ProfileMarker markerData in threadData.markers)
                         {
                             string markerName = profileData.GetMarkerName(markerData);
@@ -350,13 +365,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             analysis.Finalise(timeScaleMax, maxMarkerDepthFound);
 
             /*
-            foreach (int frameIndex in selectionIndices) 
+            foreach (int frameIndex in selectionIndices)
             {
                 int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
-                               
+
                 var frameData = profileData.GetFrame(frameOffset);
                 foreach (var threadData in frameData.threads)
-                { 
+                {
                     var threadNameWithIndex = profileData.GetThreadName(threadData);
 
                     if (filterThreads && threadFilter != threadNameWithIndex)

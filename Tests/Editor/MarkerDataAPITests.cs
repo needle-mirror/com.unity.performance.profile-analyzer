@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 
 public class MarkerDataAPITests : ProfileAnalyzerBaseTest
@@ -23,4 +23,3 @@ public class MarkerDataAPITests : ProfileAnalyzerBaseTest
         }
     }
 }
-

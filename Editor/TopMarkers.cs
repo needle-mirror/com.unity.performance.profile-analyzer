@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
@@ -9,26 +10,34 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     {
         internal class RangeSettings
         {
-            ProfileAnalysis m_Analysis;
-            int m_DepthFilter;
-            List<string> m_NameFilters;
-            List<string> m_NameExcludes;
+            public readonly ProfileDataView dataView;
 
-            public RangeSettings(ProfileAnalysis analysis, int depthFilter, List<string> nameFilters, List<string> nameExcludes)
+            public readonly int depthFilter;
+            public readonly List<string> nameFilters;
+            public readonly List<string> nameExcludes;
+            public readonly TimingOptions.TimingOption timingOption;
+            public readonly int threadSelectionCount;
+
+            public RangeSettings(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount)
             {
-                m_Analysis = analysis;
-                m_DepthFilter = depthFilter;
-                m_NameFilters = nameFilters;
-                m_NameExcludes = nameExcludes;
+                // Make a copy rather than keeping a reference
+                this.dataView = dataView==null ? new ProfileDataView() : new ProfileDataView(dataView);
+                this.depthFilter = depthFilter;
+                this.nameFilters = nameFilters;
+                this.nameExcludes = nameExcludes;
+                this.timingOption = timingOption;
+                this.threadSelectionCount = threadSelectionCount;
             }
 
             public override int GetHashCode()
             {
                 int hash = 13;
-                hash = (hash * 7) + m_Analysis.GetHashCode();
-                hash = (hash * 7) + m_DepthFilter.GetHashCode();
-                hash = (hash * 7) + m_NameFilters.GetHashCode();
-                hash = (hash * 7) + m_NameExcludes.GetHashCode();
+                hash = (hash * 7) + dataView.GetHashCode();
+                hash = (hash * 7) + depthFilter.GetHashCode();
+                hash = (hash * 7) + nameFilters.GetHashCode();
+                hash = (hash * 7) + nameExcludes.GetHashCode();
+                hash = (hash * 7) + timingOption.GetHashCode();
+                hash = (hash * 7) + threadSelectionCount.GetHashCode();
 
                 return hash;
             }
@@ -55,39 +64,60 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             bool IsEqual(RangeSettings b)
             {
-                if (m_Analysis != b.m_Analysis)
-                    return false;
-                if (m_DepthFilter != b.m_DepthFilter)
+                if (timingOption != b.timingOption)
                     return false;
 
-                if (m_NameFilters.Count != b.m_NameFilters.Count)
-                    return false;
-                if (m_NameExcludes.Count != b.m_NameExcludes.Count)
+                if (b.dataView == null && dataView != null)
                     return false;
 
-                // Want to check if contents match, not just if refeernce is the same
-                for (int i = 0; i < m_NameFilters.Count; i++)
+                // Check contents of data view (the reference will definitly not match as we made a copy)
+                if (b.dataView != null)
                 {
-                    if (m_NameFilters[i] != b.m_NameFilters[i])
+                    // Only need to check data, analysis and selectedIndices
+                    if (dataView.data != b.dataView.data)
+                        return false;
+                    if (dataView.analysis != b.dataView.analysis)
+                        return false;
+
+                    if (dataView.selectedIndices != b.dataView.selectedIndices)
+                        return false;
+                    if (dataView.selectedIndices.Count != b.dataView.selectedIndices.Count)
+                        return false;
+
+                    // Want to check if contents match, not just if reference is the same
+                    for (int i = 0; i < dataView.selectedIndices.Count; i++)
+                    {
+                        if (dataView.selectedIndices[i] != b.dataView.selectedIndices[i])
+                            return false;
+                    }
+                }
+
+                if (depthFilter != b.depthFilter)
+                    return false;
+                if (threadSelectionCount != b.threadSelectionCount)
+                    return false;
+
+                if (nameFilters.Count != b.nameFilters.Count)
+                    return false;
+                if (nameExcludes.Count != b.nameExcludes.Count)
+                    return false;
+
+                // Want to check if contents match, not just if reference is the same
+                for (int i = 0; i < nameFilters.Count; i++)
+                {
+                    if (nameFilters[i] != b.nameFilters[i])
                         return false;
                 }
-                for (int i = 0; i < m_NameExcludes.Count; i++)
+                for (int i = 0; i < nameExcludes.Count; i++)
                 {
-                    if (m_NameExcludes[i] != b.m_NameExcludes[i])
+                    if (nameExcludes[i] != b.nameExcludes[i])
                         return false;
                 }
-
-                /*
-                if (!m_NameFilters.Equals(b.m_NameFilters))
-                    return false;
-                if (!m_NameExcludes.Equals(b.m_NameExcludes))
-                    return false;
-                */
 
                 return true;
             }
 
-            public static bool operator ==(RangeSettings a, RangeSettings b)
+            public static bool operator==(RangeSettings a, RangeSettings b)
             {
                 // If both are null, or both are same instance, return true.
                 if (System.Object.ReferenceEquals(a, b))
@@ -104,46 +134,39 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return a.IsEqual(b);
             }
 
-            public static bool operator !=(RangeSettings a, RangeSettings b)
+            public static bool operator!=(RangeSettings a, RangeSettings b)
             {
                 return !(a == b);
             }
         }
 
         internal class Settings
-        {
-            ProfileAnalysis m_Analysis;
-            int m_BarCount;
-            float m_TimeRange;
-            int m_DepthFilter;
-            bool m_IncludeOthers;
-            bool m_IncludeUnaccounted;
-            List<string> m_NameFilters;
-            List<string> m_NameExcludes;
+        {   
+            public readonly int barCount;
+            public readonly float timeRange;
 
-            public Settings(ProfileAnalysis analysis, int barCount, float timeRange, int depthFilter, bool includeOthers, bool includeUnaccounted, List<string> nameFilters, List<string> nameExcludes)
+            public readonly bool includeOthers;
+            public readonly bool includeUnaccounted;
+
+            public RangeSettings rangeSettings { get ; private set ; }
+
+            public Settings(RangeSettings rangeSettings, int barCount, float timeRange, bool includeOthers, bool includeUnaccounted)
             {
-                m_Analysis = analysis;
-                m_BarCount = barCount;
-                m_TimeRange = timeRange;
-                m_DepthFilter = depthFilter;
-                m_IncludeOthers = includeOthers;
-                m_IncludeUnaccounted = includeUnaccounted;
-                m_NameFilters = nameFilters;
-                m_NameExcludes = nameExcludes;
+                this.rangeSettings = rangeSettings;
+                this.barCount = barCount;
+                this.timeRange = timeRange;
+                this.includeOthers = includeOthers;
+                this.includeUnaccounted = includeUnaccounted;
             }
 
             public override int GetHashCode()
             {
                 int hash = 13;
-                hash = (hash * 7) + m_Analysis.GetHashCode();
-                hash = (hash * 7) + m_BarCount.GetHashCode();
-                hash = (hash * 7) + m_TimeRange.GetHashCode();
-                hash = (hash * 7) + m_DepthFilter.GetHashCode();
-                hash = (hash * 7) + m_IncludeOthers.GetHashCode();
-                hash = (hash * 7) + m_IncludeUnaccounted.GetHashCode();
-                hash = (hash * 7) + m_NameFilters.GetHashCode();
-                hash = (hash * 7) + m_NameExcludes.GetHashCode();
+                hash = (hash * 7) + rangeSettings.GetHashCode();
+                hash = (hash * 7) + barCount.GetHashCode();
+                hash = (hash * 7) + timeRange.GetHashCode();
+                hash = (hash * 7) + includeOthers.GetHashCode();
+                hash = (hash * 7) + includeUnaccounted.GetHashCode();
 
                 return hash;
             }
@@ -170,47 +193,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             bool IsEqual(Settings b)
             {
-                if (m_Analysis != b.m_Analysis)
+                if (rangeSettings != b.rangeSettings)
                     return false;
-                if (m_BarCount != b.m_BarCount)
+                if (barCount != b.barCount)
                     return false;
-                if (m_TimeRange != b.m_TimeRange)
+                if (timeRange != b.timeRange)
                     return false;
-                if (m_DepthFilter != b.m_DepthFilter)
+                if (includeOthers != b.includeOthers)
                     return false;
-                if (m_IncludeOthers != b.m_IncludeOthers)
+                if (includeUnaccounted != b.includeUnaccounted)
                     return false;
-                if (m_IncludeUnaccounted != b.m_IncludeUnaccounted)
-                    return false;
-
-                if (m_NameFilters.Count != b.m_NameFilters.Count)
-                    return false;
-                if (m_NameExcludes.Count != b.m_NameExcludes.Count)
-                    return false;
-
-                // Want to check if contents match, not just if refeernce is the same
-                for (int i = 0; i < m_NameFilters.Count; i++)
-                {
-                    if (m_NameFilters[i] != b.m_NameFilters[i])
-                        return false;
-                }
-                for (int i = 0; i < m_NameExcludes.Count; i++)
-                {
-                    if (m_NameExcludes[i] != b.m_NameExcludes[i])
-                        return false;
-                }
-
-                /*
-                if (!m_NameFilters.Equals(b.m_NameFilters))
-                    return false;
-                if (!m_NameExcludes.Equals(b.m_NameExcludes))
-                    return false;
-                */
 
                 return true;
             }
 
-            public static bool operator ==(Settings a, Settings b)
+            public static bool operator==(Settings a, Settings b)
             {
                 // If both are null, or both are same instance, return true.
                 if (System.Object.ReferenceEquals(a, b))
@@ -227,7 +224,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return a.IsEqual(b);
             }
 
-            public static bool operator !=(Settings a, Settings b)
+            public static bool operator!=(Settings a, Settings b)
             {
                 return !(a == b);
             }
@@ -275,15 +272,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        ProfileAnalysis m_Analysis;
-        List<string> m_NameFilters;
-        List<string> m_NameExcludes;
-        int m_DepthFilter;
-
-        RangeSettings m_LastRangeSettings;
-        Settings m_LastSettings;
+        Settings m_CurrentSettings;             // Current settings, including latest RangeSettings
+        RangeSettings m_RequestedRangeSettings; // Next requested range setting set by SetData
 
         float m_TimeRange;
+        bool m_TimeRangeDirty;                  // Set when renquested range settings change
         MarkerSummary m_MarkerSummary;
 
         internal static class Styles
@@ -301,6 +294,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
         }
 
+        private static class Content
+        {
+            public static readonly string frameTime = L10n.Tr("{0} Frame time on median frame");
+            public static readonly string multipleThreads = L10n.Tr("Multiple threads selected\nSelect a single thread for an overview");
+            public static readonly string totalTimeAllDepths = L10n.Tr("{0} Total time of all markers at all depths");
+            public static readonly string totalTimeAtSpecificDepth = L10n.Tr("{0} Total time of all markers at Depth {1}");
+            public static readonly string selectSelf = L10n.Tr("For an overview select Analysis Type Self");
+            public static readonly string selectTotal = L10n.Tr("To include child times select Analysis Type Total");
+            public static readonly string selfTimeAllDepths = L10n.Tr("{0} Self time of markers at all depths");
+            public static readonly string selfTimeAtSpecificDepth = L10n.Tr("{0} Self time of markers at Depth {1}");
+
+            public static readonly string tooltip = L10n.Tr("{0}\n{1:f2}% ({2} on median frame {3})\n\nMedian marker time (in currently selected frames)\n{4} on frame {5}");
+        }
+
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         Draw2D m_2D;
         Color m_BackgroundColor;
@@ -312,6 +319,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_2D = draw2D;
             m_BackgroundColor = backgroundColor;
             m_TextColor = textColor;
+
+            m_CurrentSettings = new Settings(new RangeSettings(null, 0, null, null, TimingOptions.TimingOption.Time, 0), 0, 0, false, false);
+            m_TimeRangeDirty = true;
         }
 
         string ToDisplayUnits(float ms, bool showUnits = false, int limitToDigits = 5)
@@ -319,22 +329,31 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, limitToDigits);
         }
 
-        public void SetData(ProfileAnalysis analysis, int depthFilter, List<string> nameFilters, List<string> nameExcludes)
+        public void SetData(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount)
         {
-            m_Analysis = analysis;
-            m_DepthFilter = depthFilter;
-            m_NameFilters = nameFilters;
-            m_NameExcludes = nameExcludes;
+            m_RequestedRangeSettings = new RangeSettings(dataView, depthFilter, nameFilters, nameExcludes, timingOption, threadSelectionCount);
+            if (m_CurrentSettings.rangeSettings != m_RequestedRangeSettings)
+                m_TimeRangeDirty = true;
         }
 
-        float CalculateTopMarkerTimeRange(ProfileAnalysis analysis, int depthFilter, List<string> nameFilters, List<string> nameExcludes)
+        float CalculateTopMarkerTimeRange(RangeSettings rangeSettings)
         {
+            if (rangeSettings == null)
+                return 0.0f;
+            if (rangeSettings.dataView == null)
+                return 0.0f;
+
+            ProfileAnalysis analysis = rangeSettings.dataView.analysis;
             if (analysis == null)
                 return 0.0f;
 
             var frameSummary = analysis.GetFrameSummary();
             if (frameSummary == null)
                 return 0.0f;
+
+            int depthFilter = rangeSettings.depthFilter;
+            List<string> nameFilters = rangeSettings.nameFilters;
+            List<string> nameExcludes = rangeSettings.nameExcludes;
 
             var markers = analysis.GetMarkers();
 
@@ -361,7 +380,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             // Minimum is the frame time range
-            // As we can have unaccounted markers 
+            // As we can have unaccounted markers
             if (range < frameSummary.msMedian)
                 range = frameSummary.msMedian;
 
@@ -370,22 +389,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public float GetTopMarkerTimeRange()
         {
-            if (m_Analysis == null)
-                return 0.0f;
-
-            var frameSummary = m_Analysis.GetFrameSummary();
-            if (frameSummary == null)
-                return 0.0f;
-
-            m_Analysis.GetMarkers();
-
-            RangeSettings currentRangeSettings = new RangeSettings(m_Analysis, m_DepthFilter, m_NameFilters, m_NameExcludes);
-            if (currentRangeSettings != m_LastRangeSettings)
+            if (m_TimeRangeDirty)
             {
                 Profiler.BeginSample("CalculateTopMarkerTimeRange");
 
-                m_TimeRange = CalculateTopMarkerTimeRange(m_Analysis, m_DepthFilter, m_NameFilters, m_NameExcludes);
-                m_LastRangeSettings = currentRangeSettings;
+                // Use latest requested rather than current (as current may not yet be updated)
+                m_TimeRange = CalculateTopMarkerTimeRange(m_RequestedRangeSettings);
+                m_TimeRangeDirty = false;
 
                 Profiler.EndSample();
             }
@@ -393,8 +403,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_TimeRange;
         }
 
-        public MarkerSummary CalculateTopMarkers(ProfileAnalysis analysis, int barCount, float timeRange, int depthFilter, bool includeOthers, bool includeUnaccounted, List<string> nameFilters, List<string> nameExcludes)
+        public MarkerSummary CalculateTopMarkers()
         {
+            if (m_CurrentSettings.rangeSettings.dataView == null)
+                return null;
+
+            ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
+            if (analysis == null)
+                return null;
+
             FrameSummary frameSummary = analysis.GetFrameSummary();
             if (frameSummary == null)
                 return new MarkerSummary();
@@ -403,11 +420,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (markers == null)
                 return new MarkerSummary();
 
+            float timeRange = m_CurrentSettings.timeRange;
+            int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
+            List<string> nameFilters = m_CurrentSettings.rangeSettings.nameFilters;
+            List<string> nameExcludes = m_CurrentSettings.rangeSettings.nameExcludes;
+
             // Show marker graph
             float x = 0;
             float width = 1.0f;
 
-            int max = barCount;
+            int max = m_CurrentSettings.barCount;
             int at = 0;
 
             float other = 0.0f;
@@ -446,27 +468,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     float w = CaculateWidth(x, msAtMedian, msToWidth, width);
                     float msMedian = MarkerData.GetMsMedian(marker);
-                    markerSummary.entry.Add(new MarkerSummaryEntry(marker.name, msAtMedian, msMedian, x, w, marker.medianFrameIndex, SummaryType.Marker));
+                    int medianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.medianFrameIndex, m_CurrentSettings.rangeSettings.dataView);
+                    markerSummary.entry.Add(new MarkerSummaryEntry(marker.name, msAtMedian, msMedian, x, w, medianFrameIndex, SummaryType.Marker));
 
                     x += w;
                 }
                 else
                 {
                     other += msAtMedian;
-                    if (!includeOthers)
+                    if (!m_CurrentSettings.includeOthers)
                         break;
                 }
 
                 at++;
             }
 
-            if (includeOthers && other > 0.0f)
+            if (m_CurrentSettings.includeOthers && other > 0.0f)
             {
                 float w = CaculateWidth(x, other, msToWidth, width);
                 markerSummary.entry.Add(new MarkerSummaryEntry("Other", other, 0f, x, w, -1, SummaryType.Other));
                 x += w;
             }
-            if (includeUnaccounted && totalMarkerTime < frameSummary.msMedian)
+            if (m_CurrentSettings.includeUnaccounted && totalMarkerTime < frameSummary.msMedian)
             {
                 float unaccounted = frameSummary.msMedian - totalMarkerTime;
                 float w = CaculateWidth(x, unaccounted, msToWidth, width);
@@ -479,45 +502,173 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return markerSummary;
         }
 
+        GenericMenu GenerateActiveContextMenu(string markerName, Event evt)
+        {
+            GenericMenu menu = new GenericMenu();
+            menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, false));
+            menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, true));
+
+            if (m_ProfileAnalyzerWindow.AllSelected())
+                menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+            else
+                menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+
+            menu.AddSeparator("");
+            if (!m_CurrentSettings.rangeSettings.nameFilters.Contains(markerName))
+                menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(markerName));
+            else
+                menu.AddItem(Styles.menuItemRemoveFromIncludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromIncludeFilter(markerName));
+            if (!m_CurrentSettings.rangeSettings.nameExcludes.Contains(markerName))
+                menu.AddItem(Styles.menuItemAddToExcludeFilter, false, () => m_ProfileAnalyzerWindow.AddToExcludeFilter(markerName));
+            else
+                menu.AddItem(Styles.menuItemRemoveFromExcludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromExcludeFilter(markerName));
+            menu.AddSeparator("");
+            menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
+            menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
+            menu.AddSeparator("");
+            menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, markerName));
+
+            return menu;
+        }
+
+        GenericMenu GenerateDisabledContextMenu(string markerName)
+        {
+            GenericMenu menu = new GenericMenu();
+            menu.AddDisabledItem(Styles.menuItemSelectFramesInAll);
+            menu.AddDisabledItem(Styles.menuItemSelectFramesInCurrent);
+            menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+
+            menu.AddSeparator("");
+            if (!m_CurrentSettings.rangeSettings.nameFilters.Contains(markerName))
+                menu.AddDisabledItem(Styles.menuItemAddToIncludeFilter);
+            else
+                menu.AddDisabledItem(Styles.menuItemRemoveFromIncludeFilter);
+            if (!m_CurrentSettings.rangeSettings.nameExcludes.Contains(markerName))
+                menu.AddDisabledItem(Styles.menuItemAddToExcludeFilter);
+            else
+                menu.AddDisabledItem(Styles.menuItemRemoveFromExcludeFilter);
+
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemSetAsParentMarkerFilter);
+            menu.AddDisabledItem(Styles.menuItemClearParentMarkerFilter);
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemCopyToClipboard);
+
+            return menu;
+        }
+        
+        public GUIContent ConstructTimeRangeText()
+        {
+            StringBuilder sb = new StringBuilder();
+
+            ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
+            int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
+            
+            FrameSummary frameSummary = analysis.GetFrameSummary();
+
+            string frameTimeString = ToDisplayUnits(frameSummary.msMedian, true, 0);
+            string accountedTimeString = ToDisplayUnits(m_MarkerSummary.totalTime, true, 0);
+            sb.AppendFormat(Content.frameTime, frameTimeString);
+
+            // Note m_CurrentSettings.rangeSettings.dataView.analysis.GetThreads contains all thread names, not just the filtered threads
+            bool singleThread = m_CurrentSettings.rangeSettings.threadSelectionCount == 1;
+
+            if (depthFilter == ProfileAnalyzer.kDepthAll)
+            {
+                if (m_CurrentSettings.rangeSettings.timingOption == TimingOptions.TimingOption.Time)
+                {
+                    sb.Append("\n");
+                    sb.AppendFormat(Content.totalTimeAllDepths, accountedTimeString);
+                    if (singleThread)
+                    {
+                        sb.Append("\n\n");
+                        sb.Append(Content.selectSelf);
+                    }
+                }
+                else
+                {
+                    sb.Append("\n");
+                    sb.AppendFormat(Content.selfTimeAllDepths,accountedTimeString);
+                }
+            }
+            else 
+            {
+                if (m_CurrentSettings.rangeSettings.timingOption == TimingOptions.TimingOption.Self)
+                {
+                    sb.Append("\n");
+                    sb.AppendFormat(Content.selfTimeAtSpecificDepth,accountedTimeString, depthFilter);
+                    if (singleThread)
+                    {
+                        sb.Append("\n\n");
+                        sb.Append(Content.selectTotal);
+                    }
+                }
+                else
+                {
+                    sb.Append("\n");
+                    sb.AppendFormat(Content.totalTimeAtSpecificDepth, accountedTimeString, depthFilter);
+                }
+            }
+
+            if (!singleThread)
+            {
+                sb.Append("\n\n");
+                sb.Append(Content.multipleThreads);
+            }
+
+            string timeRangeString = ToDisplayUnits(m_CurrentSettings.timeRange, true);
+            return new GUIContent(timeRangeString, sb.ToString());
+        } 
+
         public void Draw(Rect rect, Color barColor, int barCount, float timeRange, Color selectedBackground, Color selectedBorder, Color selectedText, bool includeOthers, bool includeUnaccounted)
         {
-            if (m_Analysis == null)
-                return;
-
-            Settings currentSettings = new Settings(m_Analysis, barCount, timeRange, m_DepthFilter, includeOthers, includeUnaccounted, m_NameFilters, m_NameExcludes);
-            if (currentSettings != m_LastSettings)
+            Settings newSettings = new Settings(m_RequestedRangeSettings, barCount, timeRange, includeOthers, includeUnaccounted);
+            if (m_CurrentSettings != newSettings)
             {
                 Profiler.BeginSample("CalculateTopMarkers");
 
-                m_MarkerSummary = CalculateTopMarkers(m_Analysis, barCount, timeRange, m_DepthFilter, includeOthers, includeUnaccounted, m_NameFilters, m_NameExcludes);
-                m_LastSettings = currentSettings;
+                m_CurrentSettings = newSettings;
+                m_MarkerSummary = CalculateTopMarkers();
 
                 Profiler.EndSample();
             }
 
+            if (m_CurrentSettings.rangeSettings == null)
+                return;
+            if (m_CurrentSettings.rangeSettings.dataView == null)
+                return;
+            if (m_CurrentSettings.rangeSettings.dataView.analysis == null)
+                return;
+
             if (m_MarkerSummary == null || m_MarkerSummary.entry == null)
                 return;
 
-            FrameSummary frameSummary = m_Analysis.GetFrameSummary();
-            if (frameSummary==null)
+            ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
+            int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
+            List<string> nameFilters = m_CurrentSettings.rangeSettings.nameFilters;
+            List<string> nameExcludes = m_CurrentSettings.rangeSettings.nameExcludes;
+            
+            FrameSummary frameSummary = analysis.GetFrameSummary();
+            if (frameSummary == null)
                 return;
             if (frameSummary.count <= 0)
                 return;
 
-            var markers = m_Analysis.GetMarkers();
-            if (markers==null)
+            var markers = analysis.GetMarkers();
+            if (markers == null)
                 return;
 
             Profiler.BeginSample("DrawHeader");
 
-            // After the marker graph we want an indication of the time range
             int rangeLabelWidth = 60;
-            Rect rangeLabelRect = new Rect(rect.x + rect.width - rangeLabelWidth, rect.y, rangeLabelWidth, rect.height);
-            string timeRangeString = ToDisplayUnits(timeRange, true);
-            string frameTimeString = ToDisplayUnits(frameSummary.msMedian, true, 0);
-            string timeRangeTooltip = string.Format("{0} median frame time", frameTimeString);
+
+            // After the marker graph we want an indication of the time range
             if (frameSummary.count > 0)
-                GUI.Label(rangeLabelRect, new GUIContent(timeRangeString, timeRangeTooltip) );
+            {
+                Rect rangeLabelRect = new Rect(rect.x + rect.width - rangeLabelWidth, rect.y, rangeLabelWidth, rect.height);
+                GUIContent timeRangeText = ConstructTimeRangeText();
+                GUI.Label(rangeLabelRect, timeRangeText);
+            }
 
             // Reduce the size of the marker graph for the button/label we just added
             rect.width -= rangeLabelWidth;
@@ -537,7 +688,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (m_2D.DrawStart(rect, Draw2D.Origin.BottomLeft))
             {
                 Profiler.BeginSample("DrawBars");
-                
+
                 m_2D.DrawFilledBox(0, y, width, height, m_BackgroundColor);
 
                 foreach (MarkerSummaryEntry entry in m_MarkerSummary.entry)
@@ -546,8 +697,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     float x = entry.x * width;
                     float w = entry.w * width;
-                    if (entry.summaryType==SummaryType.Marker)
-                    { 
+                    if (entry.summaryType == SummaryType.Marker)
+                    {
                         if (name == selectedPairingMarkerName)
                         {
                             DrawBar(x, y, w, height, selectedBackground, selectedBorder, true);
@@ -560,7 +711,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     else
                     {
                         // Others / Unaccounted
-                        Color color = entry.summaryType==SummaryType.Unaccounted ? new Color(barColor.r * 0.5f, barColor.g * 0.5f, barColor.b * 0.5f, barColor.a) : barColor;
+                        Color color = entry.summaryType == SummaryType.Unaccounted ? new Color(barColor.r * 0.5f, barColor.g * 0.5f, barColor.b * 0.5f, barColor.a) : barColor;
 
                         DrawBar(x, y, w, height, color, selectedBorder, false);
                     }
@@ -579,6 +730,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             leftAlignStyle.normal.textColor = m_TextColor;
             Color contentColor = GUI.contentColor;
 
+            int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameSummary.medianFrameIndex, m_CurrentSettings.rangeSettings.dataView);
+
             Profiler.BeginSample("DrawText");
             foreach (MarkerSummaryEntry entry in m_MarkerSummary.entry)
             {
@@ -588,7 +741,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float w = entry.w * width;
                 float msAtMedian = entry.msAtMedian;
 
-                if (entry.summaryType==SummaryType.Marker)
+                if (entry.summaryType == SummaryType.Marker)
                 {
                     Rect labelRect = new Rect(rect.x + x, rect.y, w, rect.height);
                     GUIStyle style = centreAlignStyle;
@@ -605,9 +758,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         }
                     }
                     float percentAtMedian = msAtMedian * 100 / timeRange;
-                    string tooltip = string.Format("{0}\n{1:f2}% ({2} on median frame {3})\n\nMedian marker time (in currently selected frames)\n{4} on frame {5}",
+                    string tooltip = string.Format(
+                        Content.tooltip,
                         name,
-                        percentAtMedian, ToDisplayUnits(msAtMedian, true, 0), frameSummary.medianFrameIndex,
+                        percentAtMedian, ToDisplayUnits(msAtMedian, true, 0), frameSummaryMedianFrameIndex,
                         ToDisplayUnits(entry.msMedian, true, 0), entry.medianFrameIndex);
                     if (name == selectedPairingMarkerName)
                         style.normal.textColor = selectedText;
@@ -620,37 +774,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         if (current.type == EventType.ContextClick)
                         {
-                            GenericMenu menu = new GenericMenu();
-
-                            menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(name, false));
-                            menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(name, true));
-
-                            if (m_ProfileAnalyzerWindow.AllSelected())
-                                menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+                            GenericMenu menu;
+                            if (!m_ProfileAnalyzerWindow.IsAnalysisRunning())
+                                menu = GenerateActiveContextMenu(name, current);
                             else
-                                menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
-
-                            /*
-                            if (m_ProfileAnalyzerWindow.AllSelected() || m_ProfileAnalyzerWindow.HasSelection())
-                                menu.AddItem(Styles.menuItemClearSelection, false, () => m_ProfileAnalyzerWindow.ClearSelection());
-                            else
-                                menu.AddDisabledItem(Styles.menuItemClearSelection);
-                            */
-
-                            menu.AddSeparator("");
-                            if (!m_NameFilters.Contains(name))
-                                menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(name));
-                            else
-                                menu.AddItem(Styles.menuItemRemoveFromIncludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromIncludeFilter(name));
-                            if (!m_NameExcludes.Contains(name))
-                                menu.AddItem(Styles.menuItemAddToExcludeFilter, false, () => m_ProfileAnalyzerWindow.AddToExcludeFilter(name));
-                            else
-                                menu.AddItem(Styles.menuItemRemoveFromExcludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromExcludeFilter(name));
-                            menu.AddSeparator("");
-                            menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(name));
-                            menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
-                            menu.AddSeparator("");
-                            menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(current, name));
+                                menu = GenerateDisabledContextMenu(name);
 
                             menu.ShowAsContext();
 
@@ -665,7 +793,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
                 else
                 {
-                    DrawBarText(rect, x, w, msAtMedian, name, timeRange, leftAlignStyle, frameSummary.medianFrameIndex);
+                    DrawBarText(rect, x, w, msAtMedian, name, timeRange, leftAlignStyle, frameSummaryMedianFrameIndex);
                 }
             }
 
@@ -699,8 +827,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             GUIStyle style = leftAlignStyle;
             string tooltip = string.Format("{0}\n{1:f2}% ({2} on median frame {3})",
                 name,
-                percent, 
-                ToDisplayUnits(msTime, true, 0), 
+                percent,
+                ToDisplayUnits(msTime, true, 0),
                 medianFrameIndex);
             GUI.Label(labelRect, new GUIContent("", tooltip), style);
 
@@ -711,7 +839,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     GenericMenu menu = new GenericMenu();
 
-                    menu.AddItem(Styles.menuItemSelectFramesAll, false, m_ProfileAnalyzerWindow.SelectAllFrames);
+                    if (!m_ProfileAnalyzerWindow.IsAnalysisRunning())
+                        menu.AddItem(Styles.menuItemSelectFramesAll, false, m_ProfileAnalyzerWindow.SelectAllFrames);
+                    else
+                        menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+
                     menu.ShowAsContext();
 
                     current.Use();
@@ -725,7 +857,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return w;
         }
-        
+
         void CopyToClipboard(Event current, string text)
         {
             EditorGUIUtility.systemCopyBuffer = text;

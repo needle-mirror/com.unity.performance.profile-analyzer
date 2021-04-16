@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -68,7 +68,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         FrameTime GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
         {
-            int index = (int)((frames.Count-1) * percent / 100);
+            int index = (int)((frames.Count - 1) * percent / 100);
             outputFrameIndex = frames[index].frameIndex;
 
             // True median is half of the sum of the middle 2 frames for an even count. However this would be a value never recorded so we avoid that.
@@ -77,7 +77,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         float GetThreadPercentageOffset(List<ThreadFrameTime> frames, float percent, out int outputFrameIndex)
         {
-            int index = (int)((frames.Count-1) * percent / 100);
+            int index = (int)((frames.Count - 1) * percent / 100);
             outputFrameIndex = frames[index].frameIndex;
 
             // True median is half of the sum of the middle 2 frames for an even count. However this would be a value never recorded so we avoid that.
@@ -93,7 +93,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 marker.msAtMedian = 0.0f;
                 marker.msMin = float.MaxValue;
-                marker.msMax = 0;
+                marker.msMax = float.MinValue;
                 marker.minFrameIndex = 0;
                 marker.maxFrameIndex = 0;
                 marker.countMin = int.MaxValue;

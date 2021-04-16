@@ -1,4 +1,4 @@
-﻿# Compare view
+# Compare view
 
 In the **Compare** view you can load two data sets, which the Profiler Analyzer displays in two different colors. It displays the information from both data sets in a similar way to the [Single view](single-view.md) and has the same panes and panels.
 
@@ -51,18 +51,22 @@ The following table shows the columns that the Profile Analyzer displays when yo
 |**Left Median**<br/> **Right Median**|&#10003;|&#10003;||&#10003;|||||
 |`<`<br/> `>`|&#10003;|&#10003;||&#10003;|||||
 |**Diff**|&#10003;|&#10003;|||||||
+|**Diff Percent**|||||||||
 |**Abs Diff**|&#10003;|&#10003;||&#10003;|||||
 |**Count Left** <br/> **Count Right**|&#10003;||||&#10003;||||
 |`<` **Count** <br/> `>` **Count**|||||&#10003;||||
 |**Count Delta**|&#10003;||||&#10003;||||
+|**Count Delta Percent**|||||||||
 |**Abs Count**|||||&#10003;||||
 |**Count Left Frame** <br/> **Count Right Frame**||||||&#10003;|||
 |`<` **Frame Count** <br/> `>` **Frame Count**||||||&#10003;|||
 |**Count Delta Frame**||||||&#10003;|||
+|**Count Delta Percent Frame**|||||||||
 |**Abs Frame Count**||||||&#10003;|||
 |**Total Left** <br/> **Total Right**|||&#10003;|&#10003;|||||
 |`<` **Total** <br/> `>` **Total**|||&#10003;|&#10003;|||||
 |**Total Delta**|||&#10003;||||||
+|**Total Delta Percent**|||||||||
 |**Abs Total**|||&#10003;|&#10003;|||||
 |**Depth Left** <br/> **Depth Right**|||||||&#10003;||
 |**Depth Diff**|||||||&#10003;||
@@ -76,18 +80,22 @@ The following table explains what each column does:
 |**Left Median** <br/> **Right Median** | The sum of activity for the marker. **Left Median** displays the first data set loaded into the **Frame Control** pane, colored blue. **Right Median** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |`<` <br/> `>`|A visual representation of the **Left Median** (`<`) and **Right Median** (`>`) data.|
 |**Diff**|The difference between the summed values in each data set. Negative values mean that the left (blue) set of data is bigger, positive means the right (orange) set of data is bigger.|
+|**Diff Percent**|The difference relative to the first data set.|
 |**Abs Diff**|The absolute difference between the summed values in each data set.|
 |**Count Left**<br/>**Count Right**|The number of times the marker started or stopped. **Count Left** displays the first data set loaded into the **Frame Control** pane, colored blue. **Count Right** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |`<` **Count** <br/> `>` **Count**|A visual representation of the **Count Left** and **Count Right** data.|
 |**Count Delta**|The difference between the **Count** values in each data set. Negative values mean that the left (blue) set of data is bigger, positive means the right (orange) set of data is bigger.|
+|**Count Delta Percent**|The difference in count relative to the first data set.|
 |**Abs Count**|The absolute difference between the **Count** values for the selected frames. Negative values mean that the left (blue) set of data is bigger, positive means the right (orange) set of data is bigger.|
 |**Count Left Frame** <br/> **Count Right Frame**| The average count of the marker over all non-zero frames. **Count Left Frame** displays the first data set loaded into the **Frame Control** pane, colored blue. **Count Right Frame** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |`<` **Frame Count** <br/> `>` **Frame Count**|A visual representation of the **Count Left Frame** and **Count Right Frame** data.|
 |**Count Delta Frame**|The difference between the **Count Left Frame** and **Count Right Frame** values. Negative values mean that the left (blue) set of data is bigger, positive means the right (orange) set of data is bigger.|
+|**Count Delta Percent Frame**|The difference in average count relative to the first data set.|
 |**Abs Frame Count**|The absolute difference between the number of times the marker started or stopped in each data set.|
 |**Total Left** <br/> **Total Right**|The total time for the marker over the selected frames. **Total Left** displays the first data set loaded into the **Frame Control** pane, colored blue. **Total Right** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |`<` **Total** <br/> `>` **Total**|A visual representation of the **Total Left** and **Total Right** data.|
 |**Total Delta**|The difference between the total times over the selected frames in each data set. Negative values mean that the left (blue) set of data is bigger, positive means the right (orange) set of data is bigger.|
+|**Total Delta Percent**|The difference in total time relative to the first data set.|
 |**Abs Total**|The absolute difference between the total times over all of the selected frames in each data set.|
 |**Depth Left** <br/> **Depth Right**|The level, or depth, that the marker appears at. The marker might appear on multiple depth levels. **Depth Left** displays the first data set loaded into the **Frame Control** pane, colored blue. **Depth Right** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |**Depth Diff**|The difference between the **Depth Left** and **Depth Right** values.|

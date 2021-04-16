@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -20,7 +20,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             EditorUtility.DisplayProgressBar(m_Title, m_Description, m_CurrentFrame);
         }
 
-		public void AdvanceProgressBar()
+        public void AdvanceProgressBar()
         {
             m_CurrentFrame++;
             int currentFrame = Mathf.Clamp(0, m_CurrentFrame, m_TotalFrames);

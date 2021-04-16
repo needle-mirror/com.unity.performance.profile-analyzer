@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.IO;
 using System;
 using System.Collections.Generic;
@@ -13,6 +13,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent singleFrameTimes = new GUIContent("Single Frame Times", "Export frame time data from the single view");
             public static readonly GUIContent comparisonFrameTimes = new GUIContent("Comparison Frame Times", "Export frame time data from the comparison view");
         }
+
+        ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
 
         ProfileDataView m_ProfileDataView;
         ProfileDataView m_LeftDataView;
@@ -29,17 +31,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static public bool IsOpen()
         {
-            if (FindOpenWindow()!=null)
+            if (FindOpenWindow() != null)
                 return true;
 
             return false;
         }
 
-        static public ProfileAnalyzerExportWindow Open(float screenX, float screenY, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView)
+        static public ProfileAnalyzerExportWindow Open(float screenX, float screenY, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView, ProfileAnalyzerWindow profileAnalyzerWindow)
         {
             ProfileAnalyzerExportWindow window = GetWindow<ProfileAnalyzerExportWindow>("Export");
             window.minSize = new Vector2(200, 140);
             window.position = new Rect(screenX, screenY, 200, 140);
+            window.m_ProfileAnalyzerWindow = profileAnalyzerWindow;
             window.SetData(profileSingleView, profileLeftView, profileRightView);
             window.Show();
 
@@ -119,11 +122,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     markerData.Sort();
                     foreach (MarkerData marker in markerData)
                     {
-                        file.Write("{0},", marker.name);
+                        var markerName = marker.name;
+                        if (markerName.IndexOf('\"') >= 0)
+                            // replace all double quotation marks with single ones to avoid this breaking the escaping with double quotation marks
+                            markerName = markerName.Replace('\"', '\'');
+
+                        int medianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.medianFrameIndex, m_ProfileDataView);
+                        int minFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.minFrameIndex, m_ProfileDataView);
+                        int maxFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.maxFrameIndex, m_ProfileDataView);
+                        int firstFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.firstFrameIndex, m_ProfileDataView);
+                        int minIndividualFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.minIndividualFrameIndex, m_ProfileDataView);
+                        int maxIndividualFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.maxIndividualFrameIndex, m_ProfileDataView);
+
+                        // "Escape" marker names in case it has commas in it.
+                        file.Write("\"{0}\",", markerName);
                         file.Write("{0},{1},{2},",
                             marker.msMedian, marker.msMin, marker.msMax);
                         file.Write("{0},{1},{2},",
-                            marker.medianFrameIndex, marker.minFrameIndex, marker.maxFrameIndex);
+                            medianFrameIndex, minFrameIndex, maxFrameIndex);
                         file.Write("{0},{1},",
                             marker.minDepth, marker.maxDepth);
                         file.Write("{0},",
@@ -133,11 +149,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         file.Write("{0},{1},{2},{3},",
                             marker.count, marker.countMedian, marker.countMin, marker.countMax);
                         file.Write("{0},", marker.presentOnFrameCount);
-                        file.Write("{0},", marker.firstFrameIndex);
+                        file.Write("{0},", firstFrameIndex);
                         file.Write("{0},{1},",
                             marker.msMinIndividual, marker.msMaxIndividual);
                         file.Write("{0},{1},",
-                            marker.minIndividualFrameIndex, marker.maxIndividualFrameIndex);
+                            minIndividualFrameIndex, maxIndividualFrameIndex);
                         file.WriteLine("{0}", marker.msAtMedian);
                     }
                 }
@@ -169,6 +185,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         frame = m_ProfileDataView.data.GetFrame(frameOffset);
                         int frameIndex = m_ProfileDataView.data.OffsetToDisplayFrame(frameOffset);
+                        frameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameIndex, m_ProfileDataView);
+                        
                         float msFrame = frame.msFrame;
                         file.WriteLine("{0},{1},{2},{3}",
                             frameOffset, frameIndex, msFrame, msTimePassed);
@@ -213,15 +231,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         leftFrame = m_LeftDataView.data.GetFrame(frameOffset);
                         rightFrame = m_RightDataView.data.GetFrame(frameOffset);
                         int leftFrameIndex = m_LeftDataView.data.OffsetToDisplayFrame(frameOffset);
+                        leftFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(leftFrameIndex, m_LeftDataView);
                         int rightFrameIndex = m_RightDataView.data.OffsetToDisplayFrame(frameOffset);
+                        rightFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(rightFrameIndex, m_RightDataView);
+
                         float msFrameLeft = leftFrame != null ? leftFrame.msFrame : 0;
                         float msFrameRight = rightFrame != null ? rightFrame.msFrame : 0;
                         float msFrameDiff = msFrameRight - msFrameLeft;
                         file.Write("{0},", frameOffset);
-                        file.Write("{0},{1},",leftFrameIndex, rightFrameIndex);
+                        file.Write("{0},{1},", leftFrameIndex, rightFrameIndex);
                         file.Write("{0},{1},", msFrameLeft, msTimePassedLeft);
                         file.Write("{0},{1},", msFrameRight, msTimePassedRight);
-                        file.WriteLine("{0}",msFrameDiff);
+                        file.WriteLine("{0}", msFrameDiff);
 
                         msTimePassedLeft += msFrameLeft;
                         msTimePassedRight += msFrameRight;

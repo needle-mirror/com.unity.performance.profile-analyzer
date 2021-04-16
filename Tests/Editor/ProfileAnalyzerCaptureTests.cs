@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.TestTools;
@@ -23,9 +23,9 @@ public class ProfileAnalyzerCaptureTests : ProfileAnalyzerBaseTest
         yield return null;
 
         //analyze the data
-        m_setupData.profileData = m_setupData.profilerWindowInterface.PullFromProfiler(m_setupData.firstFrame, m_setupData.lastFrame);
-        var analysis = GetAnalysisFromFrameData(m_setupData.profileData);
-        
+        m_SetupData.profileData = m_SetupData.profilerWindowInterface.PullFromProfiler(m_SetupData.firstFrame, m_SetupData.lastFrame);
+        var analysis = GetAnalysisFromFrameData(m_SetupData.profileData);
+
         var analysisMarkers = analysis.GetMarkers();
         var analysisMarkerDict = new Dictionary<string, int>();
         for (int i = 0; i < analysisMarkers.Count; ++i)

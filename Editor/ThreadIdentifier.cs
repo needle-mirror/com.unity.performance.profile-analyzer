@@ -1,4 +1,3 @@
-﻿
 using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -28,7 +27,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             this.name = name;
             this.index = index;
             if (index == kAll)
-                threadNameWithIndex = string.Format("All:{1}", index, name);
+                threadNameWithIndex = string.Format("All:{0}", name);
             else
                 threadNameWithIndex = string.Format("{0}:{1}", index, name);
         }
@@ -76,7 +75,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         void UpdateThreadNameWithIndex()
         {
             if (index == kAll)
-                threadNameWithIndex = string.Format("All:{1}", index, name);
+                threadNameWithIndex = string.Format("All:{0}", name);
             else
                 threadNameWithIndex = string.Format("{0}:{1}", index, name);
         }

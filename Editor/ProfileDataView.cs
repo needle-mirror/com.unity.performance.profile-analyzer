@@ -13,7 +13,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public ProfileAnalysis analysisNew;
         public ProfileAnalysis analysis;
         public List<int> selectedIndices = new List<int> { 0, 0 };
+        [NonSerialized]
+        public bool inSyncWithProfilerData;
 
+        public ProfileDataView()
+        {
+        }
+
+        public ProfileDataView(ProfileDataView dataView)
+        {
+            path = dataView.path;
+            data = dataView.data;
+            analysisFullNew = dataView.analysisFullNew;
+            analysisFull = dataView.analysisFull;
+            analysisNew = dataView.analysisNew;
+            analysis = dataView.analysis;
+            selectedIndices = new List<int>(dataView.selectedIndices);
+            inSyncWithProfilerData = dataView.inSyncWithProfilerData;
+        }
         public bool IsDataValid()
         {
             if (data == null)
@@ -21,6 +38,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (data.GetFrameCount() == 0)
                 return false;
+
+            if (data.NeedsMarkerRebuild)
+            {
+                if (!ProfileData.Load(data.FilePath, out data))
+                {
+                    return false;
+                }
+            }
 
             return true;
         }
@@ -128,22 +153,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return;
 
             for (int offset = 0; offset < data.GetFrameCount(); offset++)
-            {
-                selectedIndices.Add(data.OffsetToDisplayFrame(offset));
-            }
-        }
-
-        void SelectIndexRangeFromOffsets(int startOffset, int endOffset)
-        {
-            selectedIndices.Clear();
-
-            if (data == null)
-                return;
-
-            startOffset = ClampToRange(startOffset, 0, data.GetFrameCount() - 1);
-            endOffset = ClampToRange(endOffset, 0, data.GetFrameCount() - 1);
-
-            for (int offset = startOffset; offset <= endOffset; offset++)
             {
                 selectedIndices.Add(data.OffsetToDisplayFrame(offset));
             }

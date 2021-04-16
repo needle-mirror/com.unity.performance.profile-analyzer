@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEditor.Analytics;
 using UnityEngine;
@@ -348,7 +348,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return false;
 #endif
         }
-
 
         internal class Analytic
         {

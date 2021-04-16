@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -17,7 +17,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         string ToDisplayUnits(float ms, bool showUnits = false)
         {
-            return m_Units.ToString(ms, showUnits, 5);
+            return m_Units.ToString(ms, showUnits, 5, true);
+        }
+
+        string ToTooltipDisplayUnits(float ms, bool showUnits = false)
+        {
+            return m_Units.ToTooltipString(ms, showUnits);
         }
 
         public void SetUnits(Units units)
@@ -64,14 +69,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             string tooltip = string.Format(
                 "Max :\t\t{0}\n\nUpper Quartile :\t{1}\nMedian :\t\t{2}\nLower Quartile :\t{3}\nInterquartile range : \t{4}\n\nMin :\t\t{5}\nUnits :\t\t{6}",
-                ToDisplayUnits(max),
-                ToDisplayUnits(upperQuartile),
-                ToDisplayUnits(median),
-                ToDisplayUnits(lowerQuartile),
-                ToDisplayUnits(upperQuartile - lowerQuartile),
-                ToDisplayUnits(min),
+                ToTooltipDisplayUnits(max),
+                ToTooltipDisplayUnits(upperQuartile),
+                ToTooltipDisplayUnits(median),
+                ToTooltipDisplayUnits(lowerQuartile),
+                ToTooltipDisplayUnits(upperQuartile - lowerQuartile),
+                ToTooltipDisplayUnits(min),
                 m_Units.Postfix()
-                );
+            );
 
             return tooltip;
         }

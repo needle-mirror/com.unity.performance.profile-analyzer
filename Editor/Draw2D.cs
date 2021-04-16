@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -29,7 +29,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (m_Material == null)
             {
                 m_Material = new Material(Shader.Find(m_ShaderName));
-                m_Material.EnableKeyword("UNITY_UI_CLIP_RECT");
             }
 
             if (m_Material == null)
@@ -73,6 +72,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             CheckAndSetupMaterial();
             m_Material.SetFloat("_UseClipRect", m_ClipRectEnabled ? 1f : 0f);
             m_Material.SetVector("_ClipRect", m_ClipRect);
+        }
+
+        public Rect GetClipRect()
+        {
+            return new Rect(m_ClipRect.x, m_ClipRect.y, m_ClipRect.z - m_ClipRect.x, m_ClipRect.w - m_ClipRect.y);
         }
 
         public bool DrawStart(Rect r, Origin origin = Origin.TopLeft)

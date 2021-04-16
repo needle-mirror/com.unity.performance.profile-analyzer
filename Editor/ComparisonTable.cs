@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -23,8 +23,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     class ComparisonTable : TreeView
     {
         Draw2D m_2D;
-        ProfileAnalysis m_Left;
-        ProfileAnalysis m_Right;
+        ProfileDataView m_LeftDataView;
+        ProfileDataView m_RightDataView;
         Color m_LeftColor;
         Color m_RightColor;
         List<MarkerPairing> m_Pairings;
@@ -46,24 +46,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             RightBar,
             RightMedian,
             Diff,
+            DiffPercent,
             AbsDiff,
             LeftCount,
             LeftCountBar,
             RightCountBar,
             RightCount,
             CountDiff,
+            CountDiffPercent,
             AbsCountDiff,
             LeftCountMean,
             LeftCountMeanBar,
             RightCountMeanBar,
             RightCountMean,
             CountMeanDiff,
+            CountMeanDiffPercent,
             AbsCountMeanDiff,
             LeftTotal,
             LeftTotalBar,
             RightTotalBar,
             RightTotal,
             TotalDiff,
+            TotalDiffPercent,
             AbsTotalDiff,
             LeftDepth,
             RightDepth,
@@ -81,21 +85,25 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             RightMedian,
             Diff,
             ReverseDiff,
+            DiffPercent,
             AbsDiff,
             LeftCount,
             RightCount,
             CountDiff,
             ReverseCountDiff,
+            CountDiffPercent,
             AbsCountDiff,
             LeftCountMean,
             RightCountMean,
             CountMeanDiff,
             ReverseCountMeanDiff,
+            CountMeanDiffPercent,
             AbsCountMeanDiff,
             LeftTotal,
             RightTotal,
             TotalDiff,
             ReverseTotalDiff,
+            TotalDiffPercent,
             AbsTotalDiff,
             LeftDepth,
             RightDepth,
@@ -113,24 +121,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.Diff,
             SortOption.RightMedian,
             SortOption.Diff,
+            SortOption.DiffPercent,
             SortOption.AbsDiff,
             SortOption.LeftCount,
             SortOption.ReverseCountDiff,
             SortOption.CountDiff,
             SortOption.RightCount,
             SortOption.CountDiff,
+            SortOption.CountDiffPercent,
             SortOption.AbsCountDiff,
             SortOption.LeftCountMean,
             SortOption.ReverseCountMeanDiff,
             SortOption.CountMeanDiff,
             SortOption.RightCountMean,
             SortOption.CountMeanDiff,
+            SortOption.CountMeanDiffPercent,
             SortOption.AbsCountMeanDiff,
             SortOption.LeftTotal,
             SortOption.ReverseTotalDiff,
             SortOption.TotalDiff,
             SortOption.RightTotal,
             SortOption.TotalDiff,
+            SortOption.TotalDiffPercent,
             SortOption.AbsTotalDiff,
             SortOption.LeftDepth,
             SortOption.RightDepth,
@@ -156,11 +168,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent invalidEntry = new GUIContent("-");
         }
 
-        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileAnalysis left, ProfileAnalysis right, List<MarkerPairing> pairings, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color leftColor, Color rightColor) : base(state, multicolumnHeader)
+        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileDataView left, ProfileDataView right, List<MarkerPairing> pairings, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color leftColor, Color rightColor) : base(state, multicolumnHeader)
         {
             m_2D = draw2D;
-            m_Left = left;
-            m_Right = right;
+            m_LeftDataView = left;
+            m_RightDataView = right;
             m_LeftColor = leftColor;
             m_RightColor = rightColor;
             m_Pairings = pairings;
@@ -232,7 +244,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     countMinDiff = countDiff;
                 if (countDiff > countMaxDiff && countDiff < float.MaxValue)
                     countMaxDiff = countDiff;
-                
+
                 float countMeanDiff = CountMeanDiff(item);
                 if (countMeanDiff < countMeanMinDiff)
                     countMeanMinDiff = countMeanDiff;
@@ -264,7 +276,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return m_Rows;
         }
-
 
         void OnSortingChanged(MultiColumnHeader _multiColumnHeader)
         {
@@ -308,7 +319,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             if (sortedColumns.Length == 0)
             {
-                
                 return;
             }
 
@@ -334,7 +344,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => Diff(l), ascending);
                         break;
                     case SortOption.ReverseDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => -Diff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => - Diff(l), ascending);
+                        break;
+                    case SortOption.DiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => DiffPercent(l), ascending).ThenBy(l => Diff(l), ascending);
                         break;
                     case SortOption.AbsDiff:
                         orderedQuery = orderedQuery.ThenBy(l => AbsDiff(l), ascending);
@@ -349,7 +362,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => CountDiff(l), ascending);
                         break;
                     case SortOption.ReverseCountDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => -CountDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => - CountDiff(l), ascending);
+                        break;
+                    case SortOption.CountDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => CountDiffPercent(l), ascending).ThenBy(l => CountDiff(l), ascending);
                         break;
                     case SortOption.AbsCountDiff:
                         orderedQuery = orderedQuery.ThenBy(l => AbsCountDiff(l), ascending);
@@ -364,7 +380,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => CountMeanDiff(l), ascending);
                         break;
                     case SortOption.ReverseCountMeanDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => -CountMeanDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => - CountMeanDiff(l), ascending);
+                        break;
+                    case SortOption.CountMeanDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => CountMeanDiffPercent(l), ascending).ThenBy(l => CountMeanDiff(l), ascending);
                         break;
                     case SortOption.AbsCountMeanDiff:
                         orderedQuery = orderedQuery.ThenBy(l => AbsCountMeanDiff(l), ascending);
@@ -379,7 +398,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => TotalDiff(l), ascending);
                         break;
                     case SortOption.ReverseTotalDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => -TotalDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => - TotalDiff(l), ascending);
+                        break;
+                    case SortOption.TotalDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => TotalDiffPercent(l), ascending).ThenBy(l => TotalDiff(l), ascending);
                         break;
                     case SortOption.AbsTotalDiff:
                         orderedQuery = orderedQuery.ThenBy(l => AbsTotalDiff(l), ascending);
@@ -410,7 +432,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (item.data.leftIndex < 0)
                 return null;
 
-            List<MarkerData> markers = m_Left.GetMarkers();
+            List<MarkerData> markers = m_LeftDataView.analysis.GetMarkers();
             if (item.data.leftIndex >= markers.Count)
                 return null;
 
@@ -422,7 +444,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (item.data.rightIndex < 0)
                 return null;
 
-            List<MarkerData> markers = m_Right.GetMarkers();
+            List<MarkerData> markers = m_RightDataView.analysis.GetMarkers();
             if (item.data.rightIndex >= markers.Count)
                 return null;
 
@@ -433,6 +455,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return m_ProfileAnalyzerWindow.GetUIThreadName(MarkerData.GetFirstThread(GetLeftMarker(item)));
         }
+
         string RightFirstThread(ComparisonTreeViewItem item)
         {
             return m_ProfileAnalyzerWindow.GetUIThreadName(MarkerData.GetFirstThread(GetRightMarker(item)));
@@ -470,11 +493,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return GetThreadNames(GetLeftMarker(item));
         }
+
         string RightThreads(ComparisonTreeViewItem item)
         {
             return GetThreadNames(GetRightMarker(item));
         }
-
 
         float LeftMedianSorting(ComparisonTreeViewItem item)
         {
@@ -516,54 +539,117 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return RightMedian(item) - LeftMedian(item);
         }
+
+        float DiffPercent(float left, float right)
+        {
+            if (left == 0f)
+                return float.MaxValue;
+            if (right == 0f)
+                return float.MinValue;
+
+            float diff = right - left;
+            return (100f * diff) / left;
+        }
+
+        float DiffPercent(double left, double right)
+        {
+            if (left == 0.0)
+                return float.MaxValue;
+            if (right == 0.0)
+                return float.MinValue;
+
+            double diff = right - left;
+            return (float)((100.0 * diff) / left);
+        }
+
+        float DiffPercent(ComparisonTreeViewItem item)
+        {
+            float right = RightMedian(item);
+            float left = LeftMedian(item);
+            return DiffPercent(left, right);
+        }
+
         float AbsDiff(ComparisonTreeViewItem item)
         {
             return Math.Abs(Diff(item));
         }
+
         float LeftCount(ComparisonTreeViewItem item)
         {
             return MarkerData.GetCount(GetLeftMarker(item));
         }
+
         float RightCount(ComparisonTreeViewItem item)
         {
             return MarkerData.GetCount(GetRightMarker(item));
         }
+
         float CountDiff(ComparisonTreeViewItem item)
         {
             return RightCount(item) - LeftCount(item);
         }
+
+        float CountDiffPercent(ComparisonTreeViewItem item)
+        {
+            float right = RightCount(item);
+            float left = LeftCount(item);
+            return DiffPercent(left, right);
+        }
+
         float AbsCountDiff(ComparisonTreeViewItem item)
         {
             return Math.Abs(CountDiff(item));
         }
+
         float LeftCountMean(ComparisonTreeViewItem item)
         {
             return MarkerData.GetCountMean(GetLeftMarker(item));
         }
+
         float RightCountMean(ComparisonTreeViewItem item)
         {
             return MarkerData.GetCountMean(GetRightMarker(item));
         }
+
         float CountMeanDiff(ComparisonTreeViewItem item)
         {
             return RightCountMean(item) - LeftCountMean(item);
         }
+
+        float CountMeanDiffPercent(ComparisonTreeViewItem item)
+        {
+            float right = RightCountMean(item);
+            float left = LeftCountMean(item);
+            return DiffPercent(left, right);
+        }
+
         float AbsCountMeanDiff(ComparisonTreeViewItem item)
         {
             return Math.Abs(CountMeanDiff(item));
         }
+
         double LeftTotal(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMsTotal(GetLeftMarker(item));
         }
+
         double RightTotal(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMsTotal(GetRightMarker(item));
         }
+
         double TotalDiff(ComparisonTreeViewItem item)
         {
             return RightTotal(item) - LeftTotal(item);
         }
+
+        float TotalDiffPercent(ComparisonTreeViewItem item)
+        {
+            double right = RightTotal(item);
+            double left = LeftTotal(item);
+            return DiffPercent(left, right);
+        }
+
         double AbsTotalDiff(ComparisonTreeViewItem item)
         {
             return Math.Abs(TotalDiff(item));
@@ -573,24 +659,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return MarkerData.GetMinDepth(GetLeftMarker(item));
         }
+
         int RightMinDepth(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMinDepth(GetRightMarker(item));
         }
+
         int LeftMaxDepth(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMaxDepth(GetLeftMarker(item));
         }
+
         int RightMaxDepth(ComparisonTreeViewItem item)
         {
             return MarkerData.GetMaxDepth(GetRightMarker(item));
         }
+
         int DepthDiff(ComparisonTreeViewItem item)
         {
             if (item.data.leftIndex < 0)
                 return int.MaxValue;
             if (item.data.rightIndex < 0)
-                return int.MaxValue-1;
+                return int.MaxValue - 1;
 
             return RightMinDepth(item) - LeftMinDepth(item);
         }
@@ -610,7 +700,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.Diff:
                     return myTypes.Order(l => Diff(l), ascending);
                 case SortOption.ReverseDiff:
-                    return myTypes.Order(l => -Diff(l), ascending);
+                    return myTypes.Order(l => - Diff(l), ascending);
+                case SortOption.DiffPercent:
+                    return myTypes.Order(l => DiffPercent(l), ascending).ThenBy(l => Diff(l), ascending);
                 case SortOption.AbsDiff:
                     return myTypes.Order(l => AbsDiff(l), ascending);
                 case SortOption.LeftCount:
@@ -620,7 +712,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.CountDiff:
                     return myTypes.Order(l => CountDiff(l), ascending);
                 case SortOption.ReverseCountDiff:
-                    return myTypes.Order(l => -CountDiff(l), ascending);
+                    return myTypes.Order(l => - CountDiff(l), ascending);
+                case SortOption.CountDiffPercent:
+                    return myTypes.Order(l => CountDiffPercent(l), ascending).ThenBy(l => CountDiff(l), ascending);
                 case SortOption.AbsCountDiff:
                     return myTypes.Order(l => AbsCountDiff(l), ascending);
                 case SortOption.LeftCountMean:
@@ -630,7 +724,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.CountMeanDiff:
                     return myTypes.Order(l => CountMeanDiff(l), ascending);
                 case SortOption.ReverseCountMeanDiff:
-                    return myTypes.Order(l => -CountMeanDiff(l), ascending);
+                    return myTypes.Order(l => - CountMeanDiff(l), ascending);
+                case SortOption.CountMeanDiffPercent:
+                    return myTypes.Order(l => CountMeanDiffPercent(l), ascending).ThenBy(l => CountMeanDiff(l), ascending);
                 case SortOption.AbsCountMeanDiff:
                     return myTypes.Order(l => AbsCountMeanDiff(l), ascending);
                 case SortOption.LeftTotal:
@@ -640,7 +736,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.TotalDiff:
                     return myTypes.Order(l => TotalDiff(l), ascending);
                 case SortOption.ReverseTotalDiff:
-                    return myTypes.Order(l => -TotalDiff(l), ascending);
+                    return myTypes.Order(l => - TotalDiff(l), ascending);
+                case SortOption.TotalDiffPercent:
+                    return myTypes.Order(l => TotalDiffPercent(l), ascending).ThenBy(l => TotalDiff(l), ascending);
                 case SortOption.AbsTotalDiff:
                     return myTypes.Order(l => AbsTotalDiff(l), ascending);
                 case SortOption.LeftDepth:
@@ -662,9 +760,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return myTypes.Order(l => l.data.name, ascending);
         }
 
+        public bool ShowingHorizontalScroll
+        {
+            get
+            {
+                return showingHorizontalScrollBar;
+            }
+        }
+
         protected override void RowGUI(RowGUIArgs args)
         {
             var item = (ComparisonTreeViewItem)args.item;
+
+            var clipRect = m_2D.GetClipRect();
+            clipRect.y = state.scrollPos.y;
+            clipRect.x = state.scrollPos.x;
+            m_2D.SetClipRect(clipRect);
 
             if (item.cachedRowString == null)
             {
@@ -675,31 +786,37 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 CellGUI(args.GetCellRect(i), item, (MyColumns)args.GetColumn(i), ref args);
             }
+            m_2D.ClearClipRect();
         }
 
         string ToDisplayUnits(float ms, bool showUnits = false, bool showFullValueWhenBelowZero = false)
         {
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0, showFullValueWhenBelowZero);
         }
+
         string ToDisplayUnits(double ms, bool showUnits = false, bool showFullValueWhenBelowZero = false)
         {
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0, showFullValueWhenBelowZero);
         }
 
+        string ToTooltipDisplayUnits(float ms, bool showUnits = false, int onFrame = -1)
+        {
+            return m_ProfileAnalyzerWindow.ToTooltipDisplayUnits(ms, showUnits, onFrame);
+        }
+
+        string ToTooltipDisplayUnits(double ms, bool showUnits = false, int onFrame = -1)
+        {
+            return ToTooltipDisplayUnits((float)ms, showUnits, onFrame);
+        }
+
         GUIContent ToDisplayUnitsWithTooltips(float ms, bool showUnits = false, int onFrame = -1)
         {
-            if (onFrame >= 0)
-                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero), onFrame));
-
-            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero));
+            return m_ProfileAnalyzerWindow.ToDisplayUnitsWithTooltips(ms, showUnits, onFrame);
         }
 
         GUIContent ToDisplayUnitsWithTooltips(double ms, bool showUnits = false, int onFrame = -1)
         {
-            if (onFrame >= 0)
-                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero), onFrame));
-
-            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true, DisplayUnits.kShowFullValueWhenBelowZero));
+            return ToDisplayUnitsWithTooltips((float)ms, showUnits, onFrame);
         }
 
         void CopyToClipboard(Event current, string text)
@@ -707,43 +824,72 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             EditorGUIUtility.systemCopyBuffer = text;
         }
 
+        GenericMenu GenerateActiveContextMenu(string markerName, Event evt, GUIContent content)
+        {
+            GenericMenu menu = new GenericMenu();
+            menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, false));
+            menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, true));
+            if (m_ProfileAnalyzerWindow.AllSelected())
+                menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+            else
+                menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
+
+            menu.AddSeparator("");
+            if (!m_ProfileAnalyzerWindow.GetNameFilters().Contains(markerName, StringComparer.OrdinalIgnoreCase))
+                menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(markerName));
+            else
+                menu.AddItem(Styles.menuItemRemoveFromIncludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromIncludeFilter(markerName));
+            if (!m_ProfileAnalyzerWindow.GetNameExcludes().Contains(markerName, StringComparer.OrdinalIgnoreCase))
+                menu.AddItem(Styles.menuItemAddToExcludeFilter, false, () => m_ProfileAnalyzerWindow.AddToExcludeFilter(markerName));
+            else
+                menu.AddItem(Styles.menuItemRemoveFromExcludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromExcludeFilter(markerName));
+
+            menu.AddSeparator("");
+            menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
+            menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
+            menu.AddSeparator("");
+            if (content != null && !string.IsNullOrEmpty(content.text))
+                menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, content.text));
+
+            return menu;
+        }
+
+        GenericMenu GenerateDisabledContextMenu(string markerName, GUIContent content)
+        {
+            GenericMenu menu = new GenericMenu();
+            menu.AddDisabledItem(Styles.menuItemSelectFramesInAll);
+            menu.AddDisabledItem(Styles.menuItemSelectFramesInCurrent);
+            menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+
+            menu.AddSeparator("");
+            if (!m_ProfileAnalyzerWindow.GetNameFilters().Contains(markerName, StringComparer.OrdinalIgnoreCase))
+                menu.AddDisabledItem(Styles.menuItemAddToIncludeFilter);
+            else
+                menu.AddDisabledItem(Styles.menuItemRemoveFromIncludeFilter);
+            if (!m_ProfileAnalyzerWindow.GetNameExcludes().Contains(markerName, StringComparer.OrdinalIgnoreCase))
+                menu.AddDisabledItem(Styles.menuItemAddToExcludeFilter);
+            else
+                menu.AddDisabledItem(Styles.menuItemRemoveFromExcludeFilter);
+
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemSetAsParentMarkerFilter);
+            menu.AddDisabledItem(Styles.menuItemClearParentMarkerFilter);
+            menu.AddSeparator("");
+            if (content != null && !string.IsNullOrEmpty(content.text))
+                menu.AddDisabledItem(Styles.menuItemCopyToClipboard);
+            return menu;
+        }
+
         void ShowContextMenu(Rect cellRect, string markerName, GUIContent content)
         {
             Event current = Event.current;
             if (cellRect.Contains(current.mousePosition) && current.type == EventType.ContextClick)
             {
-                GenericMenu menu = new GenericMenu();
-
-                menu.AddItem(Styles.menuItemSelectFramesInAll, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, false));
-                menu.AddItem(Styles.menuItemSelectFramesInCurrent, false, () => m_ProfileAnalyzerWindow.SelectFramesContainingMarker(markerName, true));
-                if (m_ProfileAnalyzerWindow.AllSelected())
-                    menu.AddDisabledItem(Styles.menuItemSelectFramesAll);
+                GenericMenu menu;
+                if (!m_ProfileAnalyzerWindow.IsAnalysisRunning())
+                    menu = GenerateActiveContextMenu(markerName, current, content);
                 else
-                    menu.AddItem(Styles.menuItemSelectFramesAll, false, () => m_ProfileAnalyzerWindow.SelectAllFrames());
-
-                /*
-                if (m_ProfileAnalyzerWindow.AllSelected() || m_ProfileAnalyzerWindow.HasSelection())
-                    menu.AddItem(Styles.menuItemClearSelection, false, () => m_ProfileAnalyzerWindow.ClearSelection());
-                else
-                    menu.AddDisabledItem(Styles.menuItemClearSelection);
-                */
-
-                menu.AddSeparator("");
-                if (!m_ProfileAnalyzerWindow.GetNameFilters().Contains(markerName))
-                    menu.AddItem(Styles.menuItemAddToIncludeFilter, false, () => m_ProfileAnalyzerWindow.AddToIncludeFilter(markerName));
-                else
-                    menu.AddItem(Styles.menuItemRemoveFromIncludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromIncludeFilter(markerName));
-                if (!m_ProfileAnalyzerWindow.GetNameExcludes().Contains(markerName))
-                    menu.AddItem(Styles.menuItemAddToExcludeFilter, false, () => m_ProfileAnalyzerWindow.AddToExcludeFilter(markerName));
-                else
-                    menu.AddItem(Styles.menuItemRemoveFromExcludeFilter, false, () => m_ProfileAnalyzerWindow.RemoveFromExcludeFilter(markerName));
-
-                menu.AddSeparator("");
-                menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
-                menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
-                menu.AddSeparator("");
-                if (content != null && !string.IsNullOrEmpty(content.text))
-                    menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(current, content.text));
+                    menu = GenerateDisabledContextMenu(markerName, content);
 
                 menu.ShowAsContext();
 
@@ -763,45 +909,78 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             //ShowText(rect, content.text);
         }
 
+        string PercentString(float percent)
+        {
+            if (percent == float.MinValue)
+                return "-";
+            if (percent == float.MaxValue)
+                return "-";
+
+            return string.Format("{0:+0.##;-0.##;0}%", percent);
+        }
+
+        string DiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(DiffPercent(item));
+        }
+
+        string CountDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(CountDiffPercent(item));
+        }
+
+        string CountMeanDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(CountMeanDiffPercent(item));
+        }
+
+        string TotalDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(TotalDiffPercent(item));
+        }
+
         void GenerateStrings(ComparisonTreeViewItem item)
         {
             item.cachedRowString = new GUIContent[m_MaxColumns];
 
+            int leftMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(LeftMedianFrameIndex(item), m_LeftDataView);
+            int rightMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(RightMedianFrameIndex(item), m_RightDataView);
+
             item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
-            item.cachedRowString[(int)MyColumns.LeftMedian] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(LeftMedian(item), false, LeftMedianFrameIndex(item));
-            item.cachedRowString[(int)MyColumns.RightMedian] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(RightMedian(item), false, RightMedianFrameIndex(item));
-            string tooltip = ToDisplayUnits(Diff(item), true, DisplayUnits.kShowFullValueWhenBelowZero);
-            if (DisplayUnits.kShowFullValueWhenBelowZero)
-                tooltip += string.Format("\n\n{0}\nRounded", ToDisplayUnits(Diff(item), true));
+            item.cachedRowString[(int)MyColumns.LeftMedian] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(LeftMedian(item), false, leftMedianFrameIndex);
+            item.cachedRowString[(int)MyColumns.RightMedian] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(RightMedian(item), false, rightMedianFrameIndex);
+            string tooltip = ToTooltipDisplayUnits(Diff(item), true);
             item.cachedRowString[(int)MyColumns.LeftBar] = Diff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightBar] = Diff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.Diff] = ToDisplayUnitsWithTooltips(Diff(item));
+            item.cachedRowString[(int)MyColumns.DiffPercent] = new GUIContent(DiffPercentString(item), "");
             item.cachedRowString[(int)MyColumns.AbsDiff] = ToDisplayUnitsWithTooltips(AbsDiff(item));
 
             item.cachedRowString[(int)MyColumns.LeftCount] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", LeftCount(item)));
             item.cachedRowString[(int)MyColumns.RightCount] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", RightCount(item)));
             tooltip = string.Format("{0}", CountDiff(item));
-            item.cachedRowString[(int)MyColumns.LeftCountBar] = CountDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("","");
+            item.cachedRowString[(int)MyColumns.LeftCountBar] = CountDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightCountBar] = CountDiff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
-            item.cachedRowString[(int)MyColumns.CountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", CountDiff(item)));
+            item.cachedRowString[(int)MyColumns.CountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", CountDiff(item)), CountDiffPercentString(item));
+            item.cachedRowString[(int)MyColumns.CountDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(CountDiffPercentString(item), "");
             item.cachedRowString[(int)MyColumns.AbsCountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", AbsCountDiff(item)));
-            
+
             item.cachedRowString[(int)MyColumns.LeftCountMean] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", LeftCountMean(item)));
             item.cachedRowString[(int)MyColumns.RightCountMean] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", RightCountMean(item)));
             tooltip = string.Format("{0}", CountMeanDiff(item));
             item.cachedRowString[(int)MyColumns.LeftCountMeanBar] = CountMeanDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightCountMeanBar] = CountMeanDiff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
-            item.cachedRowString[(int)MyColumns.CountMeanDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", CountMeanDiff(item)));
+            item.cachedRowString[(int)MyColumns.CountMeanDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", CountMeanDiff(item)), CountMeanDiffPercentString(item));
+            item.cachedRowString[(int)MyColumns.CountMeanDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(CountMeanDiffPercentString(item), "");
             item.cachedRowString[(int)MyColumns.AbsCountMeanDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", AbsCountMeanDiff(item)));
 
             item.cachedRowString[(int)MyColumns.LeftTotal] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(LeftTotal(item));
             item.cachedRowString[(int)MyColumns.RightTotal] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(RightTotal(item));
-            tooltip = ToDisplayUnits(TotalDiff(item), true, DisplayUnits.kShowFullValueWhenBelowZero);
-            if (DisplayUnits.kShowFullValueWhenBelowZero)
-                tooltip += string.Format("\n\n{0}\nRounded", ToDisplayUnits(TotalDiff(item), true));
+            tooltip = ToTooltipDisplayUnits(TotalDiff(item), true);
             item.cachedRowString[(int)MyColumns.LeftTotalBar] = TotalDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightTotalBar] = TotalDiff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.TotalDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(TotalDiff(item));
+            item.cachedRowString[(int)MyColumns.TotalDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(TotalDiffPercentString(item), "");
             item.cachedRowString[(int)MyColumns.AbsTotalDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(AbsTotalDiff(item));
 
             item.cachedRowString[(int)MyColumns.LeftDepth] = item.data.leftIndex < 0 ? Styles.invalidEntry : (LeftMinDepth(item) == LeftMaxDepth(item)) ? new GUIContent(string.Format("{0}", LeftMinDepth(item)), "") : new GUIContent(string.Format("{0}-{1}", LeftMinDepth(item), LeftMaxDepth(item)), "");
@@ -836,27 +1015,31 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             switch (column)
             {
                 case MyColumns.Name:
-                    {
-                        args.rowRect = cellRect;
-                        //base.RowGUI(args);
-                        ShowText(cellRect, content);
-                    }
-                    break;
+                {
+                    args.rowRect = cellRect;
+                    //base.RowGUI(args);
+                    ShowText(cellRect, content);
+                }
+                break;
                 case MyColumns.LeftMedian:
                 case MyColumns.Diff:
                 case MyColumns.RightMedian:
+                case MyColumns.DiffPercent:
                 case MyColumns.AbsDiff:
                 case MyColumns.LeftCount:
                 case MyColumns.RightCount:
                 case MyColumns.CountDiff:
+                case MyColumns.CountDiffPercent:
                 case MyColumns.AbsCountDiff:
                 case MyColumns.LeftCountMean:
                 case MyColumns.RightCountMean:
                 case MyColumns.CountMeanDiff:
+                case MyColumns.CountMeanDiffPercent:
                 case MyColumns.AbsCountMeanDiff:
                 case MyColumns.LeftTotal:
                 case MyColumns.RightTotal:
                 case MyColumns.TotalDiff:
+                case MyColumns.TotalDiffPercent:
                 case MyColumns.AbsTotalDiff:
                 case MyColumns.LeftDepth:
                 case MyColumns.RightDepth:
@@ -894,7 +1077,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             ShowContextMenu(cellRect, item.data.name, content);
         }
 
-
         // Misc
         //--------
 
@@ -927,34 +1109,38 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             var columnList = new List<MultiColumnHeaderState.Column>();
             HeaderData[] headerData = new HeaderData[]
-            { 
-                new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width : 300, minWidth : 100, autoResize : false, allowToggleVisibility : false, ascending : true),
+            {
+                new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width: 300, minWidth: 100, autoResize: false, allowToggleVisibility: false, ascending: true),
                 new HeaderData("Left Median", "Left median time\n\nCentral marker time over all selected frames"),
-                new HeaderData("<", "Difference if left data set is a larger value", width : 50), 
-                new HeaderData(">", "Difference if right data set is a larger value", width : 50), 
-                new HeaderData("Right Median", "Right median time\n\nCentral marker time over all selected frames"), 
-                new HeaderData("Diff", "Difference between left and right times"), 
-                new HeaderData("Abs Diff", "Absolute difference between left and right times"), 
-                
+                new HeaderData("<", "Difference if left data set is a larger value", width: 50),
+                new HeaderData(">", "Difference if right data set is a larger value", width: 50),
+                new HeaderData("Right Median", "Right median time\n\nCentral marker time over all selected frames"),
+                new HeaderData("Diff", "Difference between left and right times"),
+                new HeaderData("Diff Percent", "Difference between left and right times as percentage of left marker time"),
+                new HeaderData("Abs Diff", "Absolute difference between left and right times"),
+
                 new HeaderData("Count Left", "Left marker count over all selected frames\n\nMultiple can occur per frame"),
-                new HeaderData("< Count", "Count Difference if left data set count is a larger value", width : 50),
-                new HeaderData("> Count", "Count Difference if right data set count is a larger value", width : 50),
+                new HeaderData("< Count", "Count Difference if left data set count is a larger value", width: 50),
+                new HeaderData("> Count", "Count Difference if right data set count is a larger value", width: 50),
                 new HeaderData("Count Right", "Right marker count over all selected frames\n\nMultiple can occur per frame"),
                 new HeaderData("Count Delta", "Difference in marker count"),
+                new HeaderData("Count Delta Percent", "Difference in marker count as percentage of left marker count"),
                 new HeaderData("Abs Count", "Absolute difference in marker count"),
-                
+
                 new HeaderData("Count Left Frame", "Average number of markers per frame in left data set\n\ntotal count / number of non zero frames"),
-                new HeaderData("< Frame Count", "Per frame Count Difference if left data set count is a larger value", width : 50),
-                new HeaderData("> Frame Count", "Per frame Count Difference if right data set count is a larger value", width : 50),
+                new HeaderData("< Frame Count", "Per frame Count Difference if left data set count is a larger value", width: 50),
+                new HeaderData("> Frame Count", "Per frame Count Difference if right data set count is a larger value", width: 50),
                 new HeaderData("Count Right Frame", "Average number of markers per frame in right data set\n\ntotal count / number of non zero frames"),
                 new HeaderData("Count Delta Frame", "Difference in per frame marker count"),
+                new HeaderData("Count Delta Percent Frame", "Difference in per frame marker count as percentage of left count"),
                 new HeaderData("Abs Frame Count", "Absolute difference in per frame marker count"),
-                
+
                 new HeaderData("Total Left", "Left marker total time over all selected frames"),
-                new HeaderData("< Total", "Total Difference if left data set total is a larger value", width : 50),
-                new HeaderData("> Total", "Total Difference if right data set total is a larger value", width : 50),
+                new HeaderData("< Total", "Total Difference if left data set total is a larger value", width: 50),
+                new HeaderData("> Total", "Total Difference if right data set total is a larger value", width: 50),
                 new HeaderData("Total Right", "Right marker total time over all selected frames"),
                 new HeaderData("Total Delta", "Difference in total time over all selected frames"),
+                new HeaderData("Total Delta Percent", "Difference in total time over all selected frames as percentage of left marker total time"),
                 new HeaderData("Abs Total", "Absolute difference in total time over all selected frames"),
 
                 new HeaderData("Depth Left", "Marker depth in marker hierarchy\n\nMay appear at multiple levels"),
@@ -977,7 +1163,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     autoResize = header.autoResize,
                     allowToggleVisibility = header.allowToggleVisibility
                 });
-            };
+            }
+            ;
             var columns = columnList.ToArray();
 
             m_MaxColumns = Enum.GetValues(typeof(MyColumns)).Length;
@@ -1005,7 +1192,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 default:
                 case MarkerColumnFilter.Mode.Custom:
                 case MarkerColumnFilter.Mode.TimeAndCount:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftMedian,
                         (int)MyColumns.LeftBar,
@@ -1019,7 +1207,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.Time:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftMedian,
                         (int)MyColumns.LeftBar,
@@ -1030,7 +1219,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.Totals:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftTotal,
                         (int)MyColumns.LeftTotalBar,
@@ -1041,7 +1231,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.TimeWithTotals:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftMedian,
                         (int)MyColumns.LeftBar,
@@ -1056,7 +1247,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.CountTotals:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftCount,
                         (int)MyColumns.LeftCountBar,
@@ -1067,7 +1259,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.CountPerFrame:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftCountMean,
                         (int)MyColumns.LeftCountMeanBar,
@@ -1078,7 +1271,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.Depth:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftDepth,
                         (int)MyColumns.RightDepth,
@@ -1086,7 +1280,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     };
                     break;
                 case MarkerColumnFilter.Mode.Threads:
-                    visibleColumns = new int[] {
+                    visibleColumns = new int[]
+                    {
                         (int)MyColumns.Name,
                         (int)MyColumns.LeftThreads,
                         (int)MyColumns.RightThreads,
@@ -1096,6 +1291,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return visibleColumns;
         }
+
         static void SetMode(MarkerColumnFilter modeFilter, MultiColumnHeaderState state)
         {
             switch (modeFilter.mode)

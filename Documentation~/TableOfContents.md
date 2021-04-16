@@ -1,4 +1,6 @@
-﻿* [About Profile Analyzer](index.md)
+* [About Profile Analyzer](index.md)
+    * [What's new](whats-new.md)
+    * [Upgrade guide](upgrade-guide.md)
 * [Profile Analyzer window](profile-analyzer-window.md)
     * [Single view](single-view.md)
     * [Compare view](compare-view.md)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -28,7 +28,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public float msMax;             // max total time per frame
         public int minIndividualFrameIndex;
         public int maxIndividualFrameIndex;
-        public float msMinIndividual;   // min individual function call 
+        public float msMinIndividual;   // min individual function call
         public float msMaxIndividual;   // max individual function call
         public float msAtMedian;        // time at median frame
         public int medianFrameIndex;    // frame this markers median value is found on
@@ -68,11 +68,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             msLowerQuartile = 0f;
             msUpperQuartile = 0f;
             msMin = float.MaxValue;
-            msMax = 0f;
+            msMax = float.MinValue;
             minIndividualFrameIndex = 0;
             maxIndividualFrameIndex = 0;
             msMinIndividual = float.MaxValue;
-            msMaxIndividual = 0f;
+            msMaxIndividual = float.MinValue;
             msAtMedian = 0f;
             medianFrameIndex = 0;
             minFrameIndex = 0;
@@ -153,7 +153,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 buckets[bucketIndex] += 1;
             }
 
-            if (range==0)
+            if (range == 0)
             {
                 // All buckets will be the same
                 for (int bucketIndex = 1; bucketIndex < buckets.Length; bucketIndex++)
@@ -162,7 +162,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
             }
         }
-        
+
         public void ComputeCountBuckets(int min, int max)
         {
             float first = min;
@@ -276,17 +276,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return marker != null ? marker.countMin : 0;
         }
-        
+
         public static int GetCountMax(MarkerData marker)
         {
             return marker != null ? marker.countMax : 0;
         }
-        
+
         public static int GetCount(MarkerData marker)
         {
             return marker != null ? marker.count : 0;
         }
-        
+
         public static float GetCountMean(MarkerData marker)
         {
             return marker != null ? marker.countMean : 0.0f;
@@ -296,10 +296,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return marker != null ? marker.msTotal : 0.0;
         }
+
         public static int GetMinDepth(MarkerData marker)
         {
             return marker != null ? marker.minDepth : 0;
         }
+
         public static int GetMaxDepth(MarkerData marker)
         {
             return marker != null ? marker.maxDepth : 0;

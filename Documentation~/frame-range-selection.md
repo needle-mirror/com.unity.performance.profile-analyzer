@@ -45,6 +45,7 @@ You can control the selection of data in both the **Single** and **Compare** vie
 |**Period (.)**| Extend the end of the selection by one frame.|
 |**Alt+Period**<br/>**(&#8997; + Period on macOS)**|Reduce the end of the selection by one frame.|
 |**Shift+Period**|Extend the end of the selection by 10 frames.|
+|**1**<br/>**2**<br/>*Compare view only*|In **Compare** view, with **Pair Graph Selection** disabled, use the 1 or 2 key on your keyboard to switch between frames. 1 selects the top data, and 2 selects the bottom data. |
 
 ### Context menu commands
 

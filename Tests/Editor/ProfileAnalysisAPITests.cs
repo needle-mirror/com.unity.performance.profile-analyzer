@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 using UnityEngine;
 
@@ -57,7 +57,8 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         Assert.IsTrue(marker.minIndividualFrameIndex == 0);
         Assert.IsTrue(marker.msAtMedian == 0);
         Assert.IsTrue(marker.msMean == 0);
-        Assert.IsTrue(marker.msMaxIndividual == 0);
+        Assert.IsTrue(marker.msMinIndividual == float.MaxValue);
+        Assert.IsTrue(marker.msMaxIndividual == float.MinValue);
         Assert.IsTrue(marker.msMin == 0);
         Assert.IsTrue(marker.msTotal == 0);
         Assert.IsTrue(marker.name == "Test Marker");
@@ -83,7 +84,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         for (int i = 0; i <= range; ++i)
         {
             float value = ((float)i / (float)range);
-            if (i!=0 && i!=range)
+            if (i != 0 && i != range)
                 value += offset;
             var frameTime = new FrameTime(i, value, 1);
             marker.frames.Add(frameTime);
@@ -132,7 +133,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 
         var summary = analysis.GetFrameSummary();
 
-        for (int i = 0; i < summary.buckets.Length ; ++i)
+        for (int i = 0; i < summary.buckets.Length; ++i)
         {
             Assert.IsTrue(1 == summary.buckets[i]);
         }

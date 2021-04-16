@@ -1,4 +1,4 @@
-﻿namespace UnityEditor.Performance.ProfileAnalyzer
+namespace UnityEditor.Performance.ProfileAnalyzer
 {
     internal class TimingOptions
     {
@@ -8,7 +8,7 @@
             Self,
         };
 
-        public static string[] TimingOptionNames = 
+        public static string[] TimingOptionNames =
         {
             "Total",
             "Self",

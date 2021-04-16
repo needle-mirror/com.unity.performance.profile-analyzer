@@ -1,8 +1,58 @@
-﻿# Changelog
+# Changelog
 All notable changes to this package will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+
+## [1.1.0-pre.2] - 2021-04-16
+
+### Changed
+
+* Ensured forward compilation compatibility of ProfilerWindow API usage.
+
+## Fixes
+
+* Fixed Frame View Dropdown not showing time in Microseconds when Microseconds are set as display unit type.
+* Fixed ArgurmentOutOfRange exception on 'Clear Selection' usage in Frame Control.
+* Improved loading and analysis progressbar progression to be monotonously incremental and reflect actual stage correctly.
+* Fixed the marked frame time overlay so that it works on loaded data (case 1327888).
+* Fixed keyboard frame controls so that they do not play an error sound (case 1327931).
+* Fixed RangeSettings.IsEqual so that it doesn't throw an exception when there is a different dataView.selectedIndices.
+
+## [1.1.0-pre.1] - 2021-02-22
+
+### Changed
+
+* Used the new `EditorWindow.docked` API on 2020.1 and later to replace reflection usage.  
+* Made the **Thread Selection** window a utility window.
+* Added a progress bar, which shows data loading progress.
+* **All** no longer collapses in the thread view because it was superfluous and held no discernible purpose.
+* Added information to the frame summary tooltip to show the selected ranges.
+* Selecting the **Frame**, **Thread**, and **Marker Summary** title labels now also toggles their foldout.
+* Timings in tooltips now display up to seven digits with a unit type change if below 0.01. This ensures the value is readable and correct.
+* Frame Time Graph selection modifiers (Next, Previous, Grow, Shrink etc.) now work when multiple regions are selected.
+* Added new (hidden) columns to the comparison tab for **Percentage Diff** for each of the diff types
+* The **Depth Slice** drop-down is searchable and scrollable for Unity versions 2019.1 or newer.
+* Improved tooltips on the top 10 marker duration time.
+
+### Fixes
+
+* The Thread Summary and Marker Summary views now correctly clip their contents when scrolling on 2018.4 and below.
+* Marker detail bars are no longer drawn on top of the list's headers when scrolling.
+* Fixed an issue with saving when there is no data loaded, which previously caused a null reference exception.
+* **Add to** and **Remove from** name filter is no longer case sensitive.
+* Optimized frame selection with **Show Filtered Threads** option enabled and **All Threads** turned on.
+* Fixed an issue where the **Upper Quartile of frame time** option did not fit in the Graph scale dropdown in **Thread Summary**.
+* Improved the error message when the Profile Analyzer fails to load a .data file.
+* Fixed an issue where changing the depth slice and right-clicking on a marker caused an error in 2018.4 and earlier.
+* Fixed the automatic increase of an unsaved file counter in Single view.
+* Improved the Marker Column mode so that it is separate for Single and Compare view.
+* The tooltip of the frame graph's scale control is now clearer and matches the documentation.
+* Fixed an issue where a frame of '0' was incorrectly shown in the **Marker Summary** when the marker had a duration of 0ms.
+* Fixed an issue with **Selection Synchronization** between Profiler Window and Profile Analyzer in Unity 2021.1 or newer.
+* Added a log message when the loading or analysis fails due to domain reload.
+* Fixed an issue with the table context menu, where it was not disabled during data processing.
+* Fixed an issue where exporting a marker table that contained markers with commas or quotation marks to the .csv format would break the format.
 
 ## [1.0.3] - 2020-07-31
 
@@ -37,9 +87,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changes
 * Export window updates. Includes tooltips, better on screen positioning. 
-	* If opened and then new data set loaded. New data set now correctly exported.
+  * If opened and then new data set loaded. New data set now correctly exported.
 * Frame Time graph now shows border when selected
-	* Keys 1 and 2 select the first or second frame time graph to take keyboard focus
+  * Keys 1 and 2 select the first or second frame time graph to take keyboard focus
 * Frame Time graph now shows highlighted when all frames selected, un highlighted when no frames selected.
 
 ### Fixes
@@ -52,17 +102,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changes
 * Thread selection window 
-	* Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
-	* Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
-	* Apply button is now greyed out while analysis is running.
-	* Group column enabled and used to split off group from thread name, default to by group first
-	* Re sorted when selection changed (so states sort correctly when sorting by state)
-	* Sort order preserved when buttons pressed and re-opening
-	* Fixed sort order for threads (10 after 9 rather than between 1 and 2)
+  * Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
+  * Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
+  * Apply button is now greyed out while analysis is running.
+  * Group column enabled and used to split off group from thread name, default to by group first
+  * Re sorted when selection changed (so states sort correctly when sorting by state)
+  * Sort order preserved when buttons pressed and re-opening
+  * Fixed sort order for threads (10 after 9 rather than between 1 and 2)
 * Marker sorting
-	* Marker table column filtering now preserved when clicking Analyse or Compare or tab switching.
-	* Compare table bars to now sort by bar size (=delta value) rather than the left/right value.
-	* Marker table bars now start sorted by descending size which is more common usage.
+  * Marker table column filtering now preserved when clicking Analyse or Compare or tab switching.
+  * Compare table bars to now sort by bar size (=delta value) rather than the left/right value.
+  * Marker table bars now start sorted by descending size which is more common usage.
 * Added depths columns into the comparison table and a 'Depth' option in the Marker Columns dropdown
 * Added thread count into thread summary area
 * Added threads column into marker tables (threads the marker occurs on)

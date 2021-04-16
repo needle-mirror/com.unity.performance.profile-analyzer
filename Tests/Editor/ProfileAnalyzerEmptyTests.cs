@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using System.Collections.Generic;
 
 public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
@@ -17,10 +17,10 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
     [Test]
     public void ProfileAnalyzer_EmptyData_IsEmpty()
     {
-        var analyzer = m_setupData.analyzer;
-        var profileData = m_setupData.profilerWindowInterface.PullFromProfiler(0, 300);
-        var depthFilter = m_setupData.depthFilter;
-        var threadFilters = m_setupData.threadFilters;
+        var analyzer = m_SetupData.analyzer;
+        var profileData = m_SetupData.profilerWindowInterface.PullFromProfiler(0, 300);
+        var depthFilter = m_SetupData.depthFilter;
+        var threadFilters = m_SetupData.threadFilters;
 
         int firstFrameIndex = profileData.OffsetToDisplayFrame(0);
         int lastFrameIndex  = profileData.OffsetToDisplayFrame(profileData.GetFrameCount() - 1);

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -27,7 +27,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (n < 0 || n >= m_ColumnWidth.Length)
                 return 0;
-            
+
             return m_ColumnWidth[n];
         }
 
@@ -35,7 +35,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (n < 0 || n >= m_ColumnWidth.Length || m_ColumnWidth[n] <= 0)
                 EditorGUILayout.LabelField(col);
-            
+
             EditorGUILayout.LabelField(col, GUILayout.Width(m_ColumnWidth[n]));
         }
 
@@ -107,7 +107,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Draw(3, value4);
             EditorGUILayout.EndHorizontal();
         }
-
 
         // GUIContent versions
         public void Draw(int n, GUIContent col)

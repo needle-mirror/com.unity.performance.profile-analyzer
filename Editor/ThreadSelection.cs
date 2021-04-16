@@ -1,11 +1,21 @@
-﻿using System.Collections.Generic;
+using System;
+using System.Collections.Generic;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [Serializable]
     internal class ThreadSelection
     {
         public List<string> groups;
         public List<string> selection;
+
+        public bool empty
+        {
+            get
+            {
+                return groups == null || selection == null || groups.Count == 0 && selection.Count == 0;
+            }
+        }
 
         public ThreadSelection()
         {
@@ -26,7 +36,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             groups.Clear();
             selection.Clear();
 
-            ThreadIdentifier allThreadSelection = new ThreadIdentifier("All",ThreadIdentifier.kAll);
+            ThreadIdentifier allThreadSelection = new ThreadIdentifier("All", ThreadIdentifier.kAll);
             groups.Add(allThreadSelection.threadNameWithIndex);
         }
 
@@ -42,7 +52,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             groups.Clear();
             selection.Clear();
 
-            ThreadIdentifier allThreadSelection = new ThreadIdentifier(groupName,ThreadIdentifier.kAll);
+            ThreadIdentifier allThreadSelection = new ThreadIdentifier(groupName, ThreadIdentifier.kAll);
             groups.Add(allThreadSelection.threadNameWithIndex);
         }
 

@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.IO;
 using System;
 using System.Collections.Generic;
@@ -82,11 +82,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             multicolumnHeader.sortingChanged += OnSortingChanged;
             multicolumnHeader.visibleColumnsChanged += OnVisibleColumnsChanged;
 
-            m_ThreadNames = threadNames; 
+            m_ThreadNames = threadNames;
             m_ThreadUINames = threadUINames;
             m_ThreadSelection = new ThreadSelection(threadSelection);
+#if UNITY_2018_3_OR_NEWER
+            this.foldoutOverride += DoFoldout;
+#endif
             Reload();
         }
+
+#if UNITY_2018_3_OR_NEWER
+        bool DoFoldout(Rect position, bool expandedstate, GUIStyle style)
+        {
+            return !(position.y < rowHeight) && GUI.Toggle(position, expandedstate, GUIContent.none, style);
+        }
+
+#endif
 
         public void ClearThreadSelection()
         {
@@ -218,7 +229,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
 
                 node.AddChild(item);
-                
+
 
                 if (threadIdentifier.name != lastThreadName)
                 {
@@ -228,14 +239,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     depth = 1;
                 }
             }
-            
+
             SetExpanded(expandList);
-            
+
             SetupDepthsFromParentsAndChildren(root);
 
             return root;
         }
-        
+
         void BuildRowRecursive(IList<TreeViewItem> rows, TreeViewItem item)
         {
             //if (item.children == null)
@@ -248,7 +259,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 rows.Add(subNode);
 
-                if (subNode.children!=null)
+                if (subNode.children != null)
                     BuildRowRecursive(rows, subNode);
             }
         }
@@ -303,7 +314,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             SortByMultipleColumns();
-            
+
             BuildAllRows(rows, rootItem);
 
             Repaint();
@@ -356,7 +367,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             rootItem.children = SortChildrenByMultipleColumns(rootItem.children);
 
             // Sort all the next level children too (As 'All' is the only item at the top)
-            for (int i=0; i<rootItem.children.Count; i++)
+            for (int i = 0; i < rootItem.children.Count; i++)
             {
                 var child = rootItem.children[0];
                 child.children = SortChildrenByMultipleColumns(child.children);
@@ -391,7 +402,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             for (int i = 0; i < args.GetNumVisibleColumns(); ++i)
             {
                 CellGUI(args.GetCellRect(i), item, (MyColumns)args.GetColumn(i), ref args);
-            } 
+            }
         }
 
         string GetStateSort(ThreadTreeViewItem item)
@@ -402,7 +413,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return sortString;
         }
-
 
         ThreadSelected GetThreadSelectedState(ThreadIdentifier selectedThreadIdentifier)
         {
@@ -446,7 +456,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     var threadIdentifier = new ThreadIdentifier(threadNameWithIndex);
                     if (threadIdentifier.index == ThreadIdentifier.kAll || threadIdentifier.index == ThreadIdentifier.kSingle)
                         continue;
-                    
+
                     if (selectedThreadIdentifier.name != threadIdentifier.name)
                         continue;
 
@@ -557,49 +567,49 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             switch (column)
             {
                 case MyColumns.ThreadName:
+                {
+                    args.rowRect = cellRect;
+                    // base.RowGUI(args);    // Required to show tree indenting
+
+                    // Draw manually to keep indenting while add a tooltip
+                    Rect rect = cellRect;
+                    if (Event.current.rawType == EventType.Repaint)
                     {
-                        args.rowRect = cellRect;
-                        // base.RowGUI(args);    // Required to show tree indenting
+                        string text;
+                        string tooltip;
+                        GetThreadTreeViewItemInfo(item, out text, out tooltip);
+                        var content = new GUIContent(text, tooltip);
 
-                        // Draw manually to keep indenting while add a tooltip
-                        Rect rect = cellRect;
-                        if (Event.current.rawType == EventType.Repaint)
+                        if (activeLineStyle == null)
                         {
-                            string text;
-                            string tooltip;
-                            GetThreadTreeViewItemInfo(item, out text, out tooltip);
-                            var content = new GUIContent(text, tooltip);
-
-                            if (activeLineStyle == null)
-                            {
-                                // activeLineStyle = DefaultStyles.boldLabel;
-                                activeLineStyle = new GUIStyle(DefaultStyles.label);
-                                activeLineStyle.normal.textColor = DefaultStyles.boldLabel.onActive.textColor;
-                            }
-
-                            // rect = DrawIndent(rect, item, ref args);
-
-                            //bool mouseOver = rect.Contains(Event.current.mousePosition);
-                            //DefaultStyles.label.Draw(rect, content, mouseOver, false, args.selected, args.focused);
-
-                            // Must use this call to draw tooltip
-                            EditorGUI.LabelField(rect, content, args.selected ? activeLineStyle : DefaultStyles.label);
+                            // activeLineStyle = DefaultStyles.boldLabel;
+                            activeLineStyle = new GUIStyle(DefaultStyles.label);
+                            activeLineStyle.normal.textColor = DefaultStyles.boldLabel.onActive.textColor;
                         }
+
+                        // rect = DrawIndent(rect, item, ref args);
+
+                        //bool mouseOver = rect.Contains(Event.current.mousePosition);
+                        //DefaultStyles.label.Draw(rect, content, mouseOver, false, args.selected, args.focused);
+
+                        // Must use this call to draw tooltip
+                        EditorGUI.LabelField(rect, content, args.selected ? activeLineStyle : DefaultStyles.label);
                     }
-                    break;
+                }
+                break;
                 case MyColumns.GroupName:
+                {
+                    Rect rect = cellRect;
+                    if (Event.current.rawType == EventType.Repaint)
                     {
-                        Rect rect = cellRect;
-                        if (Event.current.rawType == EventType.Repaint)
-                        {
-                            rect = DrawIndent(rect, item, ref args);
+                        rect = DrawIndent(rect, item, ref args);
 
-                            string groupName = GetItemGroupName(item);
-                            var content = new GUIContent(groupName, groupName);
-                            EditorGUI.LabelField(rect, content);
-                        }
+                        string groupName = GetItemGroupName(item);
+                        var content = new GUIContent(groupName, groupName);
+                        EditorGUI.LabelField(rect, content);
                     }
-                    break;
+                }
+                break;
                 case MyColumns.State:
                     bool oldState = GetThreadSelectedState(item.threadIdentifier) == ThreadSelected.Selected;
                     bool newState = EditorGUI.Toggle(cellRect, oldState);
@@ -708,7 +718,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-
         // Misc
         //--------
 
@@ -757,17 +766,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     autoResize = header.autoResize,
                     allowToggleVisibility = header.allowToggleVisibility
                 });
-            };
+            }
+            ;
             var columns = columnList.ToArray();
 
             Assert.AreEqual(columns.Length, Enum.GetValues(typeof(MyColumns)).Length, "Number of columns should match number of enum values: You probably forgot to update one of them.");
 
             var state = new MultiColumnHeaderState(columns);
-            state.visibleColumns = new int[] {
-                        (int)MyColumns.GroupName,
-                        (int)MyColumns.ThreadName,
-                        (int)MyColumns.State,
-                    };
+            state.visibleColumns = new int[]
+            {
+                (int)MyColumns.GroupName,
+                (int)MyColumns.ThreadName,
+                (int)MyColumns.State,
+            };
             return state;
         }
 
@@ -807,16 +818,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static public bool IsOpen()
         {
+            #if UNITY_2019_3_OR_NEWER
+            return HasOpenInstances<ThreadSelectionWindow>();
+            #else
             UnityEngine.Object[] windows = Resources.FindObjectsOfTypeAll(typeof(ThreadSelectionWindow));
             if (windows != null && windows.Length > 0)
                 return true;
 
             return false;
+            #endif // UNITY_2019_3_OR_NEWER
         }
 
         static public ThreadSelectionWindow Open(float screenX, float screenY, ProfileAnalyzerWindow profileAnalyzerWindow, ThreadSelection threadSelection, List<string> threadNames, List<string> threadUINames)
         {
-            ThreadSelectionWindow window = GetWindow<ThreadSelectionWindow>("Threads");
+            ThreadSelectionWindow window = GetWindow<ThreadSelectionWindow>(true, "Threads");
             window.minSize = new Vector2(380, 200);
             window.position = new Rect(screenX, screenY, 500, 500);
             window.SetData(profileAnalyzerWindow, threadSelection, threadNames, threadUINames);
@@ -825,16 +840,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return window;
         }
 
-        static public void CloseAll()
+        void OnEnable()
         {
-            ThreadSelectionWindow window = GetWindow<ThreadSelectionWindow>("Threads");
-            window.Close();
+            m_RequestClose = false;
         }
-		
-		void OnEnable()
-		{
-			m_RequestClose = false;
-		}
 
         void CreateTable(ProfileAnalyzerWindow profileAnalyzerWindow, List<string> threadNames, List<string> threadUINames, ThreadSelection threadSelection)
         {
@@ -934,23 +943,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             EditorGUILayout.EndVertical();
-		}			
-		
-		void Update()
-		{
-            if (m_ThreadTable!=null && m_ThreadTable.StateChanged)
+        }
+
+        void Update()
+        {
+            if (m_ThreadTable != null && m_ThreadTable.StateChanged)
             {
                 m_EnableApplyButton = true;
                 m_EnableResetButton = true;
             }
 
             if (m_RequestClose)
-				Close();
+                Close();
         }
 
         void OnLostFocus()
         {
-			m_RequestClose = true;
+            m_RequestClose = true;
         }
     }
 }

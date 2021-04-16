@@ -1,4 +1,4 @@
-﻿using NUnit.Framework;
+using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 using System.Collections.Generic;
 

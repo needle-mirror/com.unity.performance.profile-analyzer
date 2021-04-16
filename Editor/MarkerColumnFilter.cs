@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine.Assertions;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -30,7 +30,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             "Threads",
             "Custom",
         };
-        public static readonly int[] ModeValues = (int[]) Enum.GetValues(typeof(Mode));
+        public static readonly int[] ModeValues = (int[])Enum.GetValues(typeof(Mode));
 
         public Mode mode;
         public int[] visibleColumns;

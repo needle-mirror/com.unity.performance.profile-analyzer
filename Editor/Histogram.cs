@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -7,16 +7,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Draw2D m_2D;
         Color m_ColorBarBackground;
         DisplayUnits m_Units;
-
-        string DisplayUnits()
-        {
-            return m_Units.Postfix();
-        }
-
-        string ToDisplayUnits(float ms, bool showUnits = false, int limitToNDigits = 5, bool showFullValueWhenBelowZero = false)
-        {
-            return m_Units.ToString(ms, showUnits, limitToNDigits, showFullValueWhenBelowZero);
-        }
 
         public void SetUnits(Units units)
         {
@@ -54,8 +44,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             GUIStyle rightAlignStyle = new GUIStyle(GUI.skin.label);
             rightAlignStyle.contentOffset = new Vector2(-5, 0);
             rightAlignStyle.alignment = TextAnchor.MiddleRight;
-            EditorGUILayout.LabelField(ToDisplayUnits(min), leftAlignStyle, GUILayout.Width(halfWidth));
-            EditorGUILayout.LabelField(ToDisplayUnits(max), rightAlignStyle, GUILayout.Width(halfWidth));
+            EditorGUILayout.LabelField(m_Units.ToString(min, false, 5, true), leftAlignStyle, GUILayout.Width(halfWidth));
+            EditorGUILayout.LabelField(m_Units.ToString(max, false, 5, true), rightAlignStyle, GUILayout.Width(halfWidth));
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
@@ -107,12 +97,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float bucketEnd = bucketStart + bucketWidth;
 
                 var tooltip = string.Format("{0}-{1}\n{2} {3}\n\nBar width: {4}",
-                        ToDisplayUnits(bucketStart),
-                        ToDisplayUnits(bucketEnd, true),
-                        count,
-                        count == 1 ? "frame" : "frames",
-                        ToDisplayUnits(bucketWidth, true, 5, true)
-                        );
+                    m_Units.ToTooltipString(bucketStart, false),
+                    m_Units.ToTooltipString(bucketEnd, true),
+                    count,
+                    count == 1 ? "frame" : "frames",
+                    m_Units.ToTooltipString(bucketWidth, true)
+                );
 
                 var content = new GUIContent("", tooltip);
                 GUI.Label(new Rect(rect.x + x, rect.y + y, w, h), content);

@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
-    internal class ThreadFrameTime : IComparable<ThreadFrameTime>
+    internal struct ThreadFrameTime : IComparable<ThreadFrameTime>
     {
         public int frameIndex;
         public float ms;

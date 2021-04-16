@@ -12,7 +12,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent frameCounts = new GUIContent(" by frame counts", "Contains marker count within the frame");
         }
 
-        public delegate float DrawFrameIndexButton(int index);
+        public delegate float DrawFrameIndexButton(int frameIndex, ProfileDataView frameContext);
 
         DrawFrameIndexButton m_DrawFrameIndexButton;
         Draw2D m_2D;
@@ -23,10 +23,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int m_WidthColumn3;
         Color colorBar;
         Color colorBarBackground;
-        
-        public TopMarkerList(Draw2D draw2D, Units units, 
-            int widthColumn0, int widthColumn1, int widthColumn2, int widthColumn3,
-            Color colorBar, Color colorBarBackground, DrawFrameIndexButton drawFrameIndexButton)
+
+        public TopMarkerList(Draw2D draw2D, Units units,
+                             int widthColumn0, int widthColumn1, int widthColumn2, int widthColumn3,
+                             Color colorBar, Color colorBarBackground, DrawFrameIndexButton drawFrameIndexButton)
         {
             m_2D = draw2D;
             SetUnits(units);
@@ -34,35 +34,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_WidthColumn1 = widthColumn1;
             m_WidthColumn2 = widthColumn2;
             m_WidthColumn3 = widthColumn3;
-            this.colorBar= colorBar;
+            this.colorBar = colorBar;
             this.colorBarBackground = colorBarBackground;
             m_DrawFrameIndexButton = drawFrameIndexButton;
         }
-        
+
         void SetUnits(Units units)
         {
             m_Units = new DisplayUnits(units);
         }
-        
-        string ToDisplayUnits(float ms, bool showUnits = false, int limitToDigits = 5)
-        {
-            return m_Units.ToString(ms, showUnits, limitToDigits);
-        }
-        
-        GUIContent ToDisplayUnitsWithTooltips(float ms, bool showUnits = false, int frameIndex = -1)
-        {
-            if (frameIndex>=0)
-                return new GUIContent(ToDisplayUnits(ms, showUnits), string.Format("{0} on frame {1}", ToDisplayUnits(ms, true, 0), frameIndex));
 
-            return new GUIContent(ToDisplayUnits(ms, showUnits), ToDisplayUnits(ms, true, 0));
-        }
-        
         public int DrawTopNumber(int topNumber, string[] topStrings, int[] topValues)
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Top ", GUILayout.Width(30));
             topNumber = EditorGUILayout.IntPopup(topNumber, topStrings, topValues, GUILayout.Width(40));
-            EditorGUILayout.LabelField(m_Units.Units==Units.Count ? Styles.frameCounts : Styles.frameCosts, GUILayout.Width(100));
+            EditorGUILayout.LabelField(m_Units.Units == Units.Count ? Styles.frameCounts : Styles.frameCosts, GUILayout.Width(100));
             EditorGUILayout.EndHorizontal();
 
             return topNumber;
@@ -103,7 +90,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return showCount ? GetTopNByCount(marker, n) : GetTopNByTime(marker, n);
         }
 
-        public int Draw(MarkerData marker, int topNumber, string[] topStrings, int[] topValues)
+        public int Draw(MarkerData marker, ProfileDataView markerContext, int topNumber, string[] topStrings, int[] topValues)
         {
             GUIStyle style = GUI.skin.label;
             float w = m_WidthColumn0;
@@ -148,23 +135,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     m_2D.DrawEnd();
 
                     Rect rect = GUILayoutUtility.GetLastRect();
-                    GUI.Label(rect, new GUIContent("", m_Units.ToString(barValue, true, 5)));
+                    GUI.Label(rect, new GUIContent("", m_Units.ToTooltipString(barValue, true)));
                 }
-                EditorGUILayout.LabelField(ToDisplayUnitsWithTooltips(barValue,true), GUILayout.Width(m_WidthColumn2));
-                if (m_DrawFrameIndexButton!=null)
-                    m_DrawFrameIndexButton(frameTime.frameIndex);
+                EditorGUILayout.LabelField(m_Units.ToGUIContentWithTooltips(barValue, true), GUILayout.Width(m_WidthColumn2));
+                if (m_DrawFrameIndexButton != null)
+                    m_DrawFrameIndexButton(frameTime.frameIndex, markerContext);
                 GUILayout.FlexibleSpace();
                 EditorGUILayout.EndHorizontal();
             }
 
             // Show blank space for missing frames
-            var content = new GUIContent("","");
+            var content = new GUIContent("", "");
             Vector2 size = GUI.skin.button.CalcSize(content);
             h = Math.Max(barHeight, size.y);
-            for (int i = frames.Count; i<topNumber; i++)
+            for (int i = frames.Count; i < topNumber; i++)
             {
                 EditorGUILayout.BeginHorizontal();
-                GUILayout.Label("",GUILayout.Height(h));
+                GUILayout.Label("", GUILayout.Height(h));
                 EditorGUILayout.EndHorizontal();
             }
 
