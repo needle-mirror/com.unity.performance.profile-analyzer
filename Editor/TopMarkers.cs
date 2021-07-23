@@ -644,9 +644,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return;
 
             ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
-            int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
-            List<string> nameFilters = m_CurrentSettings.rangeSettings.nameFilters;
-            List<string> nameExcludes = m_CurrentSettings.rangeSettings.nameExcludes;
             
             FrameSummary frameSummary = analysis.GetFrameSummary();
             if (frameSummary == null)

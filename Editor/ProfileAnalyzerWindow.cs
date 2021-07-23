@@ -1767,8 +1767,7 @@ To compare two data sets:
                         break;
 
                     case ThreadActivity.Load:
-                        ProfileData.Load(m_Path, out m_ProfilerData);
-                        m_ThreadActivity = ThreadActivity.LoadDone;
+                        m_ThreadActivity = ProfileData.Load(m_Path, out m_ProfilerData) ? ThreadActivity.LoadDone : ThreadActivity.None;
                         break;
 
                     case ThreadActivity.LoadDone:
@@ -2556,7 +2555,15 @@ To compare two data sets:
             if (context.inSyncWithProfilerData)
                 return RemapFrameIndex(context.data.OffsetToDisplayFrame(0), context.data.FrameIndexOffset);
             else
-                return context.data.FrameIndexOffset;
+                return context.data.OffsetToDisplayFrame(0);
+        }
+
+        int GetRemappedUIFirstFrameDisplayOffset(ProfileDataView context)
+        {
+            if (context.inSyncWithProfilerData)
+                return RemapFrameIndex(context.data.OffsetToDisplayFrame(0), context.data.FrameIndexOffset);
+            else
+                return k_ProfileDataDefaultDisplayOffset;
         }
 
         static readonly ProfilerMarkerAbstracted m_DrawFrameTimeGraphProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.DrawFrameTimeGraph");
@@ -2583,10 +2590,11 @@ To compare two data sets:
                     }
 
                     float yRange = m_FrameTimeGraph.GetDataRange();
-                    int displayOffset = GetRemappedUIFirstFrameOffset(m_ProfileSingleView);
+                    int offsetToDisplayMapping = GetRemappedUIFirstFrameDisplayOffset(m_ProfileSingleView);
+                    int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileSingleView);
                     bool enabled = !IsAnalysisRunning();
                     m_FrameTimeGraph.SetEnabled(enabled);
-                    m_FrameTimeGraph.Draw(rect, m_ProfileSingleView.analysis, selectedOffsets, yRange, displayOffset,
+                    m_FrameTimeGraph.Draw(rect, m_ProfileSingleView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping,
                         m_SelectedMarker.name, 0, m_ProfileSingleView.analysisFull);
 
                     EditorGUILayout.BeginHorizontal();
@@ -3632,9 +3640,11 @@ To compare two data sets:
                     selectedOffsets.Add(m_ProfileLeftView.data.DisplayFrameToOffset(index));
                 }
 
-                int displayOffset = GetRemappedUIFirstFrameOffset(m_ProfileLeftView);
+                int offsetToDisplayMapping = GetRemappedUIFirstFrameDisplayOffset(m_ProfileLeftView);
+                int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileLeftView);
+
                 m_LeftFrameTimeGraph.SetEnabled(enabled);
-                m_LeftFrameTimeGraph.Draw(rect, m_ProfileLeftView.analysis, selectedOffsets, yRange, displayOffset, m_SelectedMarker.name, maxFrames, m_ProfileLeftView.analysisFull);
+                m_LeftFrameTimeGraph.Draw(rect, m_ProfileLeftView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, m_SelectedMarker.name, maxFrames, m_ProfileLeftView.analysisFull);
             }
             else
             {
@@ -3656,9 +3666,11 @@ To compare two data sets:
                     selectedOffsets.Add(m_ProfileRightView.data.DisplayFrameToOffset(index));
                 }
 
-                int displayOffset = GetRemappedUIFirstFrameOffset(m_ProfileRightView);
+                int offsetToDisplayMapping = GetRemappedUIFirstFrameDisplayOffset(m_ProfileRightView);
+                int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileRightView);
+
                 m_RightFrameTimeGraph.SetEnabled(enabled);
-                m_RightFrameTimeGraph.Draw(rect, m_ProfileRightView.analysis, selectedOffsets, yRange, displayOffset, m_SelectedMarker.name, maxFrames, m_ProfileRightView.analysisFull);
+                m_RightFrameTimeGraph.Draw(rect, m_ProfileRightView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, m_SelectedMarker.name, maxFrames, m_ProfileRightView.analysisFull);
             }
             else
             {
@@ -4604,11 +4616,12 @@ To compare two data sets:
 
         void UpdateSelectedMarkerName(string markerName)
         {
+            m_SelectedMarker.name = markerName;
+
             // only update the Profiler Window if it wasn't updated successfully with this marker yet.
-            if(m_LastMarkerSuccesfullySyncedWithProfilerWindow == markerName)
+            if (m_LastMarkerSuccesfullySyncedWithProfilerWindow == markerName)
                 return;
             var updatedSelectedSampleSuccesfully = false;
-            m_SelectedMarker.name = markerName;
             if (m_ProfilerWindowInterface.IsReady() && !m_SelectionEventFromProfilerWindowInProgress && m_ThreadSelection.selection != null && m_ThreadSelection.selection.Count > 0)
             {
                 updatedSelectedSampleSuccesfully = m_ProfilerWindowInterface.SetProfilerWindowMarkerName(markerName, m_ThreadSelection.selection);

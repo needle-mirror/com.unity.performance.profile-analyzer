@@ -4,13 +4,20 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2021-07-23
+
+### Fixed
+
+* Fixed x axis display on frame time graph when capture doesn't match Unity Profiler contents.
+* Fixed selected marker name to be updated even when Profiler fails to sync selection.
+
 ## [1.1.0-pre.2] - 2021-04-16
 
 ### Changed
 
 * Ensured forward compilation compatibility of ProfilerWindow API usage.
 
-## Fixes
+### Fixed
 
 * Fixed Frame View Dropdown not showing time in Microseconds when Microseconds are set as display unit type.
 * Fixed ArgurmentOutOfRange exception on 'Clear Selection' usage in Frame Control.
@@ -35,7 +42,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * The **Depth Slice** drop-down is searchable and scrollable for Unity versions 2019.1 or newer.
 * Improved tooltips on the top 10 marker duration time.
 
-### Fixes
+### Fixed
 
 * The Thread Summary and Marker Summary views now correctly clip their contents when scrolling on 2018.4 and below.
 * Marker detail bars are no longer drawn on top of the list's headers when scrolling.

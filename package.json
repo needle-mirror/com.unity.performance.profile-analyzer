@@ -1,15 +1,15 @@
 {
   "name": "com.unity.performance.profile-analyzer",
   "displayName": "Profile Analyzer",
-  "version": "1.1.0-pre.2",
+  "version": "1.1.0",
   "description": "The Profile Analyzer tool supports the standard Unity Profiler. You can use it to analyze multiple frames and multiple data sets of the CPU data in the Profiler.\n\nMain features: \n▪ Multi-frame analysis of a single set of Profiler CPU data \n▪ Comparison of two multi-frame profile scans \n\n",
   "unity": "2018.4",
   "upmCi": {
-    "footprint": "b23679eb91c6bf9fbb64f5f9d7e0d6bd032f2d6d"
+    "footprint": "f7b53b0af2cc5bfb0e4ffe615001659e12932000"
   },
   "repository": {
     "url": "https://github.cds.internal.unity3d.com/unity/com.unity.performance.profile-analyzer.git",
     "type": "git",
-    "revision": "f0e95cab1f21c6886d2fdf1afcd68312d964bc14"
+    "revision": "6deae0602b5c3de7642b0f8a2821d249770147e8"
   }
 }

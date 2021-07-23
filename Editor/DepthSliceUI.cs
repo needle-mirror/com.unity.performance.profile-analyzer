@@ -88,7 +88,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             List<int> depthValues = new List<int>();
             depthStrings.Add(DepthFilterToString(ProfileAnalyzer.kDepthAll));
             depthValues.Add(ProfileAnalyzer.kDepthAll);
-            var leftIsMain = mostCommonDepthDiff < 0;
 
             var startIndex = 1;
             var depthValue = 1;

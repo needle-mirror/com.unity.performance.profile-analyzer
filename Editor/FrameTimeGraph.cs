@@ -1087,7 +1087,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return inSelectionRegion;
         }
 
-        public void Draw(Rect rect, ProfileAnalysis analysis, List<int> selectedFrameOffsets, float yMax, int displayOffset, string selectedMarkerName, int maxFrames = 0, ProfileAnalysis fullAnalysis = null)
+        public void Draw(Rect rect, ProfileAnalysis analysis, List<int> selectedFrameOffsets, float yMax, int offsetToDisplayMapping, int offsetToIndexMapping, string selectedMarkerName, int maxFrames = 0, ProfileAnalysis fullAnalysis = null)
         {
             Profiler.BeginSample("FrameTimeGraph.Draw");
 
@@ -1200,10 +1200,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int endOffset = m_Zoomed ? m_ZoomEndOffset : totalDataSize - 1;
 
             // Get try index values
-            int startIndex = displayOffset + startOffset;
-            int endIndex = displayOffset + endOffset;
-            int selectedFirstIndex = displayOffset + selectedFirstOffset;
-            int selectedLastIndex = displayOffset + selectedLastOffset;
+            int startIndex = offsetToDisplayMapping + startOffset;
+            int endIndex = offsetToDisplayMapping + endOffset;
+            int selectedFirstIndex = offsetToDisplayMapping + selectedFirstOffset;
+            int selectedLastIndex = offsetToDisplayMapping + selectedLastOffset;
 
             string detailsString = "";
 
@@ -1316,7 +1316,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             Profiler.BeginSample("FrameTimeGraph.ShowThreads");
                             ShowThreads(height, yRange, bar, full,
                                 analysisData.GetThreads(), subsetSelected, selectedFirstOffset, selectedLastOffset,
-                                displayOffset, frameOffsetToSelectionIndex);
+                                offsetToIndexMapping, frameOffsetToSelectionIndex);
                             Profiler.EndSample();
                         }
 
@@ -1324,7 +1324,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         {
                             // Analysis is just on the subset (unless we have full analysis data)
                             ShowSelectedMarker(height, yRange, bar, full, selectedMarker, subsetSelected, selectedFirstOffset, selectedLastOffset,
-                                displayOffset, frameOffsetToSelectionIndex);
+                                offsetToIndexMapping, frameOffsetToSelectionIndex);
                         }
                     }
                 }
@@ -1342,8 +1342,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     // Draw tooltip for bar (or 1 pixel segment of bar)
                     {
-                        int barStartIndex = displayOffset + m_Values[bar.startDataOffset].frameOffset;
-                        int barEndIndex = displayOffset + m_Values[bar.endDataOffset].frameOffset;
+                        int barStartIndex = offsetToDisplayMapping + m_Values[bar.startDataOffset].frameOffset;
+                        int barEndIndex = offsetToDisplayMapping + m_Values[bar.endDataOffset].frameOffset;
                         string tooltip;
                         if (barStartIndex == barEndIndex)
                             tooltip = string.Format("Frame {0}\n{1}{2}", barStartIndex, ToDisplayUnits(bar.yMax, true), detailsString);
@@ -1393,7 +1393,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     }
                 }
 
-                ShowAxis(rect, xStart, width, startOffset, endOffset, zoomedSelectedFirstOffset, zoomedSelectedLastOffset, zoomedSelectedCount, selectedCount, yMax, totalDataSize, displayOffset);
+                ShowAxis(rect, xStart, width, startOffset, endOffset, zoomedSelectedFirstOffset, zoomedSelectedLastOffset, zoomedSelectedCount, selectedCount, yMax, totalDataSize, offsetToDisplayMapping);
             }
 
             GUI.enabled = enabled;
@@ -1414,7 +1414,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         void ShowThreads(float height, float yRange, BarData bar, bool full,
             List<ThreadData> threads, bool subsetSelected, int selectedFirstOffset, int selectedLastOffset,
-            int displayOffset,  Dictionary<int, int> frameOffsetToSelectionIndex)
+            int offsetToIndexMapping,  Dictionary<int, int> frameOffsetToSelectionIndex)
         {
             float max = float.MinValue;
             bool selected = false;
@@ -1427,7 +1427,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float threadMs = 0f;
                 foreach (var thread in threads)
                 {
-                    int frameIndex = displayOffset + frameOffset;
+                    int frameIndex = offsetToIndexMapping + frameOffset;
                     var frame = thread.GetFrame(frameIndex);
                     if (frame == null)
                         continue;
@@ -1473,7 +1473,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         void ShowSelectedMarker(float height, float yRange, BarData bar, bool full,
             MarkerData selectedMarker, bool subsetSelected, int selectedFirstOffset, int selectedLastOffset,
-            int displayOffset,  Dictionary<int, int> frameOffsetToSelectionIndex)
+            int offsetToIndexMapping,  Dictionary<int, int> frameOffsetToSelectionIndex)
         {
             float max = 0f;
             bool selected = false;
@@ -1485,7 +1485,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (!full && !frameOffsetToSelectionIndex.ContainsKey(frameOffset))
                         continue;
 
-                    float ms = selectedMarker.GetFrameMs(displayOffset + frameOffset);
+                    float ms = selectedMarker.GetFrameMs(offsetToIndexMapping + frameOffset);
 
                     if (ms > max)
                         max = ms;
@@ -1662,7 +1662,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             s_YAxisMode = (AxisMode)EditorGUI.Popup(rect, (int)s_YAxisMode, yAxisOptions.ToArray());
         }
 
-        void ShowAxis(Rect rect, float xStart, float width, int startOffset, int endOffset, int selectedFirstOffset, int selectedLastOffset, int selectedCount, int totalSelectedCount, float yMax, int totalDataSize, int displayOffset)
+        void ShowAxis(Rect rect, float xStart, float width, int startOffset, int endOffset, int selectedFirstOffset, int selectedLastOffset, int selectedCount, int totalSelectedCount, float yMax, int totalDataSize, int offsetToDisplayMapping)
         {
             GUIStyle leftAlignStyle = new GUIStyle(GUI.skin.label);
             leftAlignStyle.padding = new RectOffset(leftAlignStyle.padding.left, leftAlignStyle.padding.right, 0, 0);
@@ -1688,13 +1688,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             leftAlignStyle.padding = new RectOffset(0, 0, leftAlignStyle.padding.top, leftAlignStyle.padding.bottom);
             rightAlignStyle.padding = new RectOffset(0, 0, rightAlignStyle.padding.top, rightAlignStyle.padding.bottom);
 
-            int startIndex = displayOffset + startOffset;
+            int startIndex = offsetToDisplayMapping + startOffset;
             string startIndexText = string.Format("{0}", startIndex);
             GUIContent startIndexContent = new GUIContent(startIndexText);
             Vector2 startIndexSize = GUI.skin.label.CalcSize(startIndexContent);
             bool drawStart = !m_GlobalSettings.showOrderedByFrameDuration;
 
-            int endIndex = displayOffset + endOffset;
+            int endIndex = offsetToDisplayMapping + endOffset;
             string endIndexText = string.Format("{0}", endIndex);
             GUIContent endIndexContent = new GUIContent(endIndexText);
             Vector2 endIndexSize = GUI.skin.label.CalcSize(endIndexContent);
@@ -1715,8 +1715,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 int selectedLastX = GetXForDataOffset(selectedLastOffset + 1, (int)width, totalDataSize);   // last + 1 so right hand side of the bbar
                 int selectedRangeWidth = 1 + (selectedLastX - selectedFirstX);
 
-                int selectedFirstIndex = displayOffset + selectedFirstOffset;
-                int selectedLastIndex = displayOffset + selectedLastOffset;
+                int selectedFirstIndex = offsetToDisplayMapping + selectedFirstOffset;
+                int selectedLastIndex = offsetToDisplayMapping + selectedLastOffset;
 
                 string selectionCountText;
                 if (totalSelectedCount != selectedCount)

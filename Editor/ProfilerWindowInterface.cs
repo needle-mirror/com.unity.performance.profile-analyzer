@@ -115,8 +115,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_ProfilerWindow = windows[0];
             if (m_ProfilerWindow != null)
             {
+#if UNITY_2021_2_OR_NEWER
+                var cpuModuleIdentifier = ProfilerWindow.cpuModuleIdentifier;
+#else
+                var cpuModuleIdentifier = ProfilerWindow.cpuModuleName;
+#endif
                 m_CpuProfilerModule =
-                    m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
+                    m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(cpuModuleIdentifier);
                 m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
                 m_CpuProfilerModule.selectionChanged += OnSelectionChangedInCpuProfilerModule;
 
@@ -142,7 +147,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
 #if UNITY_2021_1_OR_NEWER
                 m_ProfilerWindow = EditorWindow.GetWindow<ProfilerWindow>();
-                m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
+#if UNITY_2021_2_OR_NEWER
+                var cpuModuleIdentifier = ProfilerWindow.cpuModuleIdentifier;
+#else
+                var cpuModuleIdentifier = ProfilerWindow.cpuModuleName;
+#endif
+                m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(cpuModuleIdentifier);
                 m_CpuProfilerModule.selectionChanged -= OnSelectionChangedInCpuProfilerModule;
                 m_CpuProfilerModule.selectionChanged += OnSelectionChangedInCpuProfilerModule;
 #else
@@ -653,8 +663,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (m_ProfilerWindow == null)
                 return false;
 #if UNITY_2021_1_OR_NEWER
-            m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(ProfilerWindow.cpuModuleName);
-            if (m_CpuProfilerModule != null && m_ProfilerWindow.selectedModuleName == ProfilerWindow.cpuModuleName
+#if UNITY_2021_2_OR_NEWER
+            var cpuModuleIdentifier = ProfilerWindow.cpuModuleIdentifier;
+            var selectedModuleIdentifier = m_ProfilerWindow.selectedModuleIdentifier;
+#else
+            var cpuModuleIdentifier = ProfilerWindow.cpuModuleName;
+            var selectedModuleIdentifier = m_ProfilerWindow.selectedModuleName;
+#endif
+            m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(cpuModuleIdentifier);
+            if (m_CpuProfilerModule != null && selectedModuleIdentifier == cpuModuleIdentifier
                                             && m_ProfilerWindow.firstAvailableFrameIndex >= 0)
             {
                 // Read profiler data direct from profile to find time/duration
