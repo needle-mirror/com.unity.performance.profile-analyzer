@@ -621,7 +621,7 @@ To compare two data sets:
 
         void OnDestroy()
         {
-            if(m_BackgroundThread != null)
+            if (m_BackgroundThread != null)
                 m_BackgroundThread.Abort();
             Pre2019ReEnableRecording();
             if (m_ProfileSingleView != null && m_ProfileSingleView.data != null)
@@ -663,10 +663,10 @@ To compare two data sets:
             if (dv != m_ProfileSingleView && m_ProfileSingleView.data != null && m_ProfileSingleView.data.FilePath == path)
                 return true;
 
-			if (dv != m_ProfileLeftView && m_ProfileLeftView.data != null && m_ProfileLeftView.data.FilePath == path)
+            if (dv != m_ProfileLeftView && m_ProfileLeftView.data != null && m_ProfileLeftView.data.FilePath == path)
                 return true;
 
-			if (dv != m_ProfileRightView && m_ProfileRightView.data != null && m_ProfileRightView.data.FilePath == path)
+            if (dv != m_ProfileRightView && m_ProfileRightView.data != null && m_ProfileRightView.data.FilePath == path)
                 return true;
 
             return false;
@@ -919,7 +919,12 @@ To compare two data sets:
         void VerifyFrameDataInSyncWithProfilerWindow(ProfileDataView dataView)
         {
             var firstFrameIdx = m_ProfilerFirstFrameIndex - 1;
-            var loadedFrameCount = m_ProfilerLastFrameIndex - m_ProfilerFirstFrameIndex + (firstFrameIdx != -1 ? 1 : 0);
+            var incompleteFrameCount = 0;
+            if (dataView != null && dataView.data != null)
+                incompleteFrameCount = (dataView.data.FirstFrameIncomplete ? 1 : 0) + (dataView.data.LastFrameIncomplete ? 1 : 0);
+
+            var loadedFrameCount = m_ProfilerLastFrameIndex - m_ProfilerFirstFrameIndex + (firstFrameIdx != -1 ? 1 : 0)
+                - incompleteFrameCount;
 
             if (loadedFrameCount == 0
                 || !dataView.IsDataValid() //check if the data is valid and potentially reload the file, .data shouldn't be accessed before this point
@@ -942,7 +947,6 @@ To compare two data sets:
                 else
                 {
                     dataView.inSyncWithProfilerData = true;
-
                 }
             }
         }
@@ -1209,7 +1213,6 @@ To compare two data sets:
             }
 #endif
         }
-
 
         ProfileDataView GetActiveView
         {
@@ -1647,7 +1650,6 @@ To compare two data sets:
 
             return true;
         }
-
 
         void Compare()
         {
@@ -2492,9 +2494,9 @@ To compare two data sets:
                 var markerInThread = m_SelectedMarker.id == -1 && !string.IsNullOrEmpty(m_SelectedMarker.threadName);
                 var threadText = markerInThread ?
                     string.Format(" (Selected in: {0}{1}{2})",
-                        m_SelectedMarker.threadGroupName,
-                        string.IsNullOrEmpty(m_SelectedMarker.threadGroupName)? "":".",
-                        m_SelectedMarker.threadName) :
+                    m_SelectedMarker.threadGroupName,
+                    string.IsNullOrEmpty(m_SelectedMarker.threadGroupName) ? "" : ".",
+                    m_SelectedMarker.threadName) :
                     null;
                 string text = string.Format("{0}{1} not in selection", m_SelectedMarker.name, threadText);
 
@@ -2570,7 +2572,7 @@ To compare two data sets:
 
         void DrawFrameTimeGraph(float height)
         {
-            using(m_DrawFrameTimeGraphProfilerMarker.Auto())
+            using (m_DrawFrameTimeGraphProfilerMarker.Auto())
             {
                 GUI.SetNextControlName("FrameTimeGraph");
                 Rect rect = EditorGUILayout.GetControlRect(GUILayout.Height(height));
@@ -3331,7 +3333,7 @@ To compare two data sets:
 
         void DrawFilesLoaded()
         {
-            using(m_DrawFilesLoadedProfilerMarker.Auto())
+            using (m_DrawFilesLoadedProfilerMarker.Auto())
             {
                 var boxStyle = GUI.skin.box;
                 var rect = EditorGUILayout.BeginVertical(boxStyle);
@@ -3339,8 +3341,8 @@ To compare two data sets:
                 if (m_ActiveTab == ActiveTab.Summary)
                 {
                     EditorGUILayout.BeginHorizontal(GUILayout.Height(100 + GUI.skin.label.lineHeight +
-                                                                     (2 * (GUI.skin.label.margin.vertical +
-                                                                           GUI.skin.label.padding.vertical))));
+                        (2 * (GUI.skin.label.margin.vertical +
+                            GUI.skin.label.padding.vertical))));
 
                     float filenameWidth = GetFilenameWidth(m_ProfileSingleView.path);
                     filenameWidth = Math.Min(filenameWidth, 200);
@@ -3391,7 +3393,7 @@ To compare two data sets:
         static readonly ProfilerMarkerAbstracted m_DrawMarkerTableProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.DrawMarkerTable");
         void DrawAnalysis()
         {
-            using(m_DrawAnalysisProfilerMarker.Auto())
+            using (m_DrawAnalysisProfilerMarker.Auto())
             {
                 EditorGUILayout.BeginHorizontal();
 
@@ -3460,9 +3462,9 @@ To compare two data sets:
                                     Rect r = EditorGUILayout.GetControlRect(GUILayout.ExpandHeight(true));
 
                                     float scrollBarWidth = GUI.skin.verticalScrollbar.fixedWidth +
-                                                           GUI.skin.verticalScrollbar.border.horizontal +
-                                                           GUI.skin.verticalScrollbar.margin.horizontal +
-                                                           GUI.skin.verticalScrollbar.padding.horizontal;
+                                        GUI.skin.verticalScrollbar.border.horizontal +
+                                        GUI.skin.verticalScrollbar.margin.horizontal +
+                                        GUI.skin.verticalScrollbar.padding.horizontal;
                                     scrollBarWidth += LayoutSize.ScrollBarPadding;
 
                                     //offset vertically to get correct clipping behaviour
@@ -4044,7 +4046,7 @@ To compare two data sets:
 
         void DrawCompareOptions()
         {
-            using(m_DrawCompareOptionsProfilerMarker.Auto())
+            using (m_DrawCompareOptionsProfilerMarker.Auto())
             {
                 EditorGUILayout.BeginVertical(GUI.skin.box);
 
@@ -4096,6 +4098,7 @@ To compare two data sets:
                 EditorGUILayout.EndVertical();
             }
         }
+
         static readonly ProfilerMarkerAbstracted m_DrawComparisonProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.DrawComparison");
         static readonly ProfilerMarkerAbstracted m_DrawComparisonTableProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.DrawComparisonTable");
 
@@ -4225,9 +4228,9 @@ To compare two data sets:
                                     Rect r = EditorGUILayout.GetControlRect(GUILayout.ExpandHeight(true));
 
                                     float scrollBarWidth = GUI.skin.verticalScrollbar.fixedWidth +
-                                                           GUI.skin.verticalScrollbar.border.horizontal +
-                                                           GUI.skin.verticalScrollbar.margin.horizontal +
-                                                           GUI.skin.verticalScrollbar.padding.horizontal;
+                                        GUI.skin.verticalScrollbar.border.horizontal +
+                                        GUI.skin.verticalScrollbar.margin.horizontal +
+                                        GUI.skin.verticalScrollbar.padding.horizontal;
                                     scrollBarWidth += LayoutSize.ScrollBarPadding;
 
                                     //offset vertically to get correct clipping behaviour
@@ -4472,7 +4475,7 @@ To compare two data sets:
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
                 EditorGUILayout.LabelField("Mode:", GUILayout.Width(40));
-                ActiveTab newTab = (ActiveTab) GUILayout.Toolbar((int) m_ActiveTab, new string[] {"Single", "Compare"},
+                ActiveTab newTab = (ActiveTab)GUILayout.Toolbar((int)m_ActiveTab, new string[] {"Single", "Compare"},
                     EditorStyles.toolbarButton, GUILayout.ExpandWidth(false));
                 if (newTab != m_ActiveTab)
                 {
@@ -4626,7 +4629,7 @@ To compare two data sets:
             {
                 updatedSelectedSampleSuccesfully = m_ProfilerWindowInterface.SetProfilerWindowMarkerName(markerName, m_ThreadSelection.selection);
             }
-            if(updatedSelectedSampleSuccesfully)
+            if (updatedSelectedSampleSuccesfully)
                 m_LastMarkerSuccesfullySyncedWithProfilerWindow = markerName;
         }
 
@@ -4893,7 +4896,6 @@ To compare two data sets:
                 int rangeSize = (1 + (frameSummary.last - frameSummary.first));
                 if (frameSummary.count == rangeSize)
                 {
-
                     int remappedFirstFrame = GetRemappedUIFrameIndex(frameSummary.first, context);
                     text = string.Format("{0}", remappedFirstFrame);
                     tooltip = string.Format("{0} frames selected\n\n{1} first selected frame\n{2} last selected frame\n\nConsecutive Sequence"
@@ -5168,7 +5170,7 @@ To compare two data sets:
 
             var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
             m_ProfilerWindowInterface.JumpToFrame(RemapFrameIndex(frameIndex, frameContext.FrameIndexOffset));
-            if(!string.IsNullOrEmpty(m_SelectedMarker.name))
+            if (!string.IsNullOrEmpty(m_SelectedMarker.name))
                 m_ProfilerWindowInterface.SetProfilerWindowMarkerName(m_SelectedMarker.name, m_ThreadSelection.selection);
             ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.JumpToFrame, analytic);
         }

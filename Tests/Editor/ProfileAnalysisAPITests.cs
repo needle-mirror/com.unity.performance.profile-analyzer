@@ -5,13 +5,15 @@ using UnityEngine;
 public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 {
     [Test]
-    public void ProfileAnalysis_SetRange_ModifiesFirstLastIndices()
+    public void ProfileAnalysis_SetRange_ModifiesFirstLastIndices([Values(0, 2)] int first, [Values(150, 300)] int last)
     {
         var analysis = new ProfileAnalysis();
-        analysis.SetRange(0, 300);
+        analysis.SetRange(first, last);
 
-        Assert.IsTrue(0 == analysis.GetFrameSummary().first);
-        Assert.IsTrue(300 == analysis.GetFrameSummary().last);
+        Assert.IsTrue(first == analysis.GetFrameSummary().first);
+        Assert.IsTrue(first == analysis.GetFrameSummary().minFrameIndex);
+        Assert.IsTrue(first == analysis.GetFrameSummary().maxFrameIndex);
+        Assert.IsTrue(last == analysis.GetFrameSummary().last);
     }
 
     [Test]

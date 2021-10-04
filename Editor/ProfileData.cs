@@ -24,6 +24,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         static Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
         public int Version { get; private set; }
         public int FrameIndexOffset { get; private set; }
+        public bool FirstFrameIncomplete;
+        public bool LastFrameIncomplete;
         List<ProfileFrame> frames = new List<ProfileFrame>();
         List<string> markerNames = new List<string>();
         List<string> threadNames = new List<string>();
@@ -93,7 +95,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         internal void DeleteTmpFiles()
         {
-            if(ProfileAnalyzerWindow.FileInTempDir(FilePath))
+            if (ProfileAnalyzerWindow.FileInTempDir(FilePath))
                 File.Delete(FilePath);
         }
 
@@ -262,7 +264,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     writer.Write(threadName);
                 }
-            }   
+            }
         }
 
         internal void Write()

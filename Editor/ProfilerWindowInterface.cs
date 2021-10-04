@@ -12,7 +12,7 @@ using UnityEditor.Profiling;
 #if UNITY_2021_2_OR_NEWER
 using Unity.Profiling.Editor;
 // stub so that ProfilerWindow can be moved to this namespace in trunk without a need to change PA
-namespace Unity.Profiling.Editor { }
+namespace Unity.Profiling.Editor {}
 #endif
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -42,10 +42,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         FieldInfo m_SelectedTimeFieldInfo;
         FieldInfo m_SelectedDurationFieldInfo;
         FieldInfo m_SelectedInstanceIdFieldInfo;
-        FieldInfo m_SelectedInstanceCountFieldInfo;
         FieldInfo m_SelectedFrameIdFieldInfo;
         FieldInfo m_SelectedThreadIndexFieldInfo;
         FieldInfo m_SelectedNativeIndexFieldInfo;
+        FieldInfo m_SelectedInstanceCountFieldInfo;
+        FieldInfo m_SelectedInstanceCountForThreadFieldInfo;
+        FieldInfo m_SelectedInstanceCountForFrameFieldInfo;
+        FieldInfo m_SelectedMetaDataFieldInfo;
+        FieldInfo m_SelectedThreadCountFieldInfo;
+        FieldInfo m_SelectedCallstackInfoFieldInfo;
 
         MethodInfo m_GetProfilerModuleInfo;
         Type m_CPUProfilerModuleType;
@@ -86,11 +91,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_SelectedTimeFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("time", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedDurationFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("duration", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedInstanceIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                m_SelectedInstanceCountFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedFrameIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("frameId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 // confusingly this is called threadId but is the thread _index_
                 m_SelectedThreadIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedNativeIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("nativeIndex", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedInstanceCountFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedInstanceCountForThreadFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceCountForThread", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedInstanceCountForFrameFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceCountForFrame", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedThreadCountFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadCount", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedMetaDataFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("metaData", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                m_SelectedCallstackInfoFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("callstackInfo", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             }
 #endif
         }
@@ -208,6 +218,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return timeLineGUI;
         }
+
 #endif
 
 
@@ -222,9 +233,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
             }
         }
+
 #endif
 
-        public event Action<string, string, string> selectedMarkerChanged = delegate {  };
+        public event Action<string, string, string> selectedMarkerChanged = delegate {};
 
         public void PollProfilerWindowMarkerName()
         {
@@ -240,9 +252,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         string threadGroupName = null;
                         string threadName = null;
 #if UNITY_2020_1_OR_NEWER
-                        if(m_SelectedFrameIdFieldInfo != null && m_SelectedThreadIndexFieldInfo != null)
+                        if (m_SelectedFrameIdFieldInfo != null && m_SelectedThreadIndexFieldInfo != null)
                         {
-                            using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView( (int)m_SelectedFrameIdFieldInfo.GetValue(selectedEntry), (int)m_SelectedThreadIndexFieldInfo.GetValue(selectedEntry)))
+                            using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView((int)m_SelectedFrameIdFieldInfo.GetValue(selectedEntry), (int)m_SelectedThreadIndexFieldInfo.GetValue(selectedEntry)))
                             {
                                 if (frameData != null && frameData.valid)
                                 {
@@ -267,7 +279,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (recording)
                 StopRecording();
 
-            int firstFrameIndex = firstFrameDisplayIndex - 1;
+            int firstFrameIndex = Mathf.Max(firstFrameDisplayIndex - 1, 0);
             int lastFrameIndex = lastFrameDisplayIndex - 1;
             ProfileData profileData = GetData(firstFrameIndex, lastFrameIndex);
 
@@ -335,6 +347,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         if (threadIndex == 0)
                         {
+                            if ((frameIndex == firstFrameIndex || frameIndex == lastFrameIndex)
+                                && firstFrameIndex != lastFrameIndex && (!frameData.valid || frameData.frameTimeNs == 0))
+                            {
+                                // skip incomplete frames when they are at the beginning or end of the capture
+                                if (++frameIndex <= lastFrameIndex)
+                                {
+                                    data.FirstFrameIncomplete = true;
+                                    data.SetFrameIndexOffset(frameIndex);
+                                    continue;
+                                }
+                                else
+                                {
+                                    // break out entirely if this is the last frame
+                                    data.LastFrameIncomplete = true;
+                                    break;
+                                }
+                            }
                             frame = new ProfileFrame();
                             if (frameData.valid)
                             {
@@ -456,6 +485,25 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 frameData.SetRoot(frameIndex, 0);
 
                 var msFrame = frameData.frameTimeMS;
+
+                if ((frameIndex == firstFrameIndex || frameIndex == lastFrameIndex)
+                    && firstFrameIndex != lastFrameIndex && msFrame == 0)
+                {
+                    var nextFrame = frameIndex + 1;
+                    // skip incomplete frames when they are at the beginning or end of the capture
+                    if (nextFrame <= lastFrameIndex)
+                    {
+                        data.FirstFrameIncomplete = true;
+                        data.SetFrameIndexOffset(nextFrame);
+                        continue;
+                    }
+                    else
+                    {
+                        // break out entirely if this is the last frame
+                        data.LastFrameIncomplete = true;
+                        break;
+                    }
+                }
 
                 /*
                 if (frameIndex == lastFrameIndex)
@@ -619,15 +667,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (threadFilters.Contains(threadNameWithIndex))
                 {
-                    yield return new ThreadIndexIterator{frameData = frameData, threadIndex = threadIndex};
+                    yield return new ThreadIndexIterator {frameData = frameData, threadIndex = threadIndex};
                 }
             }
             frameData.Dispose();
         }
 
-        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out float time, out float duration, out int instanceId)
+        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out int outNativeIndex, out float time, out float duration, out int instanceId)
         {
             outThreadIndex = 0;
+            outNativeIndex = 0;
             time = 0.0f;
             duration = 0.0f;
             instanceId = 0;
@@ -644,6 +693,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         time = iterator.Current.frameData.startTimeMS;
                         duration = iterator.Current.frameData.durationMS;
                         instanceId = iterator.Current.frameData.instanceId;
+                        outNativeIndex = iterator.Current.frameData.sampleId;
                         outThreadIndex = iterator.Current.threadIndex;
                         found = true;
                         break;
@@ -672,7 +722,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 #endif
             m_CpuProfilerModule = m_ProfilerWindow.GetFrameTimeViewSampleSelectionController(cpuModuleIdentifier);
             if (m_CpuProfilerModule != null && selectedModuleIdentifier == cpuModuleIdentifier
-                                            && m_ProfilerWindow.firstAvailableFrameIndex >= 0)
+                && m_ProfilerWindow.firstAvailableFrameIndex >= 0)
             {
                 // Read profiler data direct from profile to find time/duration
                 int currentFrameIndex = (int)m_ProfilerWindow.selectedFrameIndex;
@@ -714,8 +764,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     float time;
                     float duration;
                     int instanceId;
+                    int nativeIndex;
                     int threadIndex;
-                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out time, out duration, out instanceId))
+                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out nativeIndex, out time, out duration, out instanceId))
                     {
                         /*
                         Debug.Log(string.Format("Setting profiler to {0} on {1} at frame {2} at {3}ms for {4}ms ({5})",
@@ -732,6 +783,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             m_SelectedInstanceIdFieldInfo.SetValue(selectedEntry, instanceId);
                         if (m_SelectedFrameIdFieldInfo != null)
                             m_SelectedFrameIdFieldInfo.SetValue(selectedEntry, currentFrameIndex);
+                        if (m_SelectedNativeIndexFieldInfo != null)
+                            m_SelectedNativeIndexFieldInfo.SetValue(selectedEntry, nativeIndex);
                         if (m_SelectedThreadIndexFieldInfo != null)
                             m_SelectedThreadIndexFieldInfo.SetValue(selectedEntry, threadIndex);
 
@@ -739,10 +792,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         // For now we force Instance count to 1 to avoid the incorrect info showing.
                         if (m_SelectedInstanceCountFieldInfo != null)
                             m_SelectedInstanceCountFieldInfo.SetValue(selectedEntry, 1);
-
-                        // Set other values to non negative values so selection appears
-                        if (m_SelectedNativeIndexFieldInfo != null)
-                            m_SelectedNativeIndexFieldInfo.SetValue(selectedEntry, currentFrameIndex);
+                        if (m_SelectedInstanceCountForThreadFieldInfo != null)
+                            m_SelectedInstanceCountForThreadFieldInfo.SetValue(selectedEntry, 1);
+                        if (m_SelectedInstanceCountForFrameFieldInfo != null)
+                            m_SelectedInstanceCountForFrameFieldInfo.SetValue(selectedEntry, 1);
+                        if (m_SelectedThreadCountFieldInfo != null)
+                            m_SelectedThreadCountFieldInfo.SetValue(selectedEntry, 1);
+                        if (m_SelectedMetaDataFieldInfo != null)
+                            m_SelectedMetaDataFieldInfo.SetValue(selectedEntry, "");
+                        if (m_SelectedCallstackInfoFieldInfo != null)
+                            m_SelectedCallstackInfoFieldInfo.SetValue(selectedEntry, "");
 
                         m_ProfilerWindow.Repaint();
                         m_SendingSelectionEventToProfilerWindowInProgress = false;
@@ -788,7 +847,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public event Action<int> selectedFrameChanged = delegate {  };
+        public event Action<int> selectedFrameChanged = delegate {};
 
         public void PollSelectedFrameChanges()
         {

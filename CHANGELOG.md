@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2021-10-04
+
+### Fixed
+* Fixed pulling frame data from the Profiler to exclude first and last frames if their main thread profiler data is incomplete, so that they don't skewer the analysis results [(case 1359686)](https://issuetracker.unity3d.com/product/unity/issues/guid/1359686/).
+* Fixed IndexOutOfRangeException thrown when using Profiler or selecting Profiler frames in Profile Analyzer. [(1366931)](https://issuetracker.unity3d.com/product/unity/issues/guid/1366931/)
+
 ## [1.1.0] - 2021-07-23
 
 ### Fixed

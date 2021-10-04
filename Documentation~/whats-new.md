@@ -18,4 +18,4 @@ The main updates in this release include:
 * Fixes for UI issues
 * Better logging and error handling.
 
-For a full list of changes and updates in this version, see the [Profile Analyzer package changelog](CHANGELOG.md).
+For a full list of changes and updates in this version, see the [Profile Analyzer package changelog](https://docs.unity3d.com/Packages/com.unity.performance.profile-analyzer@latest/index.html?subfolder=/changelog/CHANGELOG.html).

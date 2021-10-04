@@ -36,6 +36,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             m_FrameSummary.first = firstFrameIndex;
             m_FrameSummary.last = lastFrameIndex;
+
+            // Ensure these are initialized to frame indices within the range
+            m_FrameSummary.minFrameIndex = firstFrameIndex;
+            // if this wasn't initialized, and all frames had 0 length, it wouldn't be set in the UpdateSummary step of the analysis and point out of range
+            m_FrameSummary.maxFrameIndex = firstFrameIndex;
         }
 
         public void AddMarker(MarkerData marker)

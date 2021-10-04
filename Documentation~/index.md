@@ -10,9 +10,11 @@ For information on how to use the Profile Analyzer, see the documentation on the
 
 To install this package into versions of Unity that support the package manager follow the instructions in the [Package Manager documentation](https://docs.unity3d.com/Packages/com.unity.package-manager-ui@latest/index.html).
 
+When using any Unity version newer than 2021.2.0a5, you can just click __[this link to install it by name](com.unity3d.kharma:upmpackage/com.unity.performance.profile-analyzer)__.
+
 ### Earlier versions of Unity
 
-For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.0.4.tgz) and place the contents into your Project's Assets folder.
+For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.1.1.tgz) and place the contents into your Project's Assets folder.
 
 ## Requirements
 
