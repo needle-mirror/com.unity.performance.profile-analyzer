@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using UnityEngine.Assertions;
 using UnityEngine;
 
@@ -177,12 +178,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             string numberStr;
             if (value < minValueShownWhenUsingLimitedDecimalPlaces && showFullValueWhenBelowZero)
             {
-                numberStr = string.Format("{0}", value);
+                numberStr = string.Format(CultureInfo.InvariantCulture, "{0}", value);
             }
             else
             {
                 string formatString = string.Concat("{0:f", numberOfDecimalPlaces, "}");
-                numberStr = string.Format(formatString, value);
+                numberStr = string.Format(CultureInfo.InvariantCulture, formatString, value);
             }
 
             // Remove trailing 0 if any from string

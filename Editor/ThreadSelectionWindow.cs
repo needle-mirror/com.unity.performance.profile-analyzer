@@ -85,19 +85,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ThreadNames = threadNames;
             m_ThreadUINames = threadUINames;
             m_ThreadSelection = new ThreadSelection(threadSelection);
-#if UNITY_2018_3_OR_NEWER
             this.foldoutOverride += DoFoldout;
-#endif
             Reload();
         }
 
-#if UNITY_2018_3_OR_NEWER
         bool DoFoldout(Rect position, bool expandedstate, GUIStyle style)
         {
             return !(position.y < rowHeight) && GUI.Toggle(position, expandedstate, GUIContent.none, style);
         }
-
-#endif
 
         public void ClearThreadSelection()
         {
@@ -794,6 +789,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
     internal class ThreadSelectionWindow : EditorWindow
     {
+        private static HashSet<ThreadSelectionWindow> s_Instances = new HashSet<ThreadSelectionWindow>();
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         TreeViewState m_ThreadTreeViewState;
         //Static to store state between open/close
@@ -818,15 +814,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static public bool IsOpen()
         {
-            #if UNITY_2019_3_OR_NEWER
-            return HasOpenInstances<ThreadSelectionWindow>();
-            #else
-            UnityEngine.Object[] windows = Resources.FindObjectsOfTypeAll(typeof(ThreadSelectionWindow));
-            if (windows != null && windows.Length > 0)
-                return true;
-
-            return false;
-            #endif // UNITY_2019_3_OR_NEWER
+            return s_Instances.Count > 0;
         }
 
         static public ThreadSelectionWindow Open(float screenX, float screenY, ProfileAnalyzerWindow profileAnalyzerWindow, ThreadSelection threadSelection, List<string> threadNames, List<string> threadUINames)
@@ -843,6 +831,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         void OnEnable()
         {
             m_RequestClose = false;
+            s_Instances.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            s_Instances.Remove(this);
         }
 
         void CreateTable(ProfileAnalyzerWindow profileAnalyzerWindow, List<string> threadNames, List<string> threadUINames, ThreadSelection threadSelection)

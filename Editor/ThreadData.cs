@@ -45,11 +45,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         struct ThreadFrameTimeFrameComparer : IComparer<ThreadFrameTime>
         {
-#if UNITY_2017_OR_NEWER
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#else
-            [MethodImpl(256)]
-#endif
             public int Compare(ThreadFrameTime x, ThreadFrameTime y)
             {
                 if (x.frameIndex == y.frameIndex)
@@ -58,11 +54,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-#if UNITY_2017_OR_NEWER
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#else
-        [MethodImpl(256)]
-#endif
         public ThreadFrameTime? GetFrame(int frameIndex)
         {
             var index = frames.BinarySearch(new ThreadFrameTime(frameIndex, 0, 0), new ThreadFrameTimeFrameComparer());

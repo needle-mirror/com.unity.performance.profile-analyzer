@@ -6,9 +6,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine.Profiling;
-#if UNITY_2020_1_OR_NEWER
 using UnityEditor.Profiling;
-#endif
 #if UNITY_2021_2_OR_NEWER
 using Unity.Profiling.Editor;
 // stub so that ProfilerWindow can be moved to this namespace in trunk without a need to change PA
@@ -21,9 +19,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     {
         bool m_ProfilerWindowInitialized = false;
         const float k_NsToMs = 1000000;
-#if UNITY_2020_1_OR_NEWER
-        bool s_UseRawIterator = true;
-#endif
         ProgressBarDisplay m_progressBar;
 
         [NonSerialized] bool m_SendingSelectionEventToProfilerWindowInProgress = false;
@@ -178,12 +173,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 first = 1 + ProfilerDriver.firstFrameIndex;
                 last = 1 + ProfilerDriver.lastFrameIndex;
-#if !UNITY_2018_4_OR_NEWER
-                //Prior to 18.4 we need to clip to the visible frames in the profile which indents 1 in from end
-                //as the last frame is not visible and sometimes still being processed
-                if (first < last)
-                    last--;
-#endif
                 return true;
             }
 
@@ -251,7 +240,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         string threadGroupName = null;
                         string threadName = null;
-#if UNITY_2020_1_OR_NEWER
                         if (m_SelectedFrameIdFieldInfo != null && m_SelectedThreadIndexFieldInfo != null)
                         {
                             using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView((int)m_SelectedFrameIdFieldInfo.GetValue(selectedEntry), (int)m_SelectedThreadIndexFieldInfo.GetValue(selectedEntry)))
@@ -263,7 +251,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 }
                             }
                         }
-#endif
                         selectedMarkerChanged(m_SelectedNameFieldInfo.GetValue(selectedEntry).ToString(), threadGroupName, threadName);
                     }
                 }
@@ -306,22 +293,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return null;
 
             var frame = new ProfileFrame();
-#if UNITY_2020_1_OR_NEWER
             using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView(frameIndex, threadIndex))
             {
                 frame.msStartTime = frameData.frameStartTimeMs;
                 frame.msFrame = frameData.frameTimeMs;
             }
-#else
-            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
-            frameData.SetRoot(frameIndex, threadIndex);
-            frame.msStartTime = 1000.0 * frameData.GetFrameStartS(frameIndex);
-            frame.msFrame = frameData.frameTimeMS;
-#endif
             return frame;
         }
 
-#if UNITY_2020_1_OR_NEWER
         ProfileData GetDataRaw(ProfileData data, int firstFrameIndex, int lastFrameIndex)
         {
             bool firstError = true;
@@ -467,8 +446,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return data;
         }
 
-#endif
-
         ProfileData GetDataOriginal(ProfileData data, int firstFrameIndex, int lastFrameIndex)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
@@ -591,16 +568,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         ProfileData GetData(int firstFrameIndex, int lastFrameIndex)
         {
             ProfileData data = new ProfileData(ProfileAnalyzerWindow.TmpPath);
-#if UNITY_2020_1_OR_NEWER
             GetDataRaw(data, firstFrameIndex, lastFrameIndex);
-#else
-            GetDataOriginal(data, firstFrameIndex, lastFrameIndex);
-#endif
             data.Write();
             return data;
         }
 
-#if UNITY_2020_1_OR_NEWER
         public float GetFrameTimeRaw(int frameIndex)
         {
             using (RawFrameDataView frameData = ProfilerDriver.GetRawFrameDataView(frameIndex, 0))
@@ -612,22 +584,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-#endif
-
-
         public float GetFrameTime(int frameIndex)
         {
-#if UNITY_2020_1_OR_NEWER
-            if (s_UseRawIterator)
-                return GetFrameTimeRaw(frameIndex);
-#endif
-            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
-
-            frameData.SetRoot(frameIndex, 0);
-            float ms = frameData.frameTimeMS;
-            frameData.Dispose();
-
-            return ms;
+            return GetFrameTimeRaw(frameIndex);
         }
 
         struct ThreadIndexIterator
@@ -861,27 +820,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public bool IsRecording()
         {
-#if UNITY_2017_4_OR_NEWER
             return ProfilerDriver.enabled;
-#else
-            return false;
-#endif
         }
 
         public void StopRecording()
         {
-#if UNITY_2017_4_OR_NEWER
             // Stop recording first
             ProfilerDriver.enabled = false;
-#endif
         }
 
         public void StartRecording()
         {
-#if UNITY_2017_4_OR_NEWER
             // Stop recording first
             ProfilerDriver.enabled = true;
-#endif
         }
 
         public void OnDisable()

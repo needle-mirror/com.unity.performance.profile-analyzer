@@ -1,13 +1,12 @@
 using System;
 using UnityEngine;
-#if UNITY_2019_1_OR_NEWER
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor.IMGUI.Controls;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
-    public class DepthSliceDropdown : AdvancedDropdown
+    class DepthSliceDropdown : AdvancedDropdown
     {
         class DepthSliceDropdownItem : AdvancedDropdownItem
         {
@@ -127,4 +126,3 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
     }
 }
-#endif

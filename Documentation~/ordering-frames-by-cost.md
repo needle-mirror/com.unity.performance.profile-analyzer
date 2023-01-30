@@ -14,8 +14,6 @@ For more information on how to collect data, see the workflow documentation on [
 
 If you are in the Compare view, enable the **Pair Graph Selection** checkbox. By default, the data set is ordered by frame number. To order the frames by their length, right click on a graph in the Frame Control pane, and select **Order by Frame Duration**.
 
-![Frame Control context menu](images/frame-control-context-menu.png)<br/>*The Frame Control context menu*
-
 The Profile Analyzer then orders the graph from shortest to longest frame.
 
 ## Step 3: Select frames of interest

@@ -131,7 +131,87 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return false;
         }
 
-        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMax = 0)
+        public void RemoveMarkerTimeFromParents(MarkerData[] markers, ProfileData profileData, ProfileThread threadData, int markerAt)
+        {
+            // Get the info for the marker we plan to remove (assume thats what we are at)
+            ProfileMarker profileMarker = threadData.markers[markerAt];
+            float markerTime = profileMarker.msMarkerTotal;
+
+            // Traverse parents and remove time from them
+            int currentDepth = profileMarker.depth;
+            for (int parentMarkerAt = markerAt - 1; parentMarkerAt >= 0; parentMarkerAt--)
+            {
+                ProfileMarker parentMarkerData = threadData.markers[parentMarkerAt];
+                if (parentMarkerData.depth == currentDepth - 1)
+                {
+                    currentDepth--;
+                    if (parentMarkerData.nameIndex < markers.Length) // Had an issue where marker not yet processed(marker from another thread)
+                    {
+                        MarkerData parentMarker = markers[parentMarkerData.nameIndex];
+
+                        // If a depth slice is applied we may not have a parent marker stored
+                        if (parentMarker != null)
+                        {
+                            // Revise the duration of parent to remove time from there too
+                            // Note if the marker to remove is nested (i.e. parent of the same name, this could reduce the msTotal, more than we add to the timeIgnored)
+                            parentMarker.msTotal -= markerTime;
+
+                            // Reduce from the max marker time too
+                            // This could be incorrect when there are many instances that contribute the the total time
+                            if (parentMarker.msMaxIndividual > markerTime)
+                            {
+                                parentMarker.msMaxIndividual -= markerTime;
+                            }
+                            if (parentMarker.msMinIndividual > markerTime)
+                            {
+                                parentMarker.msMinIndividual -= markerTime;
+                            }
+
+                            // Revise stored frame time
+                            FrameTime frameTime = parentMarker.frames[parentMarker.frames.Count - 1];
+                            frameTime = new FrameTime(frameTime.frameIndex, frameTime.ms - markerTime, frameTime.count);
+                            parentMarker.frames[parentMarker.frames.Count - 1] = frameTime;
+
+                            // Note that we have modified the time
+                            parentMarker.timeRemoved += markerTime;
+
+                            // Note markerTime can be 0 in some cases.
+                            // Make sure timeRemoved is never left at 0.0
+                            // This makes sure we can test for non zero to indicate the marker has been removed 
+                            if (parentMarker.timeRemoved == 0.0)
+                                parentMarker.timeRemoved = double.Epsilon;
+                        }
+                    }
+                }
+            }
+        }
+
+        public int RemoveMarker(ProfileThread threadData, int markerAt)
+        {
+            ProfileMarker profileMarker = threadData.markers[markerAt];
+            int at = markerAt;
+
+            // skip marker
+            at++;
+
+            // Skip children
+            int currentDepth = profileMarker.depth;
+            while (at < threadData.markers.Count)
+            {
+                profileMarker = threadData.markers[at];
+                if (profileMarker.depth <= currentDepth)
+                    break;
+
+                at++;
+            }
+
+            // Mark the following number to be ignored
+            int markerAndChildCount = at - markerAt;
+
+            return markerAndChildCount;
+        }
+
+        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMax = 0, string removeMarker = null)
         {
             m_Progress = 0;
             if (profileData == null)
@@ -169,9 +249,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             int maxMarkerDepthFound = 0;
             var threads = new Dictionary<string, ThreadData>();
-            var markers = new Dictionary<string, MarkerData>();
-            var allMarkers = new Dictionary<string, int>();
+            var markers = new MarkerData[profileData.MarkerNameCount];
+            var removedMarkers = new Dictionary<string, double>();
 
+            var mainThreadIdentifier = new ThreadIdentifier("Main Thread", 1);
+
+            int markerCount = 0;
 
             bool filteringByParentMarker = false;
             int parentMarkerIndex = -1;
@@ -190,8 +273,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if (frameData == null)
                     continue;
                 var msFrame = frameData.msFrame;
-
-                analysis.UpdateSummary(frameIndex, msFrame);
 
                 if (processMarkers)
                 {
@@ -245,12 +326,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
                         }
 
-                        foreach (ProfileMarker markerData in threadData.markers)
+                        int markerAndChildCount = 0;
+                        for (int markerAt = 0, n = threadData.markers.Count; markerAt < n; markerAt++)
                         {
-                            string markerName = profileData.GetMarkerName(markerData);
-                            if (!allMarkers.ContainsKey(markerName))
-                                allMarkers.Add(markerName, 1);
-                            // No longer counting how many times we see the marker (this saves 1/3 of the analysis time).
+                            var markerData = threadData.markers[markerAt];
+
+                            if (markerAndChildCount > 0)
+                                markerAndChildCount--;
+
+                            string markerName = null;
 
                             float ms = markerData.msMarkerTotal - (selfTimes ? markerData.msChildren : 0);
                             var markerDepth = markerData.depth;
@@ -259,16 +343,48 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                             if (markerDepth == 1)
                             {
-                                if (markerName == "Idle")
+                                markerName = profileData.GetMarkerName(markerData);
+                                if (markerName.Equals("Idle", StringComparison.Ordinal))
                                     msIdleTimeOfMinDepthMarkers += ms;
                                 else
                                     msTimeOfMinDepthMarkers += ms;
                             }
 
-                            if (!include)
-                                continue;
+                            if (removeMarker != null)
+                            {
+                                if (markerAndChildCount <= 0)   // If we are already removing markers - don't focus on other occurances in the children
+                                {
+                                    if (markerName == null)
+                                        markerName = profileData.GetMarkerName(markerData);
 
-                            if (depthFilter != kDepthAll && markerDepth != depthFilter)
+                                    if (markerName == removeMarker)
+                                    {
+                                        float removeMarkerTime = markerData.msMarkerTotal;
+
+                                        // Remove this markers time from frame time (if its on the main thread)
+                                        if (thread.threadNameWithIndex == mainThreadIdentifier.threadNameWithIndex)
+                                        {
+                                            msFrame -= removeMarkerTime;
+                                        }
+
+                                        if (selfTimes == false) // (Self times would not need thread or parent adjustments)
+                                        {
+                                            // And from thread time
+                                            if (markerName == "Idle")
+                                                msIdleTimeOfMinDepthMarkers -= removeMarkerTime;
+                                            else
+                                                msTimeOfMinDepthMarkers -= removeMarkerTime;
+
+                                            // And from parents
+                                            RemoveMarkerTimeFromParents(markers, profileData, threadData, markerAt);
+                                        }
+
+                                        markerAndChildCount = RemoveMarker(threadData, markerAt);
+                                    }
+                                }
+                            }
+
+                            if (!include)
                                 continue;
 
                             // If only looking for markers below the parent
@@ -297,25 +413,46 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                     continue;
                             }
 
-                            MarkerData marker;
-                            if (markers.ContainsKey(markerName))
+                            if (depthFilter != kDepthAll && markerDepth != depthFilter)
+                                continue;
+
+                            MarkerData marker = markers[markerData.nameIndex];
+                            if (marker != null)
                             {
-                                marker = markers[markerName];
                                 if (!marker.threads.Contains(threadNameWithIndex))
                                     marker.threads.Add(threadNameWithIndex);
                             }
                             else
                             {
+                                if (markerName == null)
+                                    markerName = profileData.GetMarkerName(markerData);
                                 marker = new MarkerData(markerName);
                                 marker.firstFrameIndex = frameIndex;
                                 marker.minDepth = markerDepth;
                                 marker.maxDepth = markerDepth;
                                 marker.threads.Add(threadNameWithIndex);
                                 analysis.AddMarker(marker);
-                                markers.Add(markerName, marker);
+                                markers[markerData.nameIndex] = marker;
+                                markerCount += 1;
+                            }
+                            marker.count += 1;
+
+                            if (markerAndChildCount > 0)
+                            {
+                                marker.timeIgnored += ms;
+
+                                // Note ms can be 0 in some cases.
+                                // Make sure timeIgnored is never left at 0.0
+                                // This makes sure we can test for non zero to indicate the marker has been ignored 
+                                if (marker.timeIgnored == 0.0)
+                                    marker.timeIgnored = double.Epsilon;
+
+                                // zero out removed marker time
+                                // so we don't record in the individual marker times, marker frame times or min/max times
+                                // ('min/max times' is calculated later from marker frame times)
+                                ms = 0f;
                             }
 
-                            marker.count += 1;
                             marker.msTotal += ms;
 
                             // Individual marker time (not total over frame)
@@ -357,11 +494,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     }
                 }
 
+                analysis.UpdateSummary(frameIndex, msFrame);
+
                 at++;
                 m_Progress = (100 * at) / frameCount;
             }
 
-            analysis.GetFrameSummary().totalMarkers = allMarkers.Count;
+            analysis.GetFrameSummary().totalMarkers = profileData.MarkerNameCount;
             analysis.Finalise(timeScaleMax, maxMarkerDepthFound);
 
             /*

@@ -15,4 +15,4 @@ By default, the Profile Analyzer only displays information about the Main Thread
 |**Selected**|The number of threads selected in the data set. To add more threads use the **Thread** button in the [Filters pane](filtering-system.html/#thread-window).|
 |**Graph Scale**|Select a scale for the plot. You can choose from:<br/> **Median frame time**<br/>**Upper quartile of frame time**</br>**Max frame time**.|
 
-At the bottom of the pane, there is a summary of the median run time of the current filtered threads with a box and whisker plot of them. You can use these graphs to analyze on what threads the most time is spent.
+At the bottom of the pane, there is a summary of the median run time of the current filtered threads with a box and whisker plot of them. You can use these graphs to analyze which threads Unity spends the most time on.

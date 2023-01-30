@@ -17,8 +17,6 @@ Click the **Compare** button in the toolbar to switch to the [Compare View](comp
 1. In the [Frame Control](frame-range-selection.md) pane, right click on the top graph and choose **Select Median Frame** from the context menu.
 1. Next, right click on the lower graph and choose **Select Longest Frame** in the context menu.
 
-![Frame Control context menu](images/frame-control-context-menu.png)<br/>*The Frame Control context menu*
-
-The Profile Analyzer then analyzes the two frames and displays the data for the median and longest frames like so:
+The Profile Analyzer then analyzes the two frames and displays the data for the median and longest frames:
 
 ![Data comparison on same set](images/profile-analyzer-compare-same-data-set.png)<br/>*The Profile Analyzer window with the median and longest frames of the same data set selected*

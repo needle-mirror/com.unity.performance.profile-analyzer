@@ -4,7 +4,7 @@ The Profile Analyzer aggregates and visualizes frame and marker data from a set 
 
 For information on how to use the Profile Analyzer, see the documentation on the [Profile Analyzer window](profile-analyzer-window.md)
 
-![The Profile Analyzer window](images/profile-analyzer-compare-view.png)<br/>*The Profile Analyzer window, with two sets of data loaded to compare*
+![The Profile Analyzer window](images/profile-analyzer-compare-view.png)<br/>*The Profile Analyzer window, with two sets of data loaded*
 
 ## Installing the Profile Analyzer
 

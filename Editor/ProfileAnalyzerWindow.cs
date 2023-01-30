@@ -1,14 +1,8 @@
-#if !UNITY_2019_1_OR_NEWER
-#define UNITY_PRE_2019_1
-#endif
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-#if !UNITY_2020_1_OR_NEWER
-using System.Reflection;
-#endif
 using System.Text.RegularExpressions;
 using System.Threading;
 using UnityEditor.IMGUI.Controls;
@@ -16,17 +10,8 @@ using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
-#if UNITY_2017_1_OR_NEWER
 using ProfilerCommon = UnityEditorInternal.ProfilerDriver;
-#else
-using ProfilerCommon = UnityEngine.Profiling.Profiler;
-#endif
-#if UNITY_2018_3_OR_NEWER
 using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
-#else
-using ProfilerMarkerAbstracted = UnityEditor.Performance.ProfileAnalyzer.FakeScopedMarker;
-#endif
-
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -73,6 +58,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Any,    // OR
     };
 
+    enum RemoveMarkerOperation
+    {
+        ShowAll,
+        HideWaitForFPS,
+        HideWaitForPresent,
+        Custom,
+    };
+
     /// <summary>
     /// Main profile Analyzer UI window
     /// </summary>
@@ -99,14 +92,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent pullRange = new GUIContent("Pull Data", "Pull data from Unity profiler.\nFirst you must use the Unity profiler to capture data from application");
             public static readonly GUIContent pullRecording = new GUIContent("Pull Data", "Pull data from Unity profiler.\nStop Unity profiler recording to enable pulling data");
             public static readonly GUIContent pull = new GUIContent("Pull Data", "Pull data from Unity profiler");
-            public static readonly GUIContent nameFilter = new GUIContent("Name Filter : ", "Only show markers containing the strings");
-            public static readonly GUIContent nameExclude = new GUIContent("Exclude Names : ", "Excludes markers containing the strings");
-            public static readonly GUIContent threadFilter = new GUIContent("Thread : ", "Select threads to focus on");
-            public static readonly GUIContent threadFilterSelect = new GUIContent("Select", "Select threads to focus on");
+            public static readonly GUIContent nameFilter = new GUIContent("Name Filter : ", "Only show markers containing the strings\n\n(Effects the marker table below)");
+            public static readonly GUIContent nameExclude = new GUIContent("Exclude Names : ", "Excludes markers containing the strings\n\n(Effects the marker table below)");
+            public static readonly GUIContent threadFilter = new GUIContent("Thread : ", "Select threads to focus on\n\n(Effects the marker table below)");
+            public static readonly GUIContent threadFilterSelect = new GUIContent("Select", "Select threads to focus on\n\n(Effects the marker table below)");
             public static readonly GUIContent unitFilter = new GUIContent("Units : ", "Units to show in UI");
             public static readonly GUIContent timingFilter = new GUIContent("Analysis Type : ", TimingOptions.Tooltip);
-            public static readonly GUIContent markerColumns = new GUIContent("Marker Columns : ");
+            public static readonly GUIContent markerColumns = new GUIContent("Marker Columns : ", "Set of Columns to show in the table");
             public static readonly GUIContent graphPairing = new GUIContent("Pair Graph Selection", "Selections on one graph will affect the other");
+            public static readonly GUIContent removeMarker = new GUIContent("Remove : ", "Remove a specific marker from time analysis\n\n(Effects all views)");
+            public static readonly GUIContent hideRemoveMarkers = new GUIContent("Hide Removed Markers", "Hide removed markers from the marker table");
 
             public static readonly GUIContent frameSummary = new GUIContent("Frame Summary", "");
             public static readonly GUIContent frameCount = new GUIContent("Frame Count", "Frame Count");
@@ -131,7 +126,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent rightDepthTitle = new GUIContent("Right : ", "Marker callstack depth to analyze");
             public static readonly string autoDepthTitleText = "Auto Depth (Diff: {0:+##;-##;None})";
             public static readonly GUIContent autoDepthTitle = new GUIContent("Auto Depth", "Match up the depth levels based on the most common difference between markers present in both data sets. If the selected depth is at a depth not present in the other data set, after applying this difference, it will use the deepest level.");
-            public static readonly GUIContent parentMarker = new GUIContent("Parent Marker : ", "Marker to start analysis from. Parent of the hierarchy to analyze.");
+            public static readonly GUIContent parentMarker = new GUIContent("Parent Marker : ", "Marker to start analysis from.\nParent of the hierarchy to analyze.");
             public static readonly GUIContent selectParentMarker = new GUIContent("None", "Select using right click context menu on marker names in marker table");
 
             public static readonly GUIContent topMarkerRatio = new GUIContent("Ratio : ", "Normalize\tNormalized to time of the individual set\nLongest\tRatio based on longest time of the two");
@@ -148,6 +143,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 new GUIContent("All", "Marker name contains all strings"),
                 new GUIContent("Any", "Marker name contains any of the strings")
+            };
+
+            public static readonly GUIContent[] removeMarkerOperation =
+            {
+                new GUIContent("None", "All markers shown. None removed."),
+                new GUIContent("FPS Wait", "Remove the WaitForTargetFPS marker which represents targeted FPS (*) time\n\n(*) Via Application.targetFrameRate API usage (common on Mobile)"),
+                new GUIContent("Present Wait", "Remove the Gfx.WaitForPresentOnGfxThread marker which represents time waiting for GPU to complete (common on consoles)"),
+                new GUIContent("Custom", "Right click on a marker in the table and select 'Remove Marker' to remove a specific marker (and all children too)")
             };
 
             public static readonly GUIContent menuItemSelectFramesInAll = new GUIContent("Select Frames that contain this marker (within whole data set)", "");
@@ -208,6 +211,62 @@ To compare two data sets:
         List<string> m_ThreadUINames = new List<string>();
         List<string> m_ThreadNames = new List<string>();
         Dictionary<string, string> m_ThreadNameToUIName;
+        GUIContent[] m_removeMarkerDisplay = null;
+        int[] m_removeMarkerValues = null;
+        bool m_removeMarkerSomeMissing = false;
+
+        struct MarkerFilter
+        {
+            public Dictionary<string, bool> MarkerCache;
+            public bool NeedsRebuild;
+            public List<string> IncludeFilter;
+            public List<string> ExcludeFilter;
+            public NameFilterOperation IncludeOperation;
+            public NameFilterOperation ExcludeOperation;
+
+            public void Clear()
+            {
+                MarkerCache.Clear();
+                NeedsRebuild = true;
+            }
+
+            private void Rebuild(ProfileAnalyzerWindow window)
+            {
+                NeedsRebuild = false;
+                IncludeFilter = window.GetNameFilters();
+                ExcludeFilter = window.GetNameExcludes();
+                IncludeOperation = window.m_NameFilterOperation;
+                ExcludeOperation = window.m_NameExcludeOperation;
+            }
+
+            private bool ComputeFilter(string marker)
+            {
+                if (IncludeFilter.Count > 0)
+                {
+                    if (!NameInFilterList(marker, IncludeFilter, IncludeOperation))
+                        return false;
+                }
+                if (ExcludeFilter.Count > 0)
+                {
+                    if (NameInFilterList(marker, ExcludeFilter, ExcludeOperation))
+                        return false;
+                }
+                return true;
+            }
+
+            public bool DoesMarkerPassFilter(ProfileAnalyzerWindow window, string marker)
+            {
+                if (NeedsRebuild)
+                    Rebuild(window);
+
+                if (MarkerCache.TryGetValue(marker, out var value))
+                    return value;
+                bool passesFilter = ComputeFilter(marker);
+                MarkerCache[marker] = passesFilter;
+                return passesFilter;
+            }
+        }
+        MarkerFilter m_MarkerFilter;
 
         [SerializeField]
         ThreadSelection m_ThreadSelection = new ThreadSelection();
@@ -234,6 +293,10 @@ To compare two data sets:
         NameFilterOperation m_NameFilterOperation = NameFilterOperation.All;
         [SerializeField]
         NameFilterOperation m_NameExcludeOperation = NameFilterOperation.Any;
+        [SerializeField]
+        RemoveMarkerOperation m_removeMarkerOperation = RemoveMarkerOperation.ShowAll;
+        [SerializeField]
+        bool m_hideRemovedMarkers = true;
 
         int m_ProfilerFirstFrameIndex = 0;
         int m_ProfilerLastFrameIndex = 0;
@@ -243,6 +306,9 @@ To compare two data sets:
         ActiveTab m_ActiveTab = ActiveTab.Summary;
         bool m_OtherTabDirty = false;
         bool m_OtherTableDirty = false;
+
+        [SerializeField]
+        string m_removeMarkerCustomRemoveMarker = null;
 
         [SerializeField]
         bool m_ShowFilters = true;
@@ -256,10 +322,6 @@ To compare two data sets:
         bool m_ShowMarkerSummary = true;
         [SerializeField]
         bool m_ShowMarkerTable = true;
-
-#if UNITY_PRE_2019_1
-        bool m_NeedPre2019Enable;
-#endif
 
         internal static class UIColor
         {
@@ -358,6 +420,8 @@ To compare two data sets:
             public static readonly int WidthRHS = 290;        // Column widths + label padding between (276) + scrollbar width
             public static readonly int FilterOptionsLeftLabelWidth = 100;
             public static readonly int FilterOptionsEnumWidth = 50;
+            public static readonly int RemoveMarkerOptionsEnumWidth = 100;
+            public static readonly int RemoveMarkerMissingOptionsEnumWidth = 200;
             public static readonly int FilterOptionsLockedEnumWidth = 120;
             public static readonly int FilterOptionsRightLabelWidth = 110;
             public static readonly int FilterOptionsRightEnumWidth = 150;
@@ -430,11 +494,7 @@ To compare two data sets:
                 static Regex lastSpace = new Regex("(.+)[ ]([^ ]*)");
         */
 
-#if UNITY_2018_1_OR_NEWER
         [MenuItem("Window/Analysis/Profile Analyzer")]
-#else
-        [MenuItem("Window/Profile Analyzer")]
-#endif
         static void Init()
         {
             var window = GetWindow<ProfileAnalyzerWindow>("Profile Analyzer");
@@ -527,7 +587,7 @@ To compare two data sets:
                 m_ProfilerWindowInterface.GetProfilerWindowHandle();
             }
 
-            if (!string.IsNullOrEmpty(m_SelectedMarker.name))
+            if (IsSelectedMarkerNameValid())
             {
                 var oldSelectedMarkerName = m_SelectedMarker;
                 m_SelectedMarker.name = null;
@@ -539,6 +599,11 @@ To compare two data sets:
 
             m_ProfilerWindowInterface.selectedFrameChanged -= OnProfilerWindowSelectedFrameChanged;
             m_ProfilerWindowInterface.selectedFrameChanged += OnProfilerWindowSelectedFrameChanged;
+            m_MarkerFilter = new MarkerFilter
+            {
+                MarkerCache = new Dictionary<string, bool>(),
+                NeedsRebuild = true,
+            };
 
             m_ProfileAnalyzer = new ProfileAnalyzer();
 
@@ -623,7 +688,6 @@ To compare two data sets:
         {
             if (m_BackgroundThread != null)
                 m_BackgroundThread.Abort();
-            Pre2019ReEnableRecording();
             if (m_ProfileSingleView != null && m_ProfileSingleView.data != null)
                 m_ProfileSingleView.data.DeleteTmpFiles();
             if (m_ProfileLeftView != null && m_ProfileLeftView.data != null)
@@ -776,6 +840,7 @@ To compare two data sets:
                 }
 
                 UpdateThreadNames();
+                BuildRemoveMarkerList();
 
                 if (!m_OtherTableDirty)
                     SelectMarker(m_SelectedMarker.name);
@@ -799,14 +864,7 @@ To compare two data sets:
 
         bool IsDocked()
         {
-#if UNITY_2020_1_OR_NEWER
             return docked;
-#else
-            BindingFlags fullBinding = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-            MethodInfo isDockedMethod = typeof(EditorWindow).GetProperty("docked", fullBinding).GetGetMethod(true);
-            bool isDocked = (bool)isDockedMethod.Invoke(this, null);
-            return isDocked;
-#endif // UNITY_2020_1_OR_NEWER
         }
 
         void CheckScreenSizeChanges()
@@ -1059,11 +1117,11 @@ To compare two data sets:
             {
                 case ThreadActivity.AnalyzeDone:
                     // Create table when analysis complete
-                    Pre2019ReEnableRecording();
                     UpdateAnalysisFromAsyncProcessing(m_ProfileSingleView, m_FullAnalysisRequired);
                     m_FullAnalysisRequired = false;
 
                     UpdateThreadNames();
+                    BuildRemoveMarkerList();
 
                     if (m_ProfileSingleView.analysis != null)
                     {
@@ -1086,7 +1144,6 @@ To compare two data sets:
                     break;
 
                 case ThreadActivity.CompareDone:
-                    Pre2019ReEnableRecording();
                     UpdateAnalysisFromAsyncProcessing(m_ProfileLeftView, m_FullCompareRequired);
                     UpdateAnalysisFromAsyncProcessing(m_ProfileRightView, m_FullCompareRequired);
                     m_FullCompareRequired = false;
@@ -1094,6 +1151,7 @@ To compare two data sets:
                     m_TotalCombinedMarkerCount = m_TotalCombinedMarkerCountNew;
 
                     UpdateThreadNames();
+                    BuildRemoveMarkerList();
 
                     if (m_ProfileLeftView.analysis != null && m_ProfileRightView.analysis != null)
                     {
@@ -1116,7 +1174,6 @@ To compare two data sets:
                     break;
 
                 case ThreadActivity.LoadDone:
-                    Pre2019ReEnableRecording();
                     SetView(GetActiveView, m_ProfilerData, m_Path, GetActiveFrameTimeGraph);
                     switch (m_ActiveTab)
                     {
@@ -1192,28 +1249,6 @@ To compare two data sets:
             }
         }
 
-        void Pre2019ReEnableRecording()
-        {
-#if UNITY_PRE_2019_1
-            if (m_NeedPre2019Enable)
-            {
-                m_NeedPre2019Enable = false;
-                ProfilerCommon.enabled = true;
-            }
-#endif
-        }
-
-        void Pre2019DisableRecording()
-        {
-#if UNITY_PRE_2019_1
-            if (ProfilerCommon.enabled && ProfilerDriver.deepProfiling && (EditorApplication.isPlaying || ProfilerDriver.profileEditor))
-            {
-                ProfilerCommon.enabled = false;
-                m_NeedPre2019Enable = true;
-            }
-#endif
-        }
-
         ProfileDataView GetActiveView
         {
             get
@@ -1259,6 +1294,9 @@ To compare two data sets:
                     view.analysisFull = view.analysis;
                 else
                     view.analysisFull = view.analysisFullNew;
+
+                if (view.IsDataValid())
+                    view.FindKeyMarkers();
             }
         }
 
@@ -1267,9 +1305,44 @@ To compare two data sets:
             List<FrameTimeGraph.Data> data = new List<FrameTimeGraph.Data>();
             int frames = profileData.GetFrameCount();
 
+            bool removeFrameSyncTime = false;
+            int removeMarkerIndex = -1;
+            ThreadIdentifier mainThreadSelection = new ThreadIdentifier("Main Thread", 1);;
+
+            string removeMarker = GetRemoveMarker();
+            if (removeMarker != null)
+            {
+                // Find marker to remove 
+                removeMarkerIndex = profileData.GetMarkerIndex(removeMarker);
+                removeFrameSyncTime = (removeMarkerIndex != -1);
+            }
+
+
             for (int frameOffset = 0; frameOffset < frames; frameOffset++)
             {
-                float ms = profileData.GetFrame(frameOffset).msFrame;
+                ProfileFrame frame = profileData.GetFrame(frameOffset);
+                float ms = frame.msFrame;
+
+                if (removeFrameSyncTime)
+                {
+                    for (int threadIndex = 0; threadIndex < frame.threads.Count; threadIndex++)
+                    {
+                        ProfileThread thread = frame.threads[threadIndex];
+                        // Marker only on main thread
+                        if (profileData.GetThreadName(thread) == mainThreadSelection.threadNameWithIndex)
+                        {
+                            foreach (var marker in thread.markers)
+                            {
+                                if (marker.nameIndex != removeMarkerIndex)
+                                    continue;
+
+                                // May be multiple instances of this marker in the 'custom' case (so we can't just break out of marker loop here)
+                                ms-= marker.msMarkerTotal;
+                            }
+                            break;
+                        }
+                    }
+                }
                 FrameTimeGraph.Data dataPoint = new FrameTimeGraph.Data(ms, frameOffset);
                 data.Add(dataPoint);
             }
@@ -1283,7 +1356,6 @@ To compare two data sets:
             if (m_Path.Length != 0)
             {
                 m_ActiveLoadingView = ActiveView.Single;
-                Pre2019DisableRecording();
                 BeginAsyncAction(ThreadActivity.Load);
             }
             GUIUtility.ExitGUI();
@@ -1478,9 +1550,9 @@ To compare two data sets:
             var multiColumnHeader = new MultiColumnHeader(m_ComparisonMulticolumnHeaderState);
             multiColumnHeader.SetSorting(sortedColumn, sortAscending);
             multiColumnHeader.ResizeToFit();
-            m_ComparisonTable = new ComparisonTable(m_ComparisonTreeViewState, multiColumnHeader, m_ProfileLeftView, m_ProfileRightView, m_Pairings, this, m_2D, UIColor.left, UIColor.right);
+            m_ComparisonTable = new ComparisonTable(m_ComparisonTreeViewState, multiColumnHeader, m_ProfileLeftView, m_ProfileRightView, m_Pairings, m_hideRemovedMarkers, this, m_2D, UIColor.left, UIColor.right);
 
-            if (string.IsNullOrEmpty(m_SelectedMarker.name))
+            if (!IsSelectedMarkerNameValid())
                 SelectPairing(0);
             else
                 SelectPairingByName(m_SelectedMarker.name);
@@ -1490,8 +1562,10 @@ To compare two data sets:
         {
             var leftMarkers = left.GetMarkers();
             var rightMarkers = right.GetMarkers();
-            foreach (var pairing in pairings)
+            // using a for loop instead of foreach is surprisingly faster on Mono
+            for (int i = 0, n = pairings.Count; i < n; i++)
             {
+                var pairing = pairings[i];
                 float min = float.MaxValue;
                 float max = 0.0f;
                 MarkerData leftMarker = null;
@@ -1561,9 +1635,9 @@ To compare two data sets:
 
             // First scan just the frames
             m_ThreadPhase = 0;
-            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker);
+            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
             m_ThreadPhase++;
-            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker);
+            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
             m_ThreadPhase++;
 
             if (leftAnalysisNew == null || rightAnalysisNew == null)
@@ -1579,9 +1653,9 @@ To compare two data sets:
             // For now do it always if the depth is auto and not 'all'
             if (updateDepthPhase != 0)
             {
-                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax);
+                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
                 m_ThreadPhase++;
-                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax);
+                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
                 m_ThreadPhase++;
 
                 var pairings = GeneratePairings(leftAnalysis, rightAnalysis);
@@ -1608,7 +1682,8 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0);
+                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+                m_ThreadPhase++;
             }
             m_ThreadPhase++;
 
@@ -1622,14 +1697,15 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0);
+                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+                m_ThreadPhase++;
             }
             m_ThreadPhase++;
 
-            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMax);
+            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
             m_ThreadPhase++;
 
-            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMax);
+            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
             m_ThreadPhase++;
 
             m_TotalCombinedMarkerCountNew = GetTotalCombinedMarkerCount(m_ProfileLeftView.data, m_ProfileRightView.data);
@@ -1658,7 +1734,6 @@ To compare two data sets:
                 //m_comparisonTable = null;
                 //m_ProfileLeftView.analysis = null;
                 //m_ProfileRightView.analysis = null;
-                Pre2019DisableRecording();
                 BeginAsyncAction(ThreadActivity.Compare);
             }
             else
@@ -1801,6 +1876,17 @@ To compare two data sets:
             SelectMarkerByName(rows[0].displayName);
         }
 
+        bool IsSelectedMarkerNameValid()
+        {
+            if (string.IsNullOrEmpty(m_SelectedMarker.name))
+                return false;
+
+            if (m_hideRemovedMarkers && m_SelectedMarker.name == GetRemoveMarker())
+                return false;
+
+            return true;
+        }
+
         void CreateProfileTable()
         {
             if (m_ProfileTreeViewState == null)
@@ -1826,9 +1912,9 @@ To compare two data sets:
             var multiColumnHeader = new MultiColumnHeader(m_ProfileMulticolumnHeaderState);
             multiColumnHeader.SetSorting(sortedColumn, sortAscending);
             multiColumnHeader.ResizeToFit();
-            m_ProfileTable = new ProfileTable(m_ProfileTreeViewState, multiColumnHeader, m_ProfileSingleView, this, m_2D, UIColor.bar);
+            m_ProfileTable = new ProfileTable(m_ProfileTreeViewState, multiColumnHeader, m_ProfileSingleView, m_hideRemovedMarkers, this, m_2D, UIColor.bar);
 
-            if (string.IsNullOrEmpty(m_SelectedMarker.name))
+            if (!IsSelectedMarkerNameValid())
                 SelectFirstMarkerInTable();
             else
                 SelectMarkerByName(m_SelectedMarker.name);
@@ -1865,10 +1951,10 @@ To compare two data sets:
                     selection.Add(m_ProfileSingleView.data.OffsetToDisplayFrame(frameOffset));
                 }
 
-                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker);
+                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
                 m_ThreadPhase++;
             }
-            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker);
+            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
             m_ThreadPhase++;
             stopwatch.Stop();
             m_LastAnalysisTimeMilliseconds = stopwatch.ElapsedMilliseconds;
@@ -1894,7 +1980,6 @@ To compare two data sets:
             {
                 //m_profileTable = null;
                 //m_ProfileSingleView.analysis = null;
-                Pre2019DisableRecording();
                 BeginAsyncAction(ThreadActivity.Analyze);
             }
             else
@@ -2266,53 +2351,50 @@ To compare two data sets:
             return GetNameFilters(m_NameExclude);
         }
 
-        internal bool NameInFilterList(string name, List<string> nameFilters)
+        internal bool DoesMarkerPassFilter(string name)
         {
-            switch (m_NameFilterOperation)
+            return m_MarkerFilter.DoesMarkerPassFilter(this, name);
+        }
+
+        internal bool NameInIncludeList(string name, List<string> nameFilters)
+        {
+            return NameInFilterList(name, nameFilters, m_NameFilterOperation);
+        }
+
+        internal bool NameInExcludeList(string name, List<string> nameExcludes)
+        {
+            return NameInFilterList(name, nameExcludes, m_NameExcludeOperation);
+        }
+
+        static bool NameInFilterList(string name, List<string> nameFilters, NameFilterOperation operation)
+        {
+            switch (operation)
             {
                 default:
-                    //case NameFilterOperation.All:
-                    return NameInAllFilterList(name, nameFilters);
-                case NameFilterOperation.Any:
-                    return NameInAnyFilterList(name, nameFilters);
-            }
-        }
+                //case NameFilterOperation.All:
+                {
+                    foreach (string subString in nameFilters)
+                    {
+                        // As soon as name doesn't match one in the list then return false
+                        if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) < 0)
+                            return false;
+                    }
 
-        internal bool NameInExcludeList(string name, List<string> nameFilters)
-        {
-            switch (m_NameExcludeOperation)
-            {
-                default:
-                    //case NameFilterOperation.All:
-                    return NameInAllFilterList(name, nameFilters);
-                case NameFilterOperation.Any:
-                    return NameInAnyFilterList(name, nameFilters);
-            }
-        }
-
-        internal bool NameInAllFilterList(string name, List<string> nameFilters)
-        {
-            foreach (string subString in nameFilters)
-            {
-                // As soon as name doesn't match one in the list then return false
-                if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) < 0)
-                    return false;
-            }
-
-            // Name is matching all the filters in the list
-            return true;
-        }
-
-        bool NameInAnyFilterList(string name, List<string> nameFilters)
-        {
-            foreach (string subString in nameFilters)
-            {
-                // As soon as names matches one in the list then return true
-                if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0)
+                    // Name is matching all the filters in the list
                     return true;
-            }
+                }
+                case NameFilterOperation.Any:
+                {
+                    foreach (string subString in nameFilters)
+                    {
+                        // As soon as names matches one in the list then return true
+                        if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0)
+                            return true;
+                    }
 
-            return false;
+                    return false;
+                }
+            }
         }
 
         static string FilterWithQuotes(string markerName)
@@ -2346,7 +2428,10 @@ To compare two data sets:
         internal void AddToIncludeFilter(string markerName)
         {
             if (AddFilter(GetNameFilters(), ref m_NameFilter, markerName))
+            {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
+            }
 
             // Remove from exclude list if in the include list
             RemoveFromExcludeFilter(markerName);
@@ -2355,7 +2440,10 @@ To compare two data sets:
         internal void AddToExcludeFilter(string markerName)
         {
             if (AddFilter(GetNameExcludes(), ref m_NameExclude, markerName))
+            {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
+            }
 
             // Remove from include list if in the include list
             RemoveFromIncludeFilter(markerName);
@@ -2380,6 +2468,7 @@ To compare two data sets:
             {
                 newFilters = nameFilterString;
 
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
             }
         }
@@ -2445,7 +2534,7 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
-        void ShowSelectedMarker()
+        bool IsSelectedMarkerValid()
         {
             bool valid = true;
 
@@ -2484,6 +2573,13 @@ To compare two data sets:
                     }
                 }
             }
+
+            return valid;
+        }
+
+        void ShowSelectedMarker()
+        {
+            bool valid = IsSelectedMarkerValid();
 
             if (valid)
             {
@@ -2552,6 +2648,20 @@ To compare two data sets:
                 return k_ProfileDataDefaultDisplayOffset + context.data.DisplayFrameToOffset(frameIndex);
         }
 
+        internal bool CanExportComparisonTable()
+        {
+            return m_ProfileLeftView != null && m_ProfileLeftView.IsDataValid() && m_ProfileRightView != null && m_ProfileRightView.IsDataValid() &&
+                m_ComparisonTable != null && m_ActiveTab == ActiveTab.Compare;
+        }
+
+        internal bool TryExportComparisonTable(StreamWriter writer)
+        {
+            if (m_ComparisonTable == null || m_ActiveTab != ActiveTab.Compare)
+                return false;
+            m_ComparisonTable.WriteTableContentsCSV(writer);
+            return true;
+        }
+
         int GetRemappedUIFirstFrameOffset(ProfileDataView context)
         {
             if (context.inSyncWithProfilerData)
@@ -2596,10 +2706,15 @@ To compare two data sets:
                     int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileSingleView);
                     bool enabled = !IsAnalysisRunning();
                     m_FrameTimeGraph.SetEnabled(enabled);
+
+                    bool valid = IsSelectedMarkerValid();
+                    string validMarkerName = valid ? m_SelectedMarker.name : "";
+
                     m_FrameTimeGraph.Draw(rect, m_ProfileSingleView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping,
-                        m_SelectedMarker.name, 0, m_ProfileSingleView.analysisFull);
+                        validMarkerName, 0, m_ProfileSingleView.analysisFull);
 
                     EditorGUILayout.BeginHorizontal();
+
                     GUILayout.FlexibleSpace();
                     ShowSelectedMarker();
                     EditorGUILayout.EndHorizontal();
@@ -2762,24 +2877,18 @@ To compare two data sets:
             if (text == null)
                 return;
 
-#if UNITY_2019_1_OR_NEWER
             GUIStyle treeViewSelectionStyle = "TV Selection";
             GUIStyle backgroundStyle = new GUIStyle(treeViewSelectionStyle);
 
             GUIStyle treeViewLineStyle = "TV Line";
             GUIStyle textStyle = new GUIStyle(treeViewLineStyle);
-#else
-            GUIStyle textStyle = GUI.skin.label;
-#endif
 
             GUIContent content = new GUIContent(text, text);
             Vector2 size = textStyle.CalcSize(content);
             Rect rect = EditorGUILayout.GetControlRect(GUILayout.MaxWidth(size.x), GUILayout.Height(size.y));
             if (Event.current.type == EventType.Repaint)
             {
-#if UNITY_2019_1_OR_NEWER
                 backgroundStyle.Draw(rect, false, false, true, true);
-#endif
                 GUI.Label(rect, content, textStyle);
             }
         }
@@ -2919,6 +3028,7 @@ To compare two data sets:
 
             if (m_NameFilterOperation != lastNameFilterOperation)
             {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
             }
             string lastFilter = m_NameFilter;
@@ -2928,6 +3038,7 @@ To compare two data sets:
             GUI.enabled = lastEnabled;
             if (m_NameFilter != lastFilter)
             {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
             }
 
@@ -2938,6 +3049,7 @@ To compare two data sets:
             GUI.enabled = lastEnabled;
             if (m_NameExcludeOperation != lastNameExcludeOperation)
             {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
             }
             string lastExclude = m_NameExclude;
@@ -2947,6 +3059,7 @@ To compare two data sets:
             GUI.enabled = lastEnabled;
             if (m_NameExclude != lastExclude)
             {
+                m_MarkerFilter.Clear();
                 UpdateMarkerTable();
             }
             EditorGUILayout.EndHorizontal();
@@ -3150,6 +3263,176 @@ To compare two data sets:
 
         static readonly ProfilerMarkerAbstracted m_DrawAnalysisOptionsProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.DrawAnalysisOptions");
 
+        void UpdateRemoveMarkerDisplay()
+        {
+            UpdateActiveTab(true);
+            // Force an update
+            m_FrameTimeGraph.ClearData();
+            m_LeftFrameTimeGraph.ClearData();
+            m_RightFrameTimeGraph.ClearData();
+        }
+
+        void BuildRemoveMarkerList()
+        {
+            var entries = new List<GUIContent>();
+            var values = new List<int>();
+            m_removeMarkerSomeMissing = false;
+            foreach (RemoveMarkerOperation filterOperation in Enum.GetValues(typeof(RemoveMarkerOperation)))
+            {
+                int value = (int)filterOperation;
+                GUIContent entry = new GUIContent(Styles.removeMarkerOperation[value]);
+
+                bool found = true;
+                switch(filterOperation)
+                {
+                    case RemoveMarkerOperation.HideWaitForFPS:
+                        {
+                            switch (m_ActiveTab)
+                            {
+                                case ActiveTab.Summary:
+                                    if (!m_ProfileSingleView.containsWaitForFPS)
+                                        found = false;
+                                    break;
+                                case ActiveTab.Compare:
+                                    if (!m_ProfileLeftView.containsWaitForFPS && !m_ProfileRightView.containsWaitForFPS)
+                                        found = false;
+                                    break;
+                            }
+                        }
+                        break;
+                    case RemoveMarkerOperation.HideWaitForPresent:
+                        {
+                            switch (m_ActiveTab)
+                            {
+                                case ActiveTab.Summary:
+                                    if (!m_ProfileSingleView.containsWaitForPresent)
+                                        found = false;
+                                    break;
+                                case ActiveTab.Compare:
+                                    if (!m_ProfileLeftView.containsWaitForPresent && !m_ProfileRightView.containsWaitForPresent)
+                                        found = false;
+                                    break;
+                            }
+                        }
+                        break;
+                }
+
+                if (!found)
+                {
+                    entry.text += " (not in capture)";
+                    m_removeMarkerSomeMissing = true;
+                }
+                entries.Add(entry);
+                values.Add(value);
+            }
+
+            m_removeMarkerDisplay = entries.ToArray();
+            m_removeMarkerValues = values.ToArray();
+        }
+
+
+        void DrawRemoveMarker()
+        {
+            bool update = false;
+
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(Styles.removeMarker, GUILayout.Width(LayoutSize.FilterOptionsLeftLabelWidth));
+
+            bool lastEnabled = GUI.enabled;
+            bool enabled = !IsAnalysisRunning();
+            GUI.enabled = enabled;
+
+            if (m_removeMarkerDisplay == null || m_removeMarkerValues == null)
+                BuildRemoveMarkerList();
+
+            // Hack to make popup wider if some markers missing, and have extra text to indicate that
+            int width = (m_removeMarkerSomeMissing ? LayoutSize.RemoveMarkerMissingOptionsEnumWidth : LayoutSize.RemoveMarkerOptionsEnumWidth);
+            RemoveMarkerOperation removeMarkerOperation = (RemoveMarkerOperation)EditorGUILayout.IntPopup((int)m_removeMarkerOperation, m_removeMarkerDisplay, m_removeMarkerValues, GUILayout.Width(width));
+            if (removeMarkerOperation != m_removeMarkerOperation)
+                update = true;
+
+            if (m_removeMarkerOperation != RemoveMarkerOperation.ShowAll)
+            {
+                bool hide = EditorGUILayout.Toggle(Styles.hideRemoveMarkers, m_hideRemovedMarkers, GUILayout.ExpandWidth(false));
+                if (hide != m_hideRemovedMarkers)
+                {
+                    m_hideRemovedMarkers = hide;
+                    update = true;
+                }
+            }
+
+            switch (m_removeMarkerOperation)
+            {
+                case RemoveMarkerOperation.ShowAll:
+                    EditorGUILayout.LabelField("");
+                    break;
+/*
+                // Could make custom marker editable, but we don't support multiple markers yet
+                // So currently we limit this to being set by right click context menu
+                case removeMarkerOperation.Custom:
+                    string removeMarkerCustomRemoveMarker = EditorGUILayout.DelayedTextField(m_removeMarkerCustomRemoveMarker, GUILayout.MinWidth(200 - LayoutSize.removeMarkerOptionsEnumWidth));
+                    if (removeMarkerCustomRemoveMarker != m_removeMarkerCustomRemoveMarker)
+                    {
+                        m_removeMarkerCustomRemoveMarker = removeMarkerCustomRemoveMarker;
+                        update = true;
+                    }
+                    break;
+*/
+                default:
+                    EditorGUILayout.LabelField(GetRemoveMarker());
+                    break;
+            }
+            GUI.enabled = lastEnabled;
+            EditorGUILayout.EndHorizontal();
+
+            if (update)
+            {
+                m_removeMarkerOperation = removeMarkerOperation;
+                UpdateRemoveMarkerDisplay();
+            }
+        }
+
+        internal void SetAsRemoveMarker(string markerName)
+        {
+            if (markerName == "")
+            {
+                if (m_removeMarkerOperation != RemoveMarkerOperation.ShowAll)
+                {
+                    m_removeMarkerOperation = RemoveMarkerOperation.ShowAll;
+                    UpdateRemoveMarkerDisplay();
+                }
+            }
+            else
+            {
+                m_removeMarkerCustomRemoveMarker = markerName;
+                m_removeMarkerOperation = RemoveMarkerOperation.Custom;
+                UpdateRemoveMarkerDisplay();
+            }
+        }
+
+        string GetRemoveMarker()
+        {
+            switch (m_removeMarkerOperation)
+            {
+                default:
+                case RemoveMarkerOperation.ShowAll:
+                    return null;
+                case RemoveMarkerOperation.HideWaitForFPS:
+                    // Gfx.WaitForPresentOnGfxThread is not always present on Android 
+                    // E.g. when Application.targetFrameRate locks the frame rate
+                    // So we support removing WaitForTargetFPS
+                    // Often WaitForTargetFPS will be negligable on console and Gfx.WaitForPresentOnGfxThread is key
+                    return "WaitForTargetFPS";
+                case RemoveMarkerOperation.HideWaitForPresent:
+                    // Gfx.WaitForPresentOnGfxThread is seen on consoles
+                    return "Gfx.WaitForPresentOnGfxThread";
+                case RemoveMarkerOperation.Custom:
+                    if (m_removeMarkerCustomRemoveMarker == null || m_removeMarkerCustomRemoveMarker=="")
+                        m_removeMarkerCustomRemoveMarker = "WaitForTargetFPS";
+                    return m_removeMarkerCustomRemoveMarker;
+            }
+        }
+
         void DrawAnalysisOptions()
         {
             using (m_DrawAnalysisOptionsProfilerMarker.Auto())
@@ -3161,6 +3444,8 @@ To compare two data sets:
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 if (m_ShowFilters)
                 {
+                    DrawRemoveMarker();
+
                     DrawNameFilter();
                     EditorGUILayout.BeginHorizontal();
                     DrawThreadFilter(m_ProfileSingleView.data);
@@ -3218,42 +3503,37 @@ To compare two data sets:
             return m_ThreadProgress * 0.01f;
         }
 
+        bool IsAnalysisValid(ProfileDataView view, bool checkFrameCount = false)
+        {
+            if (!view.IsDataValid())
+                return false;
+
+            if (view.analysis == null)
+                return false;
+
+            if (checkFrameCount)
+            {
+                if (view.analysis.GetFrameSummary().frames.Count <= 0)
+                    return false;
+            }
+
+            return true;
+        }
+
         bool IsAnalysisValid(bool checkFrameCount = false)
         {
             switch (m_ActiveTab)
             {
                 case ActiveTab.Summary:
-                    if (!m_ProfileSingleView.IsDataValid())
+                    if (!IsAnalysisValid(m_ProfileSingleView, checkFrameCount))
                         return false;
-
-                    if (m_ProfileSingleView.analysis == null)
-                        return false;
-
-                    if (checkFrameCount)
-                    {
-                        if (m_ProfileSingleView.analysis.GetFrameSummary().frames.Count <= 0)
-                            return false;
-                    }
                     break;
 
                 case ActiveTab.Compare:
-                    if (!m_ProfileLeftView.IsDataValid())
+                    if (!IsAnalysisValid(m_ProfileLeftView, checkFrameCount))
                         return false;
-                    if (!m_ProfileRightView.IsDataValid())
+                    if (!IsAnalysisValid(m_ProfileRightView, checkFrameCount))
                         return false;
-
-                    if (m_ProfileLeftView.analysis == null)
-                        return false;
-                    if (m_ProfileRightView.analysis == null)
-                        return false;
-
-                    if (checkFrameCount)
-                    {
-                        if (m_ProfileLeftView.analysis.GetFrameSummary().frames.Count <= 0)
-                            return false;
-                        if (m_ProfileRightView.analysis.GetFrameSummary().frames.Count <= 0)
-                            return false;
-                    }
                     break;
             }
 
@@ -3376,13 +3656,7 @@ To compare two data sets:
             EditorGUILayout.BeginVertical(GUI.skin.box);
 
             m_HelpScroll = EditorGUILayout.BeginScrollView(m_HelpScroll, GUILayout.ExpandHeight(true));
-#if UNITY_2019_3_OR_NEWER
             GUILayout.TextArea(Styles.helpText);
-#else
-            GUIStyle helpStyle = new GUIStyle(EditorStyles.textField);
-            helpStyle.wordWrap = true;
-            EditorGUILayout.LabelField(Styles.helpText, helpStyle);
-#endif
             EditorGUILayout.EndScrollView();
 
             EditorGUILayout.EndVertical();
@@ -3419,7 +3693,7 @@ To compare two data sets:
                             using (m_TopNMarkersProfilerMarker.Auto())
                             {
                                 m_TopMarkers.SetData(m_ProfileSingleView, m_DepthSliceUI.depthFilter, GetNameFilters(),
-                                    GetNameExcludes(), m_TimingOption, m_ThreadSelection.selection.Count);
+                                    GetNameExcludes(), m_TimingOption, m_ThreadSelection.selection.Count, m_hideRemovedMarkers);
 
                                 EditorGUILayout.BeginVertical(GUILayout.Height(20));
 
@@ -3560,7 +3834,6 @@ To compare two data sets:
                 if (m_Path.Length != 0)
                 {
                     m_ActiveLoadingView = activeView;
-                    Pre2019DisableRecording();
                     BeginAsyncAction(ThreadActivity.Load);
                 }
                 GUIUtility.ExitGUI();
@@ -3627,6 +3900,9 @@ To compare two data sets:
 
             EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
 
+            bool valid = IsSelectedMarkerValid();
+            string validMarkerName = valid ? m_SelectedMarker.name : "";
+
             GUI.SetNextControlName("LeftFrameTimeGraph");
             Rect rect = EditorGUILayout.GetControlRect(GUILayout.Height(50));
             if (m_ProfileLeftView.IsDataValid())
@@ -3646,7 +3922,7 @@ To compare two data sets:
                 int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileLeftView);
 
                 m_LeftFrameTimeGraph.SetEnabled(enabled);
-                m_LeftFrameTimeGraph.Draw(rect, m_ProfileLeftView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, m_SelectedMarker.name, maxFrames, m_ProfileLeftView.analysisFull);
+                m_LeftFrameTimeGraph.Draw(rect, m_ProfileLeftView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, validMarkerName, maxFrames, m_ProfileLeftView.analysisFull);
             }
             else
             {
@@ -3672,7 +3948,7 @@ To compare two data sets:
                 int offsetToIndexMapping = GetRemappedUIFirstFrameOffset(m_ProfileRightView);
 
                 m_RightFrameTimeGraph.SetEnabled(enabled);
-                m_RightFrameTimeGraph.Draw(rect, m_ProfileRightView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, m_SelectedMarker.name, maxFrames, m_ProfileRightView.analysisFull);
+                m_RightFrameTimeGraph.Draw(rect, m_ProfileRightView.analysis, selectedOffsets, yRange, offsetToDisplayMapping, offsetToIndexMapping, validMarkerName, maxFrames, m_ProfileRightView.analysisFull);
             }
             else
             {
@@ -4055,6 +4331,8 @@ To compare two data sets:
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 if (m_ShowFilters)
                 {
+                    DrawRemoveMarker();
+
                     DrawNameFilter();
                     EditorGUILayout.BeginHorizontal();
                     DrawThreadFilter(m_ProfileLeftView.data);
@@ -4140,9 +4418,9 @@ To compare two data sets:
                                 var nameExcludes = GetNameExcludes();
 
                                 m_TopMarkersLeft.SetData(m_ProfileLeftView, m_DepthSliceUI.depthFilter1, nameFilters,
-                                    nameExcludes, m_TimingOption, m_ThreadSelection.selection.Count);
+                                    nameExcludes, m_TimingOption, m_ThreadSelection.selection.Count, m_hideRemovedMarkers);
                                 m_TopMarkersRight.SetData(m_ProfileRightView, m_DepthSliceUI.depthFilter2, nameFilters,
-                                    nameExcludes, m_TimingOption, m_ThreadSelection.selection.Count);
+                                    nameExcludes, m_TimingOption, m_ThreadSelection.selection.Count, m_hideRemovedMarkers);
 
 
                                 float leftRange = m_TopMarkersLeft.GetTopMarkerTimeRange();
@@ -4648,20 +4926,7 @@ To compare two data sets:
             if (index >= 0 && index < markers.Count)
             {
                 var marker = markers[index];
-
-                var nameFilters = GetNameFilters();
-                if (nameFilters.Count > 0)
-                {
-                    if (!NameInFilterList(marker.name, nameFilters))
-                        valid = false;
-                }
-
-                var nameExcludes = GetNameExcludes();
-                if (nameExcludes.Count > 0)
-                {
-                    if (NameInExcludeList(marker.name, nameExcludes))
-                        valid = false;
-                }
+                valid = DoesMarkerPassFilter(marker.name);
             }
 
             m_SelectedMarker.id = index;
@@ -4746,20 +5011,7 @@ To compare two data sets:
             if (index >= 0 && index < m_Pairings.Count)
             {
                 var pairing = m_Pairings[index];
-
-                var nameFilters = GetNameFilters();
-                if (nameFilters.Count > 0)
-                {
-                    if (!NameInFilterList(pairing.name, nameFilters))
-                        valid = false;
-                }
-
-                var nameExcludes = GetNameExcludes();
-                if (nameExcludes.Count > 0)
-                {
-                    if (NameInExcludeList(pairing.name, nameExcludes))
-                        valid = false;
-                }
+                valid = DoesMarkerPassFilter(pairing.name);
             }
 
             m_SelectedPairing = index;
@@ -5170,7 +5422,7 @@ To compare two data sets:
 
             var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
             m_ProfilerWindowInterface.JumpToFrame(RemapFrameIndex(frameIndex, frameContext.FrameIndexOffset));
-            if (!string.IsNullOrEmpty(m_SelectedMarker.name))
+            if (IsSelectedMarkerNameValid())
                 m_ProfilerWindowInterface.SetProfilerWindowMarkerName(m_SelectedMarker.name, m_ThreadSelection.selection);
             ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.JumpToFrame, analytic);
         }
@@ -5308,6 +5560,7 @@ To compare two data sets:
             float barValue = marker.msMean;
             string text = "Mean frame contribution";
             Units units = m_DisplayUnits.Units;
+            bool removed = marker.timeIgnored > 0;
             if (DisplayCount())
             {
                 units = Units.Count;
@@ -5322,22 +5575,31 @@ To compare two data sets:
             m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
 
             m_Columns.Draw2("", "");
+         
             EditorGUILayout.BeginHorizontal();
 
-            // NOTE: This can effect the whole width of the region its inside
-            // Not clear why
-            if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
+            if (removed)
             {
-                m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, UIColor.bar);
-                m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, UIColor.barBackground);
-                m_2D.DrawEnd();
+                EditorGUILayout.LabelField("(Marker Removed from analysis)");
+            }
+            else
+            {
+                // NOTE: This can effect the whole width of the region its inside
+                // Not clear why
+                if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
+                {
+                    m_2D.DrawFilledBox(0, ySpacing, barLength, barHeight, UIColor.bar);
+                    m_2D.DrawFilledBox(barLength, ySpacing, w - barLength, barHeight, UIColor.barBackground);
+                    m_2D.DrawEnd();
 
-                Rect rect = GUILayoutUtility.GetLastRect();
-                string tooltip = string.Format("{0}", displayUnits.ToString(barValue, true, 5));
-                GUI.Label(rect, new GUIContent("", tooltip));
+                    Rect rect = GUILayoutUtility.GetLastRect();
+                    string tooltip = string.Format("{0}", displayUnits.ToString(barValue, true, 5));
+                    GUI.Label(rect, new GUIContent("", tooltip));
+                }
+
+                EditorGUILayout.LabelField(ShowPercent((100 * barValue) / barMax), GUILayout.MaxWidth(50));
             }
 
-            EditorGUILayout.LabelField(ShowPercent((100 * barValue) / barMax), GUILayout.MaxWidth(50));
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();
@@ -5388,6 +5650,7 @@ To compare two data sets:
 
             string text = "Mean frame contribution";
             Units units = m_DisplayUnits.Units;
+            bool removed = MarkerData.GetTimeIgnored(leftMarker) > 0 || MarkerData.GetTimeIgnored(rightMarker) > 0;
             if (DisplayCount())
             {
                 units = Units.Count;
@@ -5407,27 +5670,38 @@ To compare two data sets:
 
             EditorGUILayout.LabelField(text);
             m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
-            m_Columns.Draw4("", "Left", "Right", "Diff");
+            if (removed)
+                m_Columns.Draw4("", "", "", "");
+            else
+                m_Columns.Draw4("", "Left", "Right", "Diff");
             EditorGUILayout.BeginHorizontal();
-            if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
+
+            if (removed)
             {
-                m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, UIColor.barBackground);
-
-                m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, UIColor.left);
-                m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, UIColor.right);
-                m_2D.DrawEnd();
-
-                Rect rect = GUILayoutUtility.GetLastRect();
-                string tooltip = string.Format("Left: {0}\nRight: {1}", displayUnits.ToTooltipString(leftBarValue, true), displayUnits.ToTooltipString(rightBarValue, true));
-                GUI.Label(rect, new GUIContent("", tooltip));
+                EditorGUILayout.LabelField("(Marker Removed from analysis)");
             }
-            float leftPercentage = leftBarMax > 0 ? (100 * leftBarValue) / leftBarMax : 0f;
-            float rightPercentage = rightBarMax > 0 ? (100 * rightBarValue) / rightBarMax : 0f;
+            else
+            {
+                if (m_2D.DrawStart(w, h, Draw2D.Origin.TopLeft, style))
+                {
+                    m_2D.DrawFilledBox(0, ySpacing, w, h - ySpacing, UIColor.barBackground);
 
-            EditorGUILayout.LabelField(ShowPercent(leftPercentage), GUILayout.Width(LayoutSize.WidthColumn1));
-            EditorGUILayout.LabelField(ShowPercent(rightPercentage), GUILayout.Width(LayoutSize.WidthColumn2));
-            if (leftMarker != null && rightMarker != null)
-                EditorGUILayout.LabelField(ShowPercent(rightPercentage - leftPercentage), GUILayout.Width(LayoutSize.WidthColumn3));
+                    m_2D.DrawFilledBox(0, ySpacing, leftBarLength, barHeight, UIColor.left);
+                    m_2D.DrawFilledBox(0, ySpacing + barHeight, rightBarLength, barHeight, UIColor.right);
+                    m_2D.DrawEnd();
+
+                    Rect rect = GUILayoutUtility.GetLastRect();
+                    string tooltip = string.Format("Left: {0}\nRight: {1}", displayUnits.ToTooltipString(leftBarValue, true), displayUnits.ToTooltipString(rightBarValue, true));
+                    GUI.Label(rect, new GUIContent("", tooltip));
+                }
+                float leftPercentage = leftBarMax > 0 ? (100 * leftBarValue) / leftBarMax : 0f;
+                float rightPercentage = rightBarMax > 0 ? (100 * rightBarValue) / rightBarMax : 0f;
+
+                EditorGUILayout.LabelField(ShowPercent(leftPercentage), GUILayout.Width(LayoutSize.WidthColumn1));
+                EditorGUILayout.LabelField(ShowPercent(rightPercentage), GUILayout.Width(LayoutSize.WidthColumn2));
+                if (leftMarker != null && rightMarker != null)
+                    EditorGUILayout.LabelField(ShowPercent(rightPercentage - leftPercentage), GUILayout.Width(LayoutSize.WidthColumn3));
+            }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.EndVertical();

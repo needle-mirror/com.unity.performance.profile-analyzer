@@ -34,10 +34,7 @@ By default, the **Marker columns** dropdown in the **Filters** pane has six pres
 * **Depths:** Displays information on where the markers are in the Hierarchy. For more information, see the documentation on Depth Slices in [Filters pane](filtering-system.html#depth-slice).
 * **Threads:** Displays the name of the thread that the markers appear on. For more information, see the documentation on the Thread window in [Filters pane](filtering-system.html#thread-window).
 
-
 You can also use the **Custom** column layout, to select your own custom mix of columns to add to the layout. To do this, right-click on the header of any column, and manually enable or disable any of the columns as necessary. 
-
-![Context menu](images/marker-details-custom-columns.png)<br/>*The list of columns you can add to the Marker Details pane*
 
 The following table shows the columns that the Profile Analyzer displays when you select that layout.
 
@@ -48,6 +45,7 @@ The following table shows the columns that the Profile Analyzer displays when yo
 |**Median**|&#10003;|&#10003;||&#10003;||||||
 |**Median Bar**|&#10003;|&#10003;||&#10003;||||||
 |**Mean**|&#10003;|||||||||
+|**SD**|||||||||&#10003;|
 |**Min**|&#10003;|&#10003;||&#10003;||||||
 |**Max**|&#10003;|&#10003;||&#10003;||||||
 |**Range**|&#10003;|&#10003;||&#10003;|||||
@@ -55,6 +53,7 @@ The following table shows the columns that the Profile Analyzer displays when yo
 |**Count Bar**|||||&#10003;|||||
 |**Count Frame**|&#10003;|||||&#10003;||||
 |**Count Frame Bar**||||||&#10003;||||
+|**Count SD**|||||||||&#10003;|
 |**1st**|||||||&#10003;||||
 |**At Median Frame**|&#10003;|&#10003;||&#10003;||||||
 |**Total**|||&#10003;|&#10003;||||||
@@ -70,6 +69,7 @@ The following table explains what each column does:
 |**Median**| The median value of the marker's time distribution.|
 |**Median Bar**| A visualization of the **Median** value.|
 |**Mean**| The average value of the marker's time distribution.|
+|**SD**| The standard deviation of the marker's time distribution.|
 |**Min**| The minimum value of the marker's time distribution.|
 |**Max**| The maximum value of the marker's time distribution.|
 |**Range**| The difference between the marker's **Min** and **Max** timings.|
@@ -77,17 +77,16 @@ The following table explains what each column does:
 |**Count Bar**|A visualization of the **Count** value. |
 |**Count Frame**|The average number of times per frame that the marker was pushed/popped.|
 |**Count Frame Bar**|A visualization of the **Count Frame** value.|
+|**Count SD**|The standard deviation of **Count** value.|
 |**1st**| The frame number in which the marker first was pushed / popped.|
 |**At Median Frame**| The sum of activity for the marker in the median frame.|
 |**Total**| The total time spent for this marker in all selected frames.|
 |**Total Bar**|A visualization of the **Total** value.|
-|**Thread**|The name of the thread that the marker appears on.|
+|**Threads**|The name of the thread that the marker appears on.|
 
 ### Marker Details context menu commands
 
 If you right click on a marker in the **Marker Details** list you can control the filter and list even further.
-
-![Context menu](images/marker-details-context-menu.png)<br/>*The context menu of the Marker Details pane*
 
 |**Command**|**Function**|
 |---|---|

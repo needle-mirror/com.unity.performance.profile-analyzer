@@ -2,6 +2,7 @@ using UnityEngine;
 using System.IO;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -11,6 +12,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             public static readonly GUIContent markerTable = new GUIContent("Marker table", "Export data from the single view marker table");
             public static readonly GUIContent singleFrameTimes = new GUIContent("Single Frame Times", "Export frame time data from the single view");
+            public static readonly GUIContent comparisonTables = new GUIContent("Comparison table", "Export data from the comparsion view marker table");
             public static readonly GUIContent comparisonFrameTimes = new GUIContent("Comparison Frame Times", "Export frame time data from the comparison view");
         }
 
@@ -40,8 +42,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         static public ProfileAnalyzerExportWindow Open(float screenX, float screenY, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView, ProfileAnalyzerWindow profileAnalyzerWindow)
         {
             ProfileAnalyzerExportWindow window = GetWindow<ProfileAnalyzerExportWindow>("Export");
-            window.minSize = new Vector2(200, 140);
-            window.position = new Rect(screenX, screenY, 200, 140);
+            window.minSize = new Vector2(200, 180);
+            window.position = new Rect(screenX, screenY, 200, 180);
             window.m_ProfileAnalyzerWindow = profileAnalyzerWindow;
             window.SetData(profileSingleView, profileLeftView, profileRightView);
             window.Show();
@@ -85,6 +87,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             GUILayout.Label("Comparison View");
 
+            if (!m_ProfileAnalyzerWindow.CanExportComparisonTable())
+                GUI.enabled = false;
+            if (GUILayout.Button(Styles.comparisonTables))
+                SaveComparisonTableCSV();
+            GUI.enabled = enabled;
             if (m_LeftDataView == null || !m_LeftDataView.IsDataValid() || m_RightDataView == null || !m_RightDataView.IsDataValid())
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.comparisonFrameTimes))
@@ -105,17 +112,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 using (StreamWriter file = new StreamWriter(path))
                 {
-                    file.Write("Name, ");
-                    file.Write("Median Time, Min Time, Max Time, ");
-                    file.Write("Median Frame Index, Min Frame Index, Max Frame Index, ");
-                    file.Write("Min Depth, Max Depth, ");
-                    file.Write("Total Time, ");
-                    file.Write("Mean Time, Time Lower Quartile, Time Upper Quartile, ");
-                    file.Write("Count Total, Count Median, Count Min, Count Max, ");
-                    file.Write("Number of frames containing Marker, ");
-                    file.Write("First Frame Index, ");
-                    file.Write("Time Min Individual, Time Max Individual, ");
-                    file.Write("Min Individual Frame, Max Individual Frame, ");
+                    file.Write("Name; ");
+                    file.Write("Median Time; Min Time; Max Time; ");
+                    file.Write("Median Frame Index; Min Frame Index; Max Frame Index; ");
+                    file.Write("Min Depth; Max Depth; ");
+                    file.Write("Total Time; ");
+                    file.Write("Mean Time; Time Lower Quartile; Time Upper Quartile; ");
+                    file.Write("Count Total; Count Median; Count Min; Count Max; ");
+                    file.Write("Number of frames containing Marker; ");
+                    file.Write("First Frame Index; ");
+                    file.Write("Time Min Individual; Time Max Individual; ");
+                    file.Write("Min Individual Frame; Max Individual Frame; ");
                     file.WriteLine("Time at Median Frame");
 
                     List<MarkerData> markerData = m_ProfileDataView.analysis.GetMarkers();
@@ -135,26 +142,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         int maxIndividualFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.maxIndividualFrameIndex, m_ProfileDataView);
 
                         // "Escape" marker names in case it has commas in it.
-                        file.Write("\"{0}\",", markerName);
-                        file.Write("{0},{1},{2},",
-                            marker.msMedian, marker.msMin, marker.msMax);
-                        file.Write("{0},{1},{2},",
+                        file.Write("\"{0}\";", markerName);
+                        file.Write(string.Format(CultureInfo.InvariantCulture,"{0};{1};{2};",
+                            marker.msMedian, marker.msMin, marker.msMax));
+                        file.Write("{0};{1};{2};",
                             medianFrameIndex, minFrameIndex, maxFrameIndex);
-                        file.Write("{0},{1},",
+                        file.Write("{0};{1};",
                             marker.minDepth, marker.maxDepth);
-                        file.Write("{0},",
-                            marker.msTotal);
-                        file.Write("{0},{1},{2},",
-                            marker.msMean, marker.msLowerQuartile, marker.msUpperQuartile);
-                        file.Write("{0},{1},{2},{3},",
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};",
+                            marker.msTotal));
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};{2};",
+                            marker.msMean, marker.msLowerQuartile, marker.msUpperQuartile));
+                        file.Write("{0};{1};{2};{3};",
                             marker.count, marker.countMedian, marker.countMin, marker.countMax);
-                        file.Write("{0},", marker.presentOnFrameCount);
-                        file.Write("{0},", firstFrameIndex);
-                        file.Write("{0},{1},",
-                            marker.msMinIndividual, marker.msMaxIndividual);
-                        file.Write("{0},{1},",
+                        file.Write("{0};", marker.presentOnFrameCount);
+                        file.Write("{0};", firstFrameIndex);
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};",
+                            marker.msMinIndividual, marker.msMaxIndividual));
+                        file.Write("{0};{1};",
                             minIndividualFrameIndex, maxIndividualFrameIndex);
-                        file.WriteLine("{0}", marker.msAtMedian);
+                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0}", marker.msAtMedian));
                     }
                 }
                 ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.ExportSingleFrames, analytic);
@@ -174,7 +181,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 using (StreamWriter file = new StreamWriter(path))
                 {
-                    file.WriteLine("Frame Offset, Frame Index, Frame Time (ms), Time from first frame (ms)");
+                    file.WriteLine("Frame Offset; Frame Index; Frame Time (ms); Time from first frame (ms)");
                     float maxFrames = m_ProfileDataView.data.GetFrameCount();
 
                     var frame = m_ProfileDataView.data.GetFrame(0);
@@ -186,10 +193,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         frame = m_ProfileDataView.data.GetFrame(frameOffset);
                         int frameIndex = m_ProfileDataView.data.OffsetToDisplayFrame(frameOffset);
                         frameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameIndex, m_ProfileDataView);
-                        
+
                         float msFrame = frame.msFrame;
-                        file.WriteLine("{0},{1},{2},{3}",
-                            frameOffset, frameIndex, msFrame, msTimePassed);
+                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0};{1};{2};{3}",
+                            frameOffset, frameIndex, msFrame, msTimePassed));
 
                         msTimePassed += msFrame;
                     }
@@ -211,10 +218,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 using (StreamWriter file = new StreamWriter(path))
                 {
-                    file.Write("Frame Offset, ");
-                    file.Write("Left Frame Index, Right Frame Index, ");
-                    file.Write("Left Frame Time (ms), Left time from first frame (ms), ");
-                    file.Write("Right Frame Time (ms), Right time from first frame (ms), ");
+                    file.Write("Frame Offset; ");
+                    file.Write("Left Frame Index; Right Frame Index; ");
+                    file.Write("Left Frame Time (ms); Left time from first frame (ms); ");
+                    file.Write("Right Frame Time (ms); Right time from first frame (ms); ");
                     file.WriteLine("Frame Time Diff (ms)");
                     float maxFrames = Math.Max(m_LeftDataView.data.GetFrameCount(), m_RightDataView.data.GetFrameCount());
 
@@ -238,15 +245,34 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         float msFrameLeft = leftFrame != null ? leftFrame.msFrame : 0;
                         float msFrameRight = rightFrame != null ? rightFrame.msFrame : 0;
                         float msFrameDiff = msFrameRight - msFrameLeft;
-                        file.Write("{0},", frameOffset);
-                        file.Write("{0},{1},", leftFrameIndex, rightFrameIndex);
-                        file.Write("{0},{1},", msFrameLeft, msTimePassedLeft);
-                        file.Write("{0},{1},", msFrameRight, msTimePassedRight);
-                        file.WriteLine("{0}", msFrameDiff);
+                        file.Write("{0};", frameOffset);
+                        file.Write("{0};{1};", leftFrameIndex, rightFrameIndex);
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};", msFrameLeft, msTimePassedLeft));
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};", msFrameRight, msTimePassedRight));
+                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0}", msFrameDiff));
 
                         msTimePassedLeft += msFrameLeft;
                         msTimePassedRight += msFrameRight;
                     }
+                }
+                ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.ExportComparisonFrames, analytic);
+            }
+        }
+
+        void SaveComparisonTableCSV()
+        {
+            if (m_LeftDataView == null || m_RightDataView == null)
+                return;
+            if (!m_LeftDataView.IsDataValid() || !m_RightDataView.IsDataValid())
+                return;
+
+            string path = EditorUtility.SaveFilePanel("Save comparison table CSV data", "", "tableComparison.csv", "csv");
+            if (path.Length != 0)
+            {
+                var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+                using (StreamWriter file = new StreamWriter(path))
+                {
+                    m_ProfileAnalyzerWindow.TryExportComparisonTable(file);
                 }
                 ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.ExportComparisonFrames, analytic);
             }

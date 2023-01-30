@@ -17,8 +17,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public readonly List<string> nameExcludes;
             public readonly TimingOptions.TimingOption timingOption;
             public readonly int threadSelectionCount;
+            public readonly bool hideRemovedMarkers;
 
-            public RangeSettings(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount)
+            public RangeSettings(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount, bool hideRemovedMarkers)
             {
                 // Make a copy rather than keeping a reference
                 this.dataView = dataView==null ? new ProfileDataView() : new ProfileDataView(dataView);
@@ -27,6 +28,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 this.nameExcludes = nameExcludes;
                 this.timingOption = timingOption;
                 this.threadSelectionCount = threadSelectionCount;
+                this.hideRemovedMarkers = hideRemovedMarkers;
             }
 
             public override int GetHashCode()
@@ -38,6 +40,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 hash = (hash * 7) + nameExcludes.GetHashCode();
                 hash = (hash * 7) + timingOption.GetHashCode();
                 hash = (hash * 7) + threadSelectionCount.GetHashCode();
+                hash = (hash * 7) + hideRemovedMarkers.GetHashCode();
 
                 return hash;
             }
@@ -79,8 +82,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (dataView.analysis != b.dataView.analysis)
                         return false;
 
-                    if (dataView.selectedIndices != b.dataView.selectedIndices)
-                        return false;
                     if (dataView.selectedIndices.Count != b.dataView.selectedIndices.Count)
                         return false;
 
@@ -95,6 +96,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if (depthFilter != b.depthFilter)
                     return false;
                 if (threadSelectionCount != b.threadSelectionCount)
+                    return false;
+
+                if (hideRemovedMarkers != b.hideRemovedMarkers)
                     return false;
 
                 if (nameFilters.Count != b.nameFilters.Count)
@@ -291,6 +295,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemRemoveFromExcludeFilter = new GUIContent("Remove from Exclude Filter", "");
             public static readonly GUIContent menuItemSetAsParentMarkerFilter = new GUIContent("Set as Parent Marker Filter", "");
             public static readonly GUIContent menuItemClearParentMarkerFilter = new GUIContent("Clear Parent Marker Filter", "");
+            public static readonly GUIContent menuItemSetAsRemoveMarker = new GUIContent("Remove Marker", "");
             public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
         }
 
@@ -320,7 +325,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_BackgroundColor = backgroundColor;
             m_TextColor = textColor;
 
-            m_CurrentSettings = new Settings(new RangeSettings(null, 0, null, null, TimingOptions.TimingOption.Time, 0), 0, 0, false, false);
+            m_CurrentSettings = new Settings(new RangeSettings(null, 0, null, null, TimingOptions.TimingOption.Time, 0, false), 0, 0, false, false);
             m_TimeRangeDirty = true;
         }
 
@@ -329,9 +334,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, limitToDigits);
         }
 
-        public void SetData(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount)
+        public void SetData(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount, bool hideRemovedMarkers)
         {
-            m_RequestedRangeSettings = new RangeSettings(dataView, depthFilter, nameFilters, nameExcludes, timingOption, threadSelectionCount);
+            m_RequestedRangeSettings = new RangeSettings(dataView, depthFilter, nameFilters, nameExcludes, timingOption, threadSelectionCount, hideRemovedMarkers);
             if (m_CurrentSettings.rangeSettings != m_RequestedRangeSettings)
                 m_TimeRangeDirty = true;
         }
@@ -354,6 +359,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int depthFilter = rangeSettings.depthFilter;
             List<string> nameFilters = rangeSettings.nameFilters;
             List<string> nameExcludes = rangeSettings.nameExcludes;
+            bool hideRemovedMarkers = rangeSettings.hideRemovedMarkers;
 
             var markers = analysis.GetMarkers();
 
@@ -367,13 +373,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (nameFilters.Count > 0)
                 {
-                    if (!m_ProfileAnalyzerWindow.NameInFilterList(marker.name, nameFilters))
+                    if (!m_ProfileAnalyzerWindow.NameInIncludeList(marker.name, nameFilters))
                         continue;
                 }
                 if (nameExcludes.Count > 0)
                 {
                     if (m_ProfileAnalyzerWindow.NameInExcludeList(marker.name, nameExcludes))
                         continue;
+                }
+
+                if (hideRemovedMarkers && marker.IsFullyIgnored())
+                {
+                    continue;
                 }
 
                 range += marker.msAtMedian;
@@ -424,6 +435,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
             List<string> nameFilters = m_CurrentSettings.rangeSettings.nameFilters;
             List<string> nameExcludes = m_CurrentSettings.rangeSettings.nameExcludes;
+            bool hideRemovedMarkers = m_CurrentSettings.rangeSettings.hideRemovedMarkers;
 
             // Show marker graph
             float x = 0;
@@ -446,7 +458,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             foreach (var marker in markers)
             {
                 float msAtMedian = MarkerData.GetMsAtMedian(marker);
-                totalMarkerTime += msAtMedian;
+
+                // We do this at the top so that totalMarkerTime is not increased
+                // This excludes the hidden markers time
+                if (hideRemovedMarkers && marker.IsFullyIgnored())
+                {
+                    continue;
+                }
 
                 if (depthFilter != ProfileAnalyzer.kDepthAll && marker.minDepth != depthFilter)
                 {
@@ -455,7 +473,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (nameFilters.Count > 0)
                 {
-                    if (!m_ProfileAnalyzerWindow.NameInFilterList(marker.name, nameFilters))
+                    if (!m_ProfileAnalyzerWindow.NameInIncludeList(marker.name, nameFilters))
                         continue;
                 }
                 if (nameExcludes.Count > 0)
@@ -463,6 +481,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (m_ProfileAnalyzerWindow.NameInExcludeList(marker.name, nameExcludes))
                         continue;
                 }
+
+                totalMarkerTime += msAtMedian;
 
                 if (at < max)
                 {
@@ -526,6 +546,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
             menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
             menu.AddSeparator("");
+            menu.AddItem(Styles.menuItemSetAsRemoveMarker, false, () => m_ProfileAnalyzerWindow.SetAsRemoveMarker(markerName));
+            menu.AddSeparator("");
             menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, markerName));
 
             return menu;
@@ -551,6 +573,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddSeparator("");
             menu.AddDisabledItem(Styles.menuItemSetAsParentMarkerFilter);
             menu.AddDisabledItem(Styles.menuItemClearParentMarkerFilter);
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemSetAsRemoveMarker);
             menu.AddSeparator("");
             menu.AddDisabledItem(Styles.menuItemCopyToClipboard);
 
@@ -675,7 +699,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             float width = rect.width;
             float height = rect.height;
 
-            var selectedPairingMarkerName = m_ProfileAnalyzerWindow.GetSelectedMarkerName();
+            string selectedPairingMarkerName = m_ProfileAnalyzerWindow.GetSelectedMarkerName();
 
             if (timeRange <= 0.0f)
                 timeRange = frameSummary.msMedian;
@@ -732,65 +756,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Profiler.BeginSample("DrawText");
             foreach (MarkerSummaryEntry entry in m_MarkerSummary.entry)
             {
-                String name = entry.name;
-
-                float x = entry.x * width;
-                float w = entry.w * width;
-                float msAtMedian = entry.msAtMedian;
-
                 if (entry.summaryType == SummaryType.Marker)
                 {
-                    Rect labelRect = new Rect(rect.x + x, rect.y, w, rect.height);
-                    GUIStyle style = centreAlignStyle;
-                    String displayName = "";
-                    if (w >= 20)
-                    {
-                        displayName = name;
-                        Vector2 size = centreAlignStyle.CalcSize(new GUIContent(name));
-                        if (size.x > w)
-                        {
-                            var words = name.Split('.');
-                            displayName = words[words.Length - 1];
-                            style = leftAlignStyle;
-                        }
-                    }
-                    float percentAtMedian = msAtMedian * 100 / timeRange;
-                    string tooltip = string.Format(
-                        Content.tooltip,
-                        name,
-                        percentAtMedian, ToDisplayUnits(msAtMedian, true, 0), frameSummaryMedianFrameIndex,
-                        ToDisplayUnits(entry.msMedian, true, 0), entry.medianFrameIndex);
-                    if (name == selectedPairingMarkerName)
-                        style.normal.textColor = selectedText;
-                    else
-                        style.normal.textColor = m_TextColor;
-                    GUI.Label(labelRect, new GUIContent(displayName, tooltip), style);
-
-                    Event current = Event.current;
-                    if (labelRect.Contains(current.mousePosition))
-                    {
-                        if (current.type == EventType.ContextClick)
-                        {
-                            GenericMenu menu;
-                            if (!m_ProfileAnalyzerWindow.IsAnalysisRunning())
-                                menu = GenerateActiveContextMenu(name, current);
-                            else
-                                menu = GenerateDisabledContextMenu(name);
-
-                            menu.ShowAsContext();
-
-                            current.Use();
-                        }
-                        if (current.type == EventType.MouseDown)
-                        {
-                            m_ProfileAnalyzerWindow.SelectMarker(name);
-                            m_ProfileAnalyzerWindow.RequestRepaint();
-                        }
-                    }
+                    DrawEntryBarText(rect, width, timeRange, entry, leftAlignStyle, frameSummaryMedianFrameIndex, selectedText, centreAlignStyle, selectedPairingMarkerName);
                 }
                 else
                 {
-                    DrawBarText(rect, x, w, msAtMedian, name, timeRange, leftAlignStyle, frameSummaryMedianFrameIndex);
+                    // Note this only displays the tooltip and not the text itself as we assume unaccounted is small
+                    DrawSimpleEntryBarText(rect, width, timeRange, entry, leftAlignStyle, frameSummaryMedianFrameIndex);
                 }
             }
 
@@ -816,17 +789,79 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return w;
         }
 
-        float DrawBarText(Rect rect, float x, float w, float msTime, string name, float timeRange, GUIStyle leftAlignStyle, int medianFrameIndex)
+        void DrawEntryBarText(Rect rect, float totalWidth, float timeRange, MarkerSummaryEntry entry, GUIStyle leftAlignStyle, int frameSummaryMedianFrameIndex, Color selectedText, GUIStyle centreAlignStyle, string selectedPairingMarkerName)
         {
+            float x = entry.x * totalWidth;
+            float w = entry.w * totalWidth;
+            String name = entry.name;
+            float msAtMedian = entry.msAtMedian;
+
+            Rect labelRect = new Rect(rect.x + x, rect.y, w, rect.height);
+            GUIStyle style = centreAlignStyle;
+            String displayName = "";
+            if (w >= 20)
+            {
+                displayName = name;
+                Vector2 size = centreAlignStyle.CalcSize(new GUIContent(name));
+                if (size.x > w)
+                {
+                    var words = name.Split('.');
+                    displayName = words[words.Length - 1];
+                    style = leftAlignStyle;
+                }
+            }
+
+            float percentAtMedian = msAtMedian * 100 / timeRange;
+            string tooltip = string.Format(
+                Content.tooltip,
+                name,
+                percentAtMedian, ToDisplayUnits(msAtMedian, true, 0), frameSummaryMedianFrameIndex,
+                ToDisplayUnits(entry.msMedian, true, 0), entry.medianFrameIndex);
+            if (name == selectedPairingMarkerName)
+                style.normal.textColor = selectedText;
+            else
+                style.normal.textColor = m_TextColor;
+            GUI.Label(labelRect, new GUIContent(displayName, tooltip), style);
+
+            Event current = Event.current;
+            if (labelRect.Contains(current.mousePosition))
+            {
+                if (current.type == EventType.ContextClick)
+                {
+                    GenericMenu menu;
+                    if (!m_ProfileAnalyzerWindow.IsAnalysisRunning())
+                        menu = GenerateActiveContextMenu(name, current);
+                    else
+                        menu = GenerateDisabledContextMenu(name);
+
+                    menu.ShowAsContext();
+
+                    current.Use();
+                }
+                if (current.type == EventType.MouseDown)
+                {
+                    m_ProfileAnalyzerWindow.SelectMarker(name);
+                    m_ProfileAnalyzerWindow.RequestRepaint();
+                }
+            }
+        }
+
+        void DrawSimpleEntryBarText(Rect rect, float totalWidth, float timeRange, MarkerSummaryEntry entry, GUIStyle leftAlignStyle, int frameSummaryMedianFrameIndex)
+        {
+            float x = entry.x * totalWidth;
+            float w = entry.w * totalWidth;
+            String name = entry.name;
+            float msAtMedian = entry.msAtMedian;
+
             float width = rect.width;
             Rect labelRect = new Rect(rect.x + x, rect.y, w, rect.height);
-            float percent = msTime / timeRange * 100;
+            float percent = msAtMedian / timeRange * 100;
             GUIStyle style = leftAlignStyle;
             string tooltip = string.Format("{0}\n{1:f2}% ({2} on median frame {3})",
                 name,
                 percent,
-                ToDisplayUnits(msTime, true, 0),
-                medianFrameIndex);
+                ToDisplayUnits(msAtMedian, true, 0),
+                frameSummaryMedianFrameIndex);
             GUI.Label(labelRect, new GUIContent("", tooltip), style);
 
             Event current = Event.current;
@@ -851,8 +886,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     m_ProfileAnalyzerWindow.RequestRepaint();
                 }
             }
-
-            return w;
         }
 
         void CopyToClipboard(Event current, string text)

@@ -4,6 +4,36 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2023-01-30
+
+### Fixed
+
+* Fixed exception thrown when removing marker.
+
+## [1.2.1] - 2023-01-02
+
+### Changed
+
+* Updated What's New page
+
+## [1.2.0] - 2023-01-02
+
+### Added 
+
+* Added support for removing vsync time, so we can see actual CPU duration over multiple frames. A drop down has been added to 'remove' a marker from the analysis and has entries for "FPS Wait", "Present Wait" and "Custom" where you can select any marker from the table using the right click context menu to "Remove Marker".
+* Added optional standard deviation (SD) column into marker table (on single view) for sorting data based on variation of marker timings in over the frames.
+* Added export of the comparison table as CSV.
+
+### Changed
+
+* Improved profile analysis performance.
+* Updated minimal suppourted version to Unity 2020.3.
+
+### Fixed
+
+* Fixed bug when depth filter and marker vsync removal both applied.
+* Fixed commas in CSV export file.
+
 ## [1.1.1] - 2021-10-04
 
 ### Fixed

@@ -14,8 +14,6 @@ To use the Profile Analyzer, you must populate it with data from the Profiler. T
 
 Click the **Attach to Player** dropdown at the top of the window (next to the Record button) and select a player to profile. By default this is set to **Playmode**. Click the **Record** button to start recording data. If you enabled **Autoconnect to Profiler** in the Build Settings, the Profiler automatically collects data when you start a built player.
 
-![Profiler dropdown](images/profiler-attach-to-player-dropdown.png)<br/>*The Attach To Player dropdown in the Profiler*
-
 For more information on how to record data in the Profiler, see the documentation on [Profiling your application](https://docs.unity3d.com/Manual/profiler-profiling-applications.html) in the Unity User Manual.
 
 ### b) Load data
@@ -29,7 +27,7 @@ Open the Profile Analyzer window (menu: **Window &gt; Analysis &gt; Profile Anal
 >[!TIP]
 >The Profiler window and the Profile Analyzer window require a lot of screen real-estate. Docking the two windows together in a single tabbed window lets you navigate between the two views quickly.
 
-![Profiler and Profile Analyzer](images/profile-analyzer-profiler-docked.png)<br/>*The Profiler and Profile Analyzer docked side by-side in one window*
+![Profiler and Profile Analyzer](images/profile-analyzer-profiler-docked.png)<br/>*The Profile Analyzer in the Compare mode docked next to the Profiler in one window*
 
 ## Step 4: Load and save Profile Analyzer data
 

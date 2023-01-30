@@ -49,7 +49,7 @@ The Profile Analyzer window has the following controls across both views, which 
 
 When you load some data into the Profile Analyzer window, the window populates with the profiling data, and is laid out as follows:
 
-![Profile Analyzer Window](images/single-and-compare-view-windows.png)<br/>*The Profile Analyzer window in Single view (top), and Compare view (bottom).*
+![Profile Analyzer Window](images/profile-analyzer-single-view-annotated.png)<br/>*The Profile Analyzer window in Single view
 
 |Pane|Description|
 |---|---|

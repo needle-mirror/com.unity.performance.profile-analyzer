@@ -89,6 +89,36 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return frames[index].ms;
         }
 
+        void CalculateStandardDeviations(MarkerData marker)
+        {
+            if (marker.frames.Count <= 1)
+            {
+                marker.msStandardDeviation = 0;
+                marker.countStandardDeviation = 0;
+                return;
+            }
+
+            int frameCount = marker.frames.Count;
+            float msMean = marker.msMean;
+            float countMean = marker.countMean;
+
+            double msSum = 0.0;
+            double countSum = 0.0;
+            for (int i = 0; i < frameCount; ++i)
+            {
+                float delta = (marker.frames[i].ms - msMean);
+                msSum += (delta * delta);
+
+                delta = (marker.frames[i].count - countMean);
+                countSum += (delta * delta);
+            }
+
+            double variance = msSum / (frameCount - 1);
+            marker.msStandardDeviation = (float)Math.Sqrt(variance);
+            variance = countSum / (frameCount - 1);
+            marker.countStandardDeviation = (float)Math.Sqrt(variance);
+        }
+
         public void SetupMarkers()
         {
             int countMax = 0;
@@ -151,6 +181,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 marker.msLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).ms;
                 marker.msUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).ms;
 
+                CalculateStandardDeviations(marker);
+
                 if (marker.countMax > countMax)
                     countMax = marker.countMax;
                 if (marker.countMean > countMaxMean)
@@ -163,8 +195,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void SetupMarkerBuckets()
         {
-            foreach (MarkerData marker in m_Markers)
+            // using a for loop instead of foreach is surprisingly faster on Mono
+            for (int i = 0, n = m_Markers.Count; i < n; i++)
             {
+                var marker = m_Markers[i];
                 marker.ComputeBuckets(marker.msMin, marker.msMax);
                 marker.ComputeCountBuckets(marker.countMin, marker.countMax);
             }
@@ -184,8 +218,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             float scale = range > 0 ? m_FrameSummary.buckets.Length / range : 0;
-            foreach (var frameData in m_FrameSummary.frames)
+            // using a for loop instead of foreach is surprisingly faster on Mono
+            for (int i = 0, n = m_FrameSummary.frames.Count; i < n; i++)
             {
+                var frameData = m_FrameSummary.frames[i];
                 var msFrame = frameData.ms;
                 //var frameIndex = frameData.frameIndex;
 

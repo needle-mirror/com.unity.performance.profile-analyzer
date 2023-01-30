@@ -8,29 +8,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     [Serializable]
     public class DepthSliceUI
     {
-#if !UNITY_2019_1_OR_NEWER
-        [NonSerialized]
-        string[] m_DepthStrings;
-        [NonSerialized]
-        int[] m_DepthValues;
-        [NonSerialized]
-        string[] m_DepthStringsAuto;
-        [NonSerialized]
-        int[] m_DepthValuesAuto;
-        [NonSerialized]
-        int m_OldDepthRaw1;
-        [NonSerialized]
-        int m_OldDepthRaw2;
-        [NonSerialized]
-        string[] m_DepthStrings1;
-        [NonSerialized]
-        int[] m_DepthValues1;
-        [NonSerialized]
-        string[] m_DepthStrings2;
-        [NonSerialized]
-        int[] m_DepthValues2;
-#endif
-
         [SerializeField] int m_DepthFilter = ProfileAnalyzer.kDepthAll;
         public int depthFilter {get { return m_DepthFilter; }}
 
@@ -79,74 +56,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             UpdateAutoDepthTitleText();
         }
 
-#if !UNITY_2019_1_OR_NEWER
-        void SetDepthStringsSingle(int maxDepth, out string[] strings, out int[] values)
-        {
-            var count = maxDepth;
-
-            List<string> depthStrings = new List<string>();
-            List<int> depthValues = new List<int>();
-            depthStrings.Add(DepthFilterToString(ProfileAnalyzer.kDepthAll));
-            depthValues.Add(ProfileAnalyzer.kDepthAll);
-
-            var startIndex = 1;
-            var depthValue = 1;
-            for (int depth = startIndex; depth <= count; depth++)
-            {
-                depthStrings.Add(DepthFilterToString(depth));
-                depthValues.Add(depthValue++);
-            }
-            strings = depthStrings.ToArray();
-            values = depthValues.ToArray();
-        }
-
-        void SetDepthStringsCompare(int maxDepth, out string[] strings, out int[] values, int maxDepthRight = ProfileAnalyzer.kDepthAll)
-        {
-            var locked = maxDepthRight != ProfileAnalyzer.kDepthAll;
-            var count = locked ? Math.Max(maxDepth + Math.Max(0, mostCommonDepthDiff), maxDepthRight - Math.Min(0, mostCommonDepthDiff)) : maxDepth;
-
-            List<string> depthStrings = new List<string>();
-            List<int> depthValues = new List<int>();
-            depthStrings.Add(DepthFilterToString(ProfileAnalyzer.kDepthAll));
-            depthValues.Add(ProfileAnalyzer.kDepthAll);
-            var leftIsMain = mostCommonDepthDiff < 0;
-            
-            var startIndex = 1;
-            var depthValue = 1;
-            if (maxDepth <= 0 && mostCommonDepthDiff < 0)
-            {
-                depthValue = 1;
-                startIndex = -mostCommonDepthDiff + 1;
-            }
-            else if(maxDepthRight <= 0 && mostCommonDepthDiff > 0)
-            {
-                depthValue = 1;
-                startIndex = mostCommonDepthDiff + 1;
-            }
-            for (int depth = startIndex; depth <= count; depth++)
-            {
-                if (locked)
-                {
-                    var left = Mathf.Clamp(depth - Math.Max(0, mostCommonDepthDiff), 1, maxDepth);
-                    var right = Mathf.Clamp(depth - Math.Max(0, -mostCommonDepthDiff), 1, maxDepthRight);
-                    
-                    if (maxDepth <= 0)
-                        left = -1;
-                    if (maxDepthRight <= 0)
-                        right = -1;
-
-                    depthStrings.Add(DepthFilterToString(left, right, leftIsMain));
-                }
-                else
-                    depthStrings.Add(DepthFilterToString(depth));
-                depthValues.Add(depthValue++);
-            }
-            strings = depthStrings.ToArray();
-            values = depthValues.ToArray();
-        }
-#endif
-
-#if UNITY_2019_1_OR_NEWER
         enum ViewType
         {
             Single,
@@ -244,7 +153,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
             GUI.enabled = lastEnabled;
         }
-#endif
 
         int CalcSliceMenuEntryIndex(int filterDepthLeft, int filterDepthRight, int leftMax, int rightMax)
         {
@@ -290,57 +198,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         internal void DrawDepthFilter(bool isAnalysisRunning, bool singleView,
             ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView)
         {
-#if !UNITY_2019_1_OR_NEWER
-            bool triggerRefresh = false;
-            if (!isAnalysisRunning)
-            {
-                if (singleView)
-                {
-                    var maxDepth = profileSingleView.GetMaxDepth();
-                    if (m_DepthStrings == null || maxDepth != m_OldDepthRaw1)
-                    {
-                        SetDepthStringsSingle(maxDepth, out m_DepthStrings, out m_DepthValues);
-                        m_OldDepthRaw1 = maxDepth;
-                        triggerRefresh = true;
-                    }
-                }
-                else
-                {
-                    if (m_DepthFilterAuto)
-                    {
-                        var maxLeftRaw = profileLeftView.GetMaxDepth();
-                        var maxRightRaw = profileRightView.GetMaxDepth();
-                        if (m_DepthStringsAuto == null ||
-                            m_OldDepthRaw1 != maxLeftRaw || m_OldDepthRaw2 != maxRightRaw)
-                        {
-                            SetDepthStringsCompare(maxLeftRaw, out m_DepthStringsAuto, out m_DepthValuesAuto, maxRightRaw);
-                            m_OldDepthRaw1 = maxLeftRaw;
-                            m_OldDepthRaw2 = maxRightRaw;
-                            triggerRefresh = true;
-                        }
-                    }
-                    else
-                    {
-                        var maxDepthLeft = profileLeftView.GetMaxDepth();
-                        if (m_DepthStrings1 == null || m_OldDepthRaw1 != maxDepthLeft)
-                        {
-                            SetDepthStringsSingle(maxDepthLeft, out m_DepthStrings1, out m_DepthValues1);
-                            m_OldDepthRaw1 = maxDepthLeft;
-                            triggerRefresh = true;
-                        }
-
-                        var maxDepthRight = profileRightView.GetMaxDepth();
-                        if (m_DepthStrings2 == null || m_OldDepthRaw2 != maxDepthRight)
-                        {
-                            SetDepthStringsSingle(maxDepthRight, out m_DepthStrings2, out m_DepthValues2);
-                            m_OldDepthRaw2 = maxDepthRight;
-                            triggerRefresh = true;
-                        }
-                    }
-                }
-            }
-#endif
-
             bool lastEnabled = GUI.enabled;
             bool enabled = !isAnalysisRunning;
 
@@ -348,23 +205,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (singleView)
             {
                 EditorGUILayout.LabelField(ProfileAnalyzerWindow.Styles.depthTitle, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsLeftLabelWidth));
-#if UNITY_2019_1_OR_NEWER
                 DrawDepthFilterDropdown(null, enabled,
                     profileSingleView, (primary, left, right) => m_DepthFilter = primary,
                     ViewType.Single, profileSingleView, profileLeftView, profileRightView);
-#else
-                if (m_DepthStrings != null)
-                {
-                    var lastDepthFilter = m_DepthFilter;
-                    m_DepthFilter = m_DepthFilter == ProfileAnalyzer.kDepthAll ? ProfileAnalyzer.kDepthAll : profileSingleView.ClampToValidDepthValue(m_DepthFilter);
-
-                    GUI.enabled = enabled;
-                    m_DepthFilter = EditorGUILayout.IntPopup(m_DepthFilter, m_DepthStrings, m_DepthValues, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
-                    GUI.enabled = lastEnabled;
-                    if (m_DepthFilter != lastDepthFilter)
-                        triggerRefresh = true;
-                }
-#endif
             }
             else
             {
@@ -372,7 +215,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (m_DepthFilterAuto)
                 {
-#if UNITY_2019_1_OR_NEWER
                     DrawDepthFilterDropdown(null, enabled, profileLeftView, (primary, left, right) =>
                         {
                             m_DepthFilter1 = left;
@@ -380,79 +222,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             ClampDepthFilterForAutoRespectingDiff(ref m_DepthFilter1, ref m_DepthFilter2, profileLeftView, profileRightView);
                         },
                         ViewType.Locked, profileSingleView, profileLeftView, profileRightView);
-#else
-
-                    if (m_DepthStringsAuto != null)
-                    {
-                        var leftMax = profileLeftView.GetMaxDepth();
-                        var rightMax = profileRightView.GetMaxDepth();
-                        var lastDepthFilterDropdownIndex = CalcSliceMenuEntryIndex(m_DepthFilter1, m_DepthFilter2, leftMax, rightMax);
-                        ClampDepthFilterForAutoRespectingDiff(ref m_DepthFilter1, ref m_DepthFilter2,
-                            profileLeftView, profileRightView);
-
-                        var layoutOptionWidth = ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth;
-                        if(m_DepthFilter1 != m_DepthFilter2)
-                            layoutOptionWidth = ProfileAnalyzerWindow.LayoutSize.FilterOptionsLockedEnumWidth;
-
-                        GUI.enabled = enabled;
-                        var depthFilterDropdownIndex = Mathf.Clamp(lastDepthFilterDropdownIndex, -1, m_DepthStringsAuto.Length - 1);
-                        depthFilterDropdownIndex = EditorGUILayout.IntPopup(depthFilterDropdownIndex, m_DepthStringsAuto, m_DepthValuesAuto, GUILayout.Width(layoutOptionWidth));
-                        GUI.enabled = lastEnabled;
-
-                        if (depthFilterDropdownIndex != lastDepthFilterDropdownIndex)
-                        {
-                            if(depthFilterDropdownIndex == ProfileAnalyzer.kDepthAll)
-                                m_DepthFilter1 = m_DepthFilter2 = ProfileAnalyzer.kDepthAll;
-                            else
-                                CalcAutoSlicesFromMenuEntryIndex(depthFilterDropdownIndex, ref m_DepthFilter1, ref m_DepthFilter2, leftMax, rightMax);
-                            ClampDepthFilterForAutoRespectingDiff(ref m_DepthFilter1, ref m_DepthFilter2, profileLeftView, profileRightView);
-                            triggerRefresh = true;
-                        }
-                    }
-#endif
                 }
                 else
                 {
 
-#if UNITY_2019_1_OR_NEWER
                     DrawDepthFilterDropdown(ProfileAnalyzerWindow.Styles.leftDepthTitle, enabled, profileLeftView,
                         (primary, left, right) => m_DepthFilter1 = primary,
                         ViewType.Left, profileSingleView, profileLeftView, profileRightView);
-#else
-                    if (m_DepthStrings1 != null)
-                    {
-                        EditorGUILayout.LabelField(ProfileAnalyzerWindow.Styles.leftDepthTitle, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
 
-                        int lastDepthFilter1 = m_DepthFilter1;
-                        m_DepthFilter1 = m_DepthFilter1 == ProfileAnalyzer.kDepthAll ? ProfileAnalyzer.kDepthAll : profileLeftView.ClampToValidDepthValue(m_DepthFilter1);
-
-                        GUI.enabled = enabled;
-                        m_DepthFilter1 = EditorGUILayout.IntPopup(m_DepthFilter1, m_DepthStrings1, m_DepthValues1, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
-                        GUI.enabled = lastEnabled;
-                        if (m_DepthFilter1 != lastDepthFilter1)
-                            triggerRefresh = true;
-                    }
-#endif
-
-#if UNITY_2019_1_OR_NEWER
                     DrawDepthFilterDropdown(ProfileAnalyzerWindow.Styles.rightDepthTitle, enabled && !m_DepthFilterAuto, profileRightView,
                         (primary, left, right) => m_DepthFilter2 = primary,
                         ViewType.Right, profileSingleView, profileLeftView, profileRightView);
-#else
-                    if (m_DepthStrings2 != null)
-                    {
-                        EditorGUILayout.LabelField(ProfileAnalyzerWindow.Styles.rightDepthTitle, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
-
-                        int lastDepthFilter2 = m_DepthFilter2;
-                        m_DepthFilter2 = m_DepthFilter2 == ProfileAnalyzer.kDepthAll ? ProfileAnalyzer.kDepthAll : profileRightView.ClampToValidDepthValue(m_DepthFilter2);
-
-                        GUI.enabled = enabled && !m_DepthFilterAuto;
-                        m_DepthFilter2 = EditorGUILayout.IntPopup(m_DepthFilter2, m_DepthStrings2, m_DepthValues2, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
-                        GUI.enabled = lastEnabled;
-                        if (m_DepthFilter2 != lastDepthFilter2)
-                            triggerRefresh = true;
-                    }
-#endif
                 }
                 bool lastDepthFilterLock = m_DepthFilterAuto;
                 GUI.enabled = enabled;
@@ -462,22 +242,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     if (UpdateDepthFilters(singleView, profileSingleView, profileLeftView, profileRightView))
                         m_UpdateActiveTabCallback(true);
-#if !UNITY_2019_1_OR_NEWER
-                    m_DepthStringsAuto = null;
-                    m_DepthStrings1 = null;
-                    m_DepthStrings2 = null;
-#endif
                 }
             }
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
-#if !UNITY_2019_1_OR_NEWER
-            if (triggerRefresh)
-            {
-                UpdateDepthFilters(singleView, profileSingleView, profileLeftView, profileRightView);
-                m_UpdateActiveTabCallback(true);
-            }
-#endif
         }
 
         internal bool UpdateDepthFilters(bool singleView, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView)

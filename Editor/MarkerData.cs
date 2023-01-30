@@ -17,6 +17,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int countMedian;         // median over all frames
         public int countLowerQuartile;  // over all frames
         public int countUpperQuartile;  // over all frames
+        public float countStandardDeviation;
         public int lastFrame;
         public int presentOnFrameCount; // number of frames containing this marker
         public int firstFrameIndex;
@@ -26,6 +27,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public float msUpperQuartile;   // over all frames
         public float msMin;             // min total time per frame
         public float msMax;             // max total time per frame
+        public float msStandardDeviation;
         public int minIndividualFrameIndex;
         public int maxIndividualFrameIndex;
         public float msMinIndividual;   // min individual function call
@@ -42,6 +44,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int[] buckets;           // Each bucket contains 'number of frames' for 'sum of markers in the frame' in that range
         public int[] countBuckets;      // Each bucket contains 'number of frames' for 'count in the frame' in that range
         public List<FrameTime> frames;
+
+        public double timeRemoved;
+        public double timeIgnored;
 
         public MarkerData(string markerName)
         {
@@ -60,6 +65,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             countMedian = 0;
             countLowerQuartile = 0;
             countUpperQuartile = 0;
+            countStandardDeviation = 0f;
             lastFrame = -1;
             presentOnFrameCount = 0;
             firstFrameIndex = -1;
@@ -69,6 +75,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             msUpperQuartile = 0f;
             msMin = float.MaxValue;
             msMax = float.MinValue;
+            msStandardDeviation = 0f;
             minIndividualFrameIndex = 0;
             maxIndividualFrameIndex = 0;
             msMinIndividual = float.MaxValue;
@@ -85,6 +92,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 buckets[b] = 0;
                 countBuckets[b] = 0;
             }
+
+            timeRemoved = 0.0;
+            timeIgnored = 0.0;
         }
 
         /// <summary>Compare the time duration between the marker median times. Used for sorting in descending order</summary>
@@ -132,8 +142,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             float scale = range > 0 ? buckets.Length / range : 0;
-            foreach (FrameTime frameTime in frames)
+            // using a for loop instead of foreach is surprisingly faster on Mono
+            for (int i = 0, n = frames.Count; i < n; i++)
             {
+                var frameTime = frames[i];
                 var ms = frameTime.ms;
                 //int frameIndex = frameTime.frameIndex;
 
@@ -177,8 +189,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             float scale = range > 0 ? countBuckets.Length / range : 0;
-            foreach (FrameTime frameTime in frames)
+            // using a for loop instead of foreach is surprisingly faster on Mono
+            for (int i = 0, n = frames.Count; i < n; i++)
             {
+                var frameTime = frames[i];
                 var count = frameTime.count;
 
                 int bucketIndex = (int)((count - first) * scale);
@@ -305,6 +319,25 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public static int GetMaxDepth(MarkerData marker)
         {
             return marker != null ? marker.maxDepth : 0;
+        }
+        public static double GetTimeRemoved(MarkerData marker)
+        {
+            return marker != null ? marker.timeRemoved : 0.0;
+        }
+        public static double GetTimeIgnored(MarkerData marker)
+        {
+            return marker != null ? marker.timeIgnored : 0.0;
+        }
+
+        public bool IsFullyIgnored()
+        {
+            if (timeIgnored > 0.0)
+            {
+                if (msTotal == 0.0)
+                    return true;
+            }
+
+            return false;
         }
     }
 }

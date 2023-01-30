@@ -38,8 +38,6 @@ By default, the **Marker columns** dropdown in the **Filters** pane has six pres
 
 You can also use the **Custom** column layout to select your own custom mix of columns to add to the layout. To do this, right click on the header of any column, and manually enable or disable any of the columns as necessary.
 
-![Context menu](images/marker-details-compare-custom-columns.png)<br/>*The list of columns you can add to the Marker Comparison pane*
-
 >[!NOTE]
 >In this pane, the **Left** label refers to the first data set loaded into the **Frame Control** pane, which is colored blue. The **Right** label refers to the second data set, which is colored orange.
 
@@ -104,8 +102,6 @@ The following table explains what each column does:
 ### Marker Comparison context menu commands
 
 If you right-click on a marker in the **Marker Comparison** list you can control the filter and list even further.
-
-![Context menu](images/marker-details-context-menu.png)<br/>*The context menu of the Marker Comparison pane*
 
 |**Command**|**Function**|
 |---|---|

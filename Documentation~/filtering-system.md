@@ -32,7 +32,9 @@ Click the **Clear** button to clear all of the threads you've selected, and **Re
 
 When you select a **Depth Slice** level in the dropdown, it corresponds to the level of the marker within the hierarchy of the thread. You can visualize this in the Profiler window as follows:
 
-![Depth Slice](images/filters-depth-slice-comparison.png)<br/>*Top, the Profile Analyzer in the Single view with a Depth Slice of 3 selected in the Filters pane. Bottom, the Profiler window with the CPU Usage module selected, in Timeline view. Note that the markers in the Marker Details list correspond to the markers in the third level of the Main Thread's hierarchy.*
+![Depth Slice](images/profile-analyzer-depth-slice-highlight.png)<br/>*The Profile Analyzer in the Single view with a Depth Slice of 3 selected in the Filters pane.*
+
+![Depth Slice](images/filters-depth-slice-comparison-profiler-window.png)<br/>*The Profiler window with the CPU Usage module selected, in Timeline view. Note that the markers in the Marker Details list correspond to the markers in the third level of the Main Thread's hierarchy.*
 
 In the Compare view, the Profile Analyzer automatically aligns the depth of the two data sets so that the top level markers are aligned correctly. The value of the offset is displayed in brackets after the **Auto Right** checkbox.
 
@@ -42,4 +44,5 @@ To override the automatic depth alignment, disable the **Auto Right** checkbox a
 
 To filter the dataset by a specific marker and its children, right click on the marker in the **Marker Details/Comparison** pane and then select **Set As Parent Marker Filter**. You can visualize this in the Profiler window as follows: 
 
-![Parent marker](images/filters-parent-marker-comparison.png)<br/> *Top, the Profile Analyzer in the Single view with the data filtered by the parent marker of Gfx.WaitForPresentOnGfxThread. Bottom, the same frame opened in the Profiler window, with this thread highlighted. Note that the markers in the Timeline view correspond to those filtered in the Profile Analyzer.*
+![Parent marker](images/filters-parent-marker-comparison-profile-analyzer.png)<br/>*The Profile Analyzer in the Single view with the data filtered by the parent marker of BehaviourUpdate.*
+![Parent marker](images/filters-parent-marker-comparison-profiler.png)<br/>*The same frame opened in the Profiler window, with this thread highlighted. Note that the markers in the Timeline view correspond to those filtered in the Profile Analyzer.*

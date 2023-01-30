@@ -831,6 +831,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return m_FrameOffsetToDataOffsetMapping[frameOffset];
         }
 
+        public void ClearData()
+        {
+            m_Values = null;
+        }
+
         public bool HasData()
         {
             if (m_Values == null)

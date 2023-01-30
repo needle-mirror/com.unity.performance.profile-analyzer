@@ -17,11 +17,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public static void EnableAnalytics()
         {
-#if UNITY_2018_1_OR_NEWER
             AnalyticsResult result = EditorAnalytics.RegisterEventWithLimit(k_EventTopicName, k_MaxEventsPerHour, k_MaxEventItems, k_VendorKey);
             if (result == AnalyticsResult.Ok)
                 s_EnableAnalytics = true;
-#endif
         }
 
         public enum UIButton
@@ -195,7 +193,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!s_EnableAnalytics)
                 return false;
 
-#if UNITY_2018_1_OR_NEWER
             // Duration is in "ticks" 100 nanosecond intervals. I.e. 0.1 microseconds
             float durationInTicks = SecondsToTicks(durationInSeconds);
 
@@ -231,9 +228,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return false;
 
             return true;
-#else
-            return false;
-#endif
         }
 
         public static bool SendUIUsageModeEvent(UIUsageMode uiUsageMode, float durationInSeconds)
@@ -241,7 +235,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!s_EnableAnalytics)
                 return false;
 
-#if UNITY_2018_1_OR_NEWER
             // Duration is in "ticks" 100 nanosecond intervals. I.e. 0.1 microseconds
             float durationInTicks = SecondsToTicks(durationInSeconds);
 
@@ -265,9 +258,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return false;
 
             return true;
-#else
-            return false;
-#endif
         }
 
         public static bool SendUIVisibilityEvent(UIVisibility uiVisibility, float durationInSeconds, bool show)
@@ -275,7 +265,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!s_EnableAnalytics)
                 return false;
 
-#if UNITY_2018_1_OR_NEWER
             // Duration is in "ticks" 100 nanosecond intervals. I.e. 0.1 microseconds
             float durationInTicks = SecondsToTicks(durationInSeconds);
 
@@ -310,9 +299,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return false;
 
             return true;
-#else
-            return false;
-#endif
         }
 
         public static bool SendUIResizeEvent(UIResizeView uiResizeView, float durationInSeconds, float width, float height, bool isDocked)
@@ -320,7 +306,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!s_EnableAnalytics)
                 return false;
 
-#if UNITY_2018_1_OR_NEWER
             // Duration is in "ticks" 100 nanosecond intervals. I.e. 0.1 microseconds
             float durationInTicks = SecondsToTicks(durationInSeconds);
 
@@ -344,9 +329,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return false;
 
             return true;
-#else
-            return false;
-#endif
         }
 
         internal class Analytic

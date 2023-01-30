@@ -12,8 +12,6 @@ This workflow explains how to compare two frames from different data sets. In th
 
 Enable **Pair Graph Selection**. Right-click on one of the graphs in the Frame Control pane and then choose **Select Median Frame** from the context menu.
 
-![Frame Control context menu](images/frame-control-context-menu.png)<br/>*The Frame Control context menu*
-
 The Profile Analyzer then analyzes the two median frames of the data sets like this:
 
 ![Two data sets compared](images/profile-analyzer-compare-different-data-sets.png)

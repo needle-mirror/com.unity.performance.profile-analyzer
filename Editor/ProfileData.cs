@@ -32,6 +32,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Dictionary<string, int> markerNamesDict = new Dictionary<string, int>();
         Dictionary<string, int> threadNameDict = new Dictionary<string, int>();
         public string FilePath { get; private set; }
+        public int MarkerNameCount => markerNames.Count;
         static float s_Progress = 0;
 
         public ProfileData()

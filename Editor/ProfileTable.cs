@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
@@ -23,6 +24,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     {
         Draw2D m_2D;
         ProfileDataView m_DataView;
+        bool m_HideRemovedMarkers;
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         Color m_BarColor;
         float m_MaxMedian;
@@ -37,10 +39,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public enum MyColumns
         {
             Name,
+            State,
             Depth,
             Median,
             MedianBar,
             Mean,
+            StandardDeviation,
             Min,
             Max,
             Range,
@@ -48,6 +52,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             CountBar,
             CountMean,
             CountMeanBar,
+            CountStandardDeviation,
             FirstFrame,
             AtMedian,
             Total,
@@ -60,14 +65,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public enum SortOption
         {
             Name,
+            State,
             Depth,
             Median,
             Mean,
             Min,
             Max,
+            StandardDeviation,
             Range,
             Count,
             CountMean,
+            CountStandardDeviation,
             FirstFrame,
             AtMedian,
             Total,
@@ -78,10 +86,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         SortOption[] m_SortOptions =
         {
             SortOption.Name,
+            SortOption.State,
             SortOption.Depth,
             SortOption.Median,
             SortOption.Median,
             SortOption.Mean,
+            SortOption.StandardDeviation,
             SortOption.Min,
             SortOption.Max,
             SortOption.Range,
@@ -89,6 +99,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.Count,
             SortOption.CountMean,
             SortOption.CountMean,
+            SortOption.CountStandardDeviation,
             SortOption.FirstFrame,
             SortOption.AtMedian,
             SortOption.Total,
@@ -108,13 +119,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemRemoveFromExcludeFilter = new GUIContent("Remove from Exclude Filter", "");
             public static readonly GUIContent menuItemSetAsParentMarkerFilter = new GUIContent("Set as Parent Marker Filter", "");
             public static readonly GUIContent menuItemClearParentMarkerFilter = new GUIContent("Clear Parent Marker Filter", "");
+            public static readonly GUIContent menuItemSetAsRemoveMarker = new GUIContent("Remove Marker", "");
             public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
         }
 
-        public ProfileTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileDataView dataView, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color barColor) : base(state, multicolumnHeader)
+        public ProfileTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileDataView dataView, bool hideRemovedMarkers, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color barColor) : base(state, multicolumnHeader)
         {
             m_2D = draw2D;
             m_DataView = dataView;
+            m_HideRemovedMarkers = hideRemovedMarkers;
             m_ProfileAnalyzerWindow = profileAnalyzerWindow;
             m_BarColor = barColor;
 
@@ -139,9 +152,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int depthForHiddenRoot = -1;
             ProfileTreeViewItem root = new ProfileTreeViewItem(idForhiddenRoot, depthForHiddenRoot, "root", null);
 
-            List<string> nameFilters = m_ProfileAnalyzerWindow.GetNameFilters();
-            List<string> nameExcludes = m_ProfileAnalyzerWindow.GetNameExcludes();
-
             m_MaxMedian = 0.0f;
             m_MaxTotal = 0.0;
             m_MaxCount = 0;
@@ -150,18 +160,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             for (int index = 0; index < markers.Count; ++index)
             {
                 var marker = markers[index];
-                if (nameFilters.Count > 0)
-                {
-                    if (!m_ProfileAnalyzerWindow.NameInFilterList(marker.name, nameFilters))
-                        continue;
-                }
-                if (nameExcludes.Count > 0)
-                {
-                    if (m_ProfileAnalyzerWindow.NameInExcludeList(marker.name, nameExcludes))
-                        continue;
-                }
+                if (!m_ProfileAnalyzerWindow.DoesMarkerPassFilter(marker.name))
+                    continue;
 
-                var item = new ProfileTreeViewItem(index, 0, marker.name, marker);
+                if (m_HideRemovedMarkers && marker.IsFullyIgnored())
+                    continue;
+
+               var item = new ProfileTreeViewItem(index, 0, marker.name, marker);
                 root.AddChild(item);
                 float ms = item.data.msMedian;
                 if (ms > m_MaxMedian)
@@ -287,6 +292,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     case SortOption.Name:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.name, ascending);
                         break;
+                    case SortOption.State:
+                        orderedQuery = orderedQuery.ThenBy(l => State(l), ascending);
+                        break;
                     case SortOption.Depth:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.minDepth, ascending);
                         break;
@@ -295,6 +303,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         break;
                     case SortOption.Median:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.msMedian, ascending);
+                        break;
+                    case SortOption.StandardDeviation:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.msStandardDeviation, ascending);
                         break;
                     case SortOption.Min:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.msMin, ascending);
@@ -310,6 +321,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         break;
                     case SortOption.CountMean:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.countMean, ascending);
+                        break;
+                    case SortOption.CountStandardDeviation:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.countStandardDeviation, ascending);
                         break;
                     case SortOption.FirstFrame:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.firstFrameIndex, ascending);
@@ -337,12 +351,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 case SortOption.Name:
                     return myTypes.Order(l => l.data.name, ascending);
+                case SortOption.State:
+                    return myTypes.Order(l => State(l), ascending);
                 case SortOption.Depth:
                     return myTypes.Order(l => l.data.minDepth, ascending);
                 case SortOption.Mean:
                     return myTypes.Order(l => l.data.msMean, ascending);
                 case SortOption.Median:
                     return myTypes.Order(l => l.data.msMedian, ascending);
+                case SortOption.StandardDeviation:
+                    return myTypes.Order(l => l.data.msStandardDeviation, ascending);
                 case SortOption.Min:
                     return myTypes.Order(l => l.data.msMin, ascending);
                 case SortOption.Max:
@@ -353,6 +371,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return myTypes.Order(l => l.data.count, ascending);
                 case SortOption.CountMean:
                     return myTypes.Order(l => l.data.countMean, ascending);
+                case SortOption.CountStandardDeviation:
+                    return myTypes.Order(l => l.data.countStandardDeviation, ascending);
                 case SortOption.FirstFrame:
                     return myTypes.Order(l => l.data.firstFrameIndex, ascending);
                 case SortOption.AtMedian:
@@ -368,6 +388,23 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             // default
             return myTypes.Order(l => l.data.name, ascending);
+        }
+
+        int State(ProfileTreeViewItem item)
+        {
+            if (item.data.timeRemoved > 0.0)
+            {
+                return -3;
+            }
+            if (item.data.timeIgnored > 0.0)
+            {
+                if (item.data.IsFullyIgnored())
+                    return -2;
+                else
+                    return -1;
+            }
+
+            return 0;
         }
 
         public bool ShowingHorizontalScroll
@@ -459,8 +496,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
             menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
             menu.AddSeparator("");
-            if (content != null && !string.IsNullOrEmpty(content.text))
-                menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, content.text));
+            menu.AddItem(Styles.menuItemSetAsRemoveMarker, false, () => m_ProfileAnalyzerWindow.SetAsRemoveMarker(markerName));
+            menu.AddSeparator("");
+            if (markerName != null && !string.IsNullOrEmpty(markerName))
+                menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, markerName));
 
             return menu;
         }
@@ -485,6 +524,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddSeparator("");
             menu.AddDisabledItem(Styles.menuItemSetAsParentMarkerFilter);
             menu.AddDisabledItem(Styles.menuItemClearParentMarkerFilter);
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemSetAsRemoveMarker);
             menu.AddSeparator("");
             if (content != null && !string.IsNullOrEmpty(content.text))
                 menu.AddDisabledItem(Styles.menuItemCopyToClipboard);
@@ -532,19 +573,43 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int firstFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(item.data.firstFrameIndex, m_DataView);
             int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(m_DataView.analysis.GetFrameSummary().medianFrameIndex, m_DataView);
 
-            item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
+            if (item.data.timeRemoved > 0.0)
+            {
+                item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Modified]", item.data.name + "\n\nTime reduced by removing child marker time");
+                item.cachedRowString[(int)MyColumns.State] = new GUIContent("Modified", "Time reduced by removing child marker time");
+            }
+            else if (item.data.timeIgnored > 0.0)
+            {
+                if (item.data.IsFullyIgnored())
+                {
+                    item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Removed]", item.data.name + "\n\nAll marker time removed");
+                    item.cachedRowString[(int)MyColumns.State] = new GUIContent("Removed", "All marker time removed");
+                }
+                else
+                {
+                    item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Partial Removal]", item.data.name + "\n\nSome marker time removed (some instances)");
+                    item.cachedRowString[(int)MyColumns.State] = new GUIContent("Partial Removal", "Some marker time removed (some instances)");
+                }
+            }
+            else
+            {
+                item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
+                item.cachedRowString[(int)MyColumns.State] = new GUIContent("", "");
+            }
             item.cachedRowString[(int)MyColumns.Mean] = ToDisplayUnitsWithTooltips(item.data.msMean, false);
             item.cachedRowString[(int)MyColumns.Depth] = (item.data.minDepth == item.data.maxDepth) ? new GUIContent(string.Format("{0}", item.data.minDepth), "") : new GUIContent(string.Format("{0}-{1}", item.data.minDepth, item.data.maxDepth), "");
             item.cachedRowString[(int)MyColumns.Median] = ToDisplayUnitsWithTooltips(item.data.msMedian, false, medianFrameIndex);
             string tooltip = ToTooltipDisplayUnits(item.data.msMedian, true, medianFrameIndex);
             item.cachedRowString[(int)MyColumns.MedianBar] = new GUIContent("", tooltip);
+            item.cachedRowString[(int)MyColumns.StandardDeviation] = ToDisplayUnitsWithTooltips(item.data.msStandardDeviation, false);
             item.cachedRowString[(int)MyColumns.Min] = ToDisplayUnitsWithTooltips(item.data.msMin, false, minFrameIndex);
             item.cachedRowString[(int)MyColumns.Max] = ToDisplayUnitsWithTooltips(item.data.msMax, false, maxFrameIndex);
             item.cachedRowString[(int)MyColumns.Range] = ToDisplayUnitsWithTooltips(item.data.msMax - item.data.msMin);
             item.cachedRowString[(int)MyColumns.Count] = new GUIContent(string.Format("{0}", item.data.count), "");
             item.cachedRowString[(int)MyColumns.CountBar] = new GUIContent("", string.Format("{0}", item.data.count));
-            item.cachedRowString[(int)MyColumns.CountMean] = new GUIContent(string.Format("{0:f0}", item.data.countMean), "");
-            item.cachedRowString[(int)MyColumns.CountMeanBar] = new GUIContent("", string.Format("{0:f0}", item.data.countMean));
+            item.cachedRowString[(int)MyColumns.CountMean] = new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countMean), "");
+            item.cachedRowString[(int)MyColumns.CountMeanBar] = new GUIContent("", string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countMean));
+            item.cachedRowString[(int)MyColumns.CountStandardDeviation] = new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countStandardDeviation), string.Format(CultureInfo.InvariantCulture, "{0}", item.data.countStandardDeviation));
             item.cachedRowString[(int)MyColumns.FirstFrame] = new GUIContent(firstFrameIndex.ToString());
             item.cachedRowString[(int)MyColumns.AtMedian] = ToDisplayUnitsWithTooltips(item.data.msAtMedian, false, frameSummaryMedianFrameIndex);
             item.cachedRowString[(int)MyColumns.Total] = ToDisplayUnitsWithTooltips(item.data.msTotal);
@@ -586,14 +651,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
                 break;
 
+                case MyColumns.State:
                 case MyColumns.Mean:
                 case MyColumns.Depth:
                 case MyColumns.Median:
+                case MyColumns.StandardDeviation:
                 case MyColumns.Min:
                 case MyColumns.Max:
                 case MyColumns.Range:
                 case MyColumns.Count:
                 case MyColumns.CountMean:
+                case MyColumns.CountStandardDeviation:
                 case MyColumns.AtMedian:
                 case MyColumns.Total:
                 case MyColumns.Threads:
@@ -661,10 +729,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             HeaderData[] headerData = new HeaderData[]
             {
                 new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width: 300, minWidth: 100, autoResize: false, allowToggleVisibility: false, ascending: true),
+                new HeaderData("State", "Status of marker entry (if modified or removed from frame time due to 'Remove' filter)"),
                 new HeaderData("Depth", "Marker depth in marker hierarchy\n\nMay appear at multiple levels"),
                 new HeaderData("Median", "Central marker time over all selected frames\n\nAlways present in data set\n1st of 2 central values for even frame count"),
                 new HeaderData("Median Bar", "Central marker time over all selected frames", width: 50),
                 new HeaderData("Mean", "Per frame marker time / number of non zero frames"),
+                new HeaderData("SD", "Standard deviation in marker times"),
                 new HeaderData("Min", "Minimum marker time"),
                 new HeaderData("Max", "Maximum marker time"),
                 new HeaderData("Range", "Difference between maximum and minimum"),
@@ -672,6 +742,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 new HeaderData("Count Bar", "Marker count over all selected frames\n\nMultiple can occur per frame"),
                 new HeaderData("Count Frame", "Average number of markers per frame\n\ntotal count / number of non zero frames", width: 70, minWidth: 50),
                 new HeaderData("Count Frame Bar", "Average number of markers per frame\n\ntotal count / number of non zero frames", width: 70, minWidth: 50),
+                new HeaderData("Count SD", "Standard deviation in marker per frame counts"),
                 new HeaderData("1st", "First frame index that the marker appears on"),
                 new HeaderData("At Median Frame", "Marker time on the median frame\n\nI.e. Marker total duration on the average frame", width: 90, minWidth: 50),
                 new HeaderData("Total", "Marker total time over all selected frames"),

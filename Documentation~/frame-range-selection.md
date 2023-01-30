@@ -17,7 +17,7 @@ The Profile Analyzer uses all the frames in the data sets unless you select a su
 
 To help visualize which frames are in the current selection, the start and end frame number, plus the frame count in square brackets appears on the x-axis of the graph.
 
-![Frame Control pane with selected item](images/profile-analyzer-frame-control-selection.png)<br/>*The Frame Control in the Single view (top), with 204 frames selected, starting on frame 115 and ending on frame 318. The  Compare view (bottom) has Pair Graph Selection enabled, with the same 237 frames selected on both graphs, starting on frame 135 and ending on frame 371.*
+![Frame Control pane with selected item](images/profile-analyzer-frame-control-selection.png)<br/>*The Frame Control in the Single view (top), with 187 frames selected, starting on frame 37 and ending on frame 224. The  Compare view (bottom) has Pair Graph Selection enabled, with the same 237 frames selected on both graphs, starting on frame 135 and ending on frame 371.*
 
 ## Frame range controls
 
@@ -50,8 +50,6 @@ You can control the selection of data in both the **Single** and **Compare** vie
 ### Context menu commands
 
 Right click on the Frame Control graph to bring up the context menu.
-
-![Frame Control context menu](images/frame-control-context-menu.png)<br/>*Frame Control context menu*
 
 |**Menu item**|**Function**|
 |---|---|

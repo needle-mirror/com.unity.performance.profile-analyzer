@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
@@ -28,6 +29,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Color m_LeftColor;
         Color m_RightColor;
         List<MarkerPairing> m_Pairings;
+        bool m_HideRemovedMarkers;
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         float m_DiffRange;
         float m_CountDiffRange;
@@ -41,6 +43,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public enum MyColumns
         {
             Name,
+            State,
             LeftMedian,
             LeftBar,
             RightBar,
@@ -81,6 +84,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public enum SortOption
         {
             Name,
+            State,
             LeftMedian,
             RightMedian,
             Diff,
@@ -116,6 +120,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         SortOption[] m_SortOptions =
         {
             SortOption.Name,
+            SortOption.State,
             SortOption.LeftMedian,
             SortOption.ReverseDiff,
             SortOption.Diff,
@@ -163,12 +168,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent menuItemRemoveFromExcludeFilter = new GUIContent("Remove from Exclude Filter", "");
             public static readonly GUIContent menuItemSetAsParentMarkerFilter = new GUIContent("Set as Parent Marker Filter", "");
             public static readonly GUIContent menuItemClearParentMarkerFilter = new GUIContent("Clear Parent Marker Filter", "");
+            public static readonly GUIContent menuItemSetAsRemoveMarker = new GUIContent("Remove Marker", "");
             public static readonly GUIContent menuItemCopyToClipboard = new GUIContent("Copy to Clipboard", "");
 
             public static readonly GUIContent invalidEntry = new GUIContent("-");
         }
 
-        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileDataView left, ProfileDataView right, List<MarkerPairing> pairings, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color leftColor, Color rightColor) : base(state, multicolumnHeader)
+        public ComparisonTable(TreeViewState state, MultiColumnHeader multicolumnHeader, ProfileDataView left, ProfileDataView right, List<MarkerPairing> pairings, bool hideRemovedMarkers, ProfileAnalyzerWindow profileAnalyzerWindow, Draw2D draw2D, Color leftColor, Color rightColor) : base(state, multicolumnHeader)
         {
             m_2D = draw2D;
             m_LeftDataView = left;
@@ -176,6 +182,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_LeftColor = leftColor;
             m_RightColor = rightColor;
             m_Pairings = pairings;
+            m_HideRemovedMarkers = hideRemovedMarkers;
             m_ProfileAnalyzerWindow = profileAnalyzerWindow;
 
             m_MaxColumns = Enum.GetValues(typeof(MyColumns)).Length;
@@ -199,9 +206,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int depthForHiddenRoot = -1;
             ProfileTreeViewItem root = new ProfileTreeViewItem(idForhiddenRoot, depthForHiddenRoot, "root", null);
 
-            List<string> nameFilters = m_ProfileAnalyzerWindow.GetNameFilters();
-            List<string> nameExcludes = m_ProfileAnalyzerWindow.GetNameExcludes();
-
             float minDiff = float.MaxValue;
             float maxDiff = 0.0f;
             double totalMinDiff = float.MaxValue;
@@ -213,16 +217,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             for (int index = 0; index < m_Pairings.Count; ++index)
             {
                 var pairing = m_Pairings[index];
-                if (nameFilters.Count > 0)
-                {
-                    if (!m_ProfileAnalyzerWindow.NameInFilterList(pairing.name, nameFilters))
-                        continue;
-                }
-                if (nameExcludes.Count > 0)
-                {
-                    if (m_ProfileAnalyzerWindow.NameInExcludeList(pairing.name, nameExcludes))
-                        continue;
-                }
+
+                if (!m_ProfileAnalyzerWindow.DoesMarkerPassFilter(pairing.name))
+                    continue;
+
+                double timeIgnored;
+                double msTotal;
+                if (m_HideRemovedMarkers && IsFullyIgnored(pairing, out timeIgnored, out msTotal))
+                    continue;
 
                 var item = new ComparisonTreeViewItem(index, 0, pairing.name, pairing);
                 root.AddChild(item);
@@ -334,6 +336,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     case SortOption.Name:
                         orderedQuery = orderedQuery.ThenBy(l => l.data.name, ascending);
                         break;
+                    case SortOption.State:
+                        orderedQuery = orderedQuery.ThenBy(l => State(l), ascending);
+                        break;
                     case SortOption.LeftMedian:
                         orderedQuery = orderedQuery.ThenBy(l => LeftMedianSorting(l), ascending);
                         break;
@@ -427,28 +432,37 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             rootItem.children = orderedQuery.Cast<TreeViewItem>().ToList();
         }
 
-        MarkerData GetLeftMarker(ComparisonTreeViewItem item)
+        MarkerData GetLeftMarker(MarkerPairing pairing)
         {
-            if (item.data.leftIndex < 0)
+            if (pairing.leftIndex < 0)
                 return null;
 
             List<MarkerData> markers = m_LeftDataView.analysis.GetMarkers();
-            if (item.data.leftIndex >= markers.Count)
+            if (pairing.leftIndex >= markers.Count)
                 return null;
 
-            return markers[item.data.leftIndex];
+            return markers[pairing.leftIndex];
+        }
+        MarkerData GetRightMarker(MarkerPairing pairing)
+        {
+            if (pairing.rightIndex < 0)
+                return null;
+
+            List<MarkerData> markers = m_RightDataView.analysis.GetMarkers();
+            if (pairing.rightIndex >= markers.Count)
+                return null;
+
+            return markers[pairing.rightIndex];
+        }
+
+        MarkerData GetLeftMarker(ComparisonTreeViewItem item)
+        {
+            return GetLeftMarker(item.data);
         }
 
         MarkerData GetRightMarker(ComparisonTreeViewItem item)
         {
-            if (item.data.rightIndex < 0)
-                return null;
-
-            List<MarkerData> markers = m_RightDataView.analysis.GetMarkers();
-            if (item.data.rightIndex >= markers.Count)
-                return null;
-
-            return markers[item.data.rightIndex];
+            return GetRightMarker(item.data);
         }
 
         string LeftFirstThread(ComparisonTreeViewItem item)
@@ -685,6 +699,101 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return RightMinDepth(item) - LeftMinDepth(item);
         }
 
+        double TimeRemoved(ComparisonTreeViewItem item)
+        {
+            double removed;
+            removed = MarkerData.GetTimeRemoved(GetLeftMarker(item));
+            if (removed > 0.0)
+                return removed;
+            removed = MarkerData.GetTimeRemoved(GetRightMarker(item));
+            if (removed > 0.0)
+                return removed;
+
+            return 0.0;
+        }
+
+        double TimeIgnored(MarkerPairing pairing)
+        {
+            double ignored;
+            ignored = MarkerData.GetTimeIgnored(GetLeftMarker(pairing));
+            if (ignored > 0.0)
+                return ignored;
+            ignored = MarkerData.GetTimeIgnored(GetRightMarker(pairing));
+            if (ignored > 0.0)
+                return ignored;
+
+            return 0.0;
+        }
+
+        double TimeIgnored(ComparisonTreeViewItem item)
+        {
+            double ignored;
+            ignored = MarkerData.GetTimeIgnored(GetLeftMarker(item));
+            if (ignored > 0.0)
+                return ignored;
+            ignored = MarkerData.GetTimeIgnored(GetRightMarker(item));
+            if (ignored > 0.0)
+                return ignored;
+
+            return 0.0;
+        }
+
+        bool IsFullyIgnored(MarkerPairing pairing, out double timeIgnored, out double msTotal)
+        {
+            MarkerData left = GetLeftMarker(pairing);
+            MarkerData right = GetRightMarker(pairing);
+
+            double leftTimeIgnored = MarkerData.GetTimeIgnored(left);
+            double rightTimeIgnored = MarkerData.GetTimeIgnored(right);
+            double leftMsTotal = MarkerData.GetMsTotal(left);
+            double rightMsTotal = MarkerData.GetMsTotal(right);
+
+            bool result = false;
+            if (leftTimeIgnored > 0.0 || rightTimeIgnored > 0.0)
+            {
+                if (leftMsTotal == 0.0 && rightMsTotal == 0.0)
+                    result = true;
+            }
+
+            if (leftTimeIgnored > 0.0)
+            {
+                timeIgnored = leftTimeIgnored;
+                msTotal = leftMsTotal;
+            }
+            else
+            {
+                timeIgnored = rightTimeIgnored;
+                msTotal = rightMsTotal;
+            }
+
+            return result;
+        }
+
+        bool IsFullyIgnored(ComparisonTreeViewItem item, out double timeIgnored, out double msTotal)
+        {
+            return IsFullyIgnored(item.data, out timeIgnored, out msTotal);
+        }
+
+        int State(ComparisonTreeViewItem item)
+        {
+            if (TimeRemoved(item) > 0.0)
+            {
+                return -3;
+            }
+            if (TimeIgnored(item) > 0.0)
+            {
+                double timeIgnored;
+                double msTotal;
+                bool removed = IsFullyIgnored(item, out timeIgnored, out msTotal);
+                if (removed)
+                    return -2;
+                else
+                    return -1;
+            }
+
+            return 0;
+        }
+
         IOrderedEnumerable<ComparisonTreeViewItem> InitialOrder(IEnumerable<ComparisonTreeViewItem> myTypes, int[] history)
         {
             SortOption sortOption = m_SortOptions[history[0]];
@@ -693,6 +802,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 case SortOption.Name:
                     return myTypes.Order(l => l.data.name, ascending);
+                case SortOption.State:
+                    return myTypes.Order(l => State(l), ascending);
                 case SortOption.LeftMedian:
                     return myTypes.Order(l => LeftMedianSorting(l), ascending);
                 case SortOption.RightMedian:
@@ -789,6 +900,53 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_2D.ClearClipRect();
         }
 
+        static bool IsBar(MyColumns col)
+        {
+            switch (col)
+            {
+                case MyColumns.LeftBar:
+                case MyColumns.RightBar:
+                case MyColumns.LeftCountBar:
+                case MyColumns.RightCountBar:
+                case MyColumns.LeftTotalBar:
+                case MyColumns.RightTotalBar:
+                case MyColumns.LeftCountMeanBar:
+                case MyColumns.RightCountMeanBar:
+                    return true;
+            }
+
+            return false;
+        }
+
+        internal void WriteTableContentsCSV(System.IO.StreamWriter writer)
+        {
+            var visibleColumns = multiColumnHeader.state.visibleColumns.Where(c => !IsBar((MyColumns)c)).ToArray();
+            for (int i = 0, n = visibleColumns.Length; i < n; i++)
+            {
+                if (i != 0)
+                    writer.Write(';');
+                var colIdx = visibleColumns[i];
+                writer.Write(s_HeaderData[colIdx].content.text);
+            }
+            writer.WriteLine();
+
+            foreach (var child in rootItem.children)
+            {
+                var item = (ComparisonTreeViewItem)child;
+                if (item.cachedRowString == null)
+                    GenerateStrings(item);
+                for (int i = 0, n = visibleColumns.Length; i < n; i++)
+                {
+                    if (i != 0)
+                        writer.Write(';');
+                    var colIdx = visibleColumns[i];
+                    writer.Write(item.cachedRowString[colIdx].text);
+                }
+
+                writer.WriteLine();
+            }
+        }
+
         string ToDisplayUnits(float ms, bool showUnits = false, bool showFullValueWhenBelowZero = false)
         {
             return m_ProfileAnalyzerWindow.ToDisplayUnits(ms, showUnits, 0, showFullValueWhenBelowZero);
@@ -848,8 +1006,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddItem(Styles.menuItemSetAsParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(markerName));
             menu.AddItem(Styles.menuItemClearParentMarkerFilter, false, () => m_ProfileAnalyzerWindow.SetAsParentMarkerFilter(""));
             menu.AddSeparator("");
-            if (content != null && !string.IsNullOrEmpty(content.text))
-                menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, content.text));
+            menu.AddItem(Styles.menuItemSetAsRemoveMarker, false, () => m_ProfileAnalyzerWindow.SetAsRemoveMarker(markerName));
+            menu.AddSeparator("");
+            if (markerName != null && !string.IsNullOrEmpty(markerName))
+                menu.AddItem(Styles.menuItemCopyToClipboard, false, () => CopyToClipboard(evt, markerName));
 
             return menu;
         }
@@ -874,6 +1034,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             menu.AddSeparator("");
             menu.AddDisabledItem(Styles.menuItemSetAsParentMarkerFilter);
             menu.AddDisabledItem(Styles.menuItemClearParentMarkerFilter);
+            menu.AddSeparator("");
+            menu.AddDisabledItem(Styles.menuItemSetAsRemoveMarker);
             menu.AddSeparator("");
             if (content != null && !string.IsNullOrEmpty(content.text))
                 menu.AddDisabledItem(Styles.menuItemCopyToClipboard);
@@ -916,7 +1078,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (percent == float.MaxValue)
                 return "-";
 
-            return string.Format("{0:+0.##;-0.##;0}%", percent);
+            return string.Format(CultureInfo.InvariantCulture, "{0:+0.##;-0.##;0}%", percent);
         }
 
         string DiffPercentString(ComparisonTreeViewItem item)
@@ -946,7 +1108,33 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int leftMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(LeftMedianFrameIndex(item), m_LeftDataView);
             int rightMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(RightMedianFrameIndex(item), m_RightDataView);
 
-            item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
+            if (TimeRemoved(item) > 0.0)
+            {
+                item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Modified]", item.data.name + "\n\nTime reduced by removing child marker time");
+                item.cachedRowString[(int)MyColumns.State] = new GUIContent("Modified", "Time reduced by removing child marker time");
+            }
+            else if (TimeIgnored(item) > 0.0)
+            {
+                double timeIgnored;
+                double msTotal;
+                bool removed = IsFullyIgnored(item, out timeIgnored, out msTotal);
+
+                if (removed)
+                {
+                    item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Removed]", item.data.name + "\n\nAll marker time removed");
+                    item.cachedRowString[(int)MyColumns.State] = new GUIContent("Removed", "All marker time removed");
+                }
+                else
+                {
+                    item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name + " [Partial Removal]", item.data.name + "\n\nSome marker time removed (some instances)");
+                    item.cachedRowString[(int)MyColumns.State] = new GUIContent("Partial Removal", "Some marker time removed (some instances)");
+                }
+            }
+            else
+            { 
+                item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
+                item.cachedRowString[(int)MyColumns.State] = new GUIContent("", "");
+            }
             item.cachedRowString[(int)MyColumns.LeftMedian] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(LeftMedian(item), false, leftMedianFrameIndex);
             item.cachedRowString[(int)MyColumns.RightMedian] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToDisplayUnitsWithTooltips(RightMedian(item), false, rightMedianFrameIndex);
             string tooltip = ToTooltipDisplayUnits(Diff(item), true);
@@ -965,8 +1153,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             item.cachedRowString[(int)MyColumns.CountDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(CountDiffPercentString(item), "");
             item.cachedRowString[(int)MyColumns.AbsCountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", AbsCountDiff(item)));
 
-            item.cachedRowString[(int)MyColumns.LeftCountMean] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", LeftCountMean(item)));
-            item.cachedRowString[(int)MyColumns.RightCountMean] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", RightCountMean(item)));
+            item.cachedRowString[(int)MyColumns.LeftCountMean] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", LeftCountMean(item)));
+            item.cachedRowString[(int)MyColumns.RightCountMean] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", RightCountMean(item)));
             tooltip = string.Format("{0}", CountMeanDiff(item));
             item.cachedRowString[(int)MyColumns.LeftCountMeanBar] = CountMeanDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightCountMeanBar] = CountMeanDiff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
@@ -1021,6 +1209,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     ShowText(cellRect, content);
                 }
                 break;
+                case MyColumns.State:
                 case MyColumns.LeftMedian:
                 case MyColumns.Diff:
                 case MyColumns.RightMedian:
@@ -1105,12 +1294,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(MarkerColumnFilter modeFilter)
-        {
-            var columnList = new List<MultiColumnHeaderState.Column>();
-            HeaderData[] headerData = new HeaderData[]
+        static HeaderData[] s_HeaderData = new HeaderData[]
             {
                 new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width: 300, minWidth: 100, autoResize: false, allowToggleVisibility: false, ascending: true),
+                new HeaderData("State", "Status of marker entry (if modified or removed from frame time due to 'Remove' filter)"),
+
                 new HeaderData("Left Median", "Left median time\n\nCentral marker time over all selected frames"),
                 new HeaderData("<", "Difference if left data set is a larger value", width: 50),
                 new HeaderData(">", "Difference if right data set is a larger value", width: 50),
@@ -1150,7 +1338,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 new HeaderData("Threads Left", "Threads the marker occurs on in left data set (with filtering applied)"),
                 new HeaderData("Threads Right", "Threads the marker occurs on in right data set (with filtering applied)"),
             };
-            foreach (var header in headerData)
+        public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(MarkerColumnFilter modeFilter)
+        {
+            var columnList = new List<MultiColumnHeaderState.Column>();
+            foreach (var header in s_HeaderData)
             {
                 columnList.Add(new MultiColumnHeaderState.Column
                 {
