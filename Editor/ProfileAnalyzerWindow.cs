@@ -1312,7 +1312,7 @@ To compare two data sets:
             string removeMarker = GetRemoveMarker();
             if (removeMarker != null)
             {
-                // Find marker to remove 
+                // Find marker to remove
                 removeMarkerIndex = profileData.GetMarkerIndex(removeMarker);
                 removeFrameSyncTime = (removeMarkerIndex != -1);
             }
@@ -1635,9 +1635,9 @@ To compare two data sets:
 
             // First scan just the frames
             m_ThreadPhase = 0;
-            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
             m_ThreadPhase++;
-            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
             m_ThreadPhase++;
 
             if (leftAnalysisNew == null || rightAnalysisNew == null)
@@ -1653,9 +1653,9 @@ To compare two data sets:
             // For now do it always if the depth is auto and not 'all'
             if (updateDepthPhase != 0)
             {
-                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
+                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
                 m_ThreadPhase++;
-                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
+                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
                 m_ThreadPhase++;
 
                 var pairings = GeneratePairings(leftAnalysis, rightAnalysis);
@@ -1682,7 +1682,7 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
@@ -1697,15 +1697,15 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
 
-            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
+            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
             m_ThreadPhase++;
 
-            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMax, GetRemoveMarker());
+            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
             m_ThreadPhase++;
 
             m_TotalCombinedMarkerCountNew = GetTotalCombinedMarkerCount(m_ProfileLeftView.data, m_ProfileRightView.data);
@@ -1951,10 +1951,10 @@ To compare two data sets:
                     selection.Add(m_ProfileSingleView.data.OffsetToDisplayFrame(frameOffset));
                 }
 
-                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
                 m_ThreadPhase++;
             }
-            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, GetRemoveMarker());
+            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
             m_ThreadPhase++;
             stopwatch.Stop();
             m_LastAnalysisTimeMilliseconds = stopwatch.ElapsedMilliseconds;
@@ -3404,6 +3404,7 @@ To compare two data sets:
             }
             else
             {
+                m_hideRemovedMarkers = true;
                 m_removeMarkerCustomRemoveMarker = markerName;
                 m_removeMarkerOperation = RemoveMarkerOperation.Custom;
                 UpdateRemoveMarkerDisplay();
@@ -3418,7 +3419,7 @@ To compare two data sets:
                 case RemoveMarkerOperation.ShowAll:
                     return null;
                 case RemoveMarkerOperation.HideWaitForFPS:
-                    // Gfx.WaitForPresentOnGfxThread is not always present on Android 
+                    // Gfx.WaitForPresentOnGfxThread is not always present on Android
                     // E.g. when Application.targetFrameRate locks the frame rate
                     // So we support removing WaitForTargetFPS
                     // Often WaitForTargetFPS will be negligable on console and Gfx.WaitForPresentOnGfxThread is key
@@ -5575,7 +5576,7 @@ To compare two data sets:
             m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
 
             m_Columns.Draw2("", "");
-         
+
             EditorGUILayout.BeginHorizontal();
 
             if (removed)
