@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine.Profiling;
 using UnityEditor.Profiling;
+
 #if UNITY_2021_2_OR_NEWER
 using Unity.Profiling.Editor;
 // stub so that ProfilerWindow can be moved to this namespace in trunk without a need to change PA
@@ -225,7 +226,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
 #endif
 
-        public event Action<string, string, string> selectedMarkerChanged = delegate {};
+        public event Action<string, string, string> selectedMarkerChanged = delegate { };
 
         public void PollProfilerWindowMarkerName()
         {
@@ -379,6 +380,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                         // The markers are in depth first order
                         depthStack.Clear();
+                        ProfileMarker[] threadMarkers = new ProfileMarker[frameData.sampleCount - 1];
                         // first sample is the thread name
                         for (int i = 1; i < frameData.sampleCount; i++)
                         {
@@ -411,11 +413,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 else
                                 {
                                     string name = frameData.GetSampleName(i);
-                                    data.AddMarkerName(name, markerData);
+                                    data.AddMarkerName(name, ref markerData);
                                     markerIdToNameIndex[markerId] = markerData.nameIndex;
                                 }
 
-                                thread.AddMarker(markerData);
+                                threadMarkers[i - 1] = markerData;
                             }
 
                             int childrenCount = frameData.GetSampleChildrenCount(i);
@@ -436,6 +438,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 }
                             }
                         }
+                        thread.AddMarkerArray(threadMarkers);
                     }
                     threadIndex++;
                 }
@@ -536,6 +539,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     const bool enterChildren = true;
                     // The markers are in depth first order and the depth is known
                     // So we can infer a parent child relationship
+                    var markers = new List<ProfileMarker>();
                     while (frameData.Next(enterChildren))
                     {
                         if (frameData.durationMS < 0)
@@ -553,9 +557,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         }
                         var markerData = ProfileMarker.Create(frameData);
 
-                        data.AddMarkerName(frameData.name, markerData);
-                        thread.AddMarker(markerData);
+                        data.AddMarkerName(frameData.name, ref markerData);
+                        markers.Add(markerData);
                     }
+                    thread.AddMarkerArray(markers.ToArray());
                 }
             }
 
@@ -567,9 +572,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         ProfileData GetData(int firstFrameIndex, int lastFrameIndex)
         {
-            ProfileData data = new ProfileData(ProfileAnalyzerWindow.TmpPath);
+            ProfileData data = new ProfileData();
             GetDataRaw(data, firstFrameIndex, lastFrameIndex);
-            data.Write();
+            data.Write(ProfileAnalyzerWindow.TmpPath);
             return data;
         }
 
@@ -626,7 +631,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (threadFilters.Contains(threadNameWithIndex))
                 {
-                    yield return new ThreadIndexIterator {frameData = frameData, threadIndex = threadIndex};
+                    yield return new ThreadIndexIterator { frameData = frameData, threadIndex = threadIndex };
                 }
             }
             frameData.Dispose();
@@ -806,7 +811,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public event Action<int> selectedFrameChanged = delegate {};
+        public event Action<int> selectedFrameChanged = delegate { };
 
         public void PollSelectedFrameChanges()
         {

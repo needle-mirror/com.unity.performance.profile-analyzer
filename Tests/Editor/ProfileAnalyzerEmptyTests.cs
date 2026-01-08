@@ -34,7 +34,7 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
         var threadFilters = m_SetupData.threadFilters;
 
         int firstFrameIndex = profileData.OffsetToDisplayFrame(0);
-        int lastFrameIndex  = profileData.OffsetToDisplayFrame(profileData.GetFrameCount() - 1);
+        int lastFrameIndex = profileData.OffsetToDisplayFrame(profileData.GetFrameCount() - 1);
 
         Assert.AreEqual(k_FirstValidFrameInProfiler, firstFrameIndex, "First Frame index not " + k_FirstValidFrameInProfiler);
         Assert.AreEqual(k_LastFrameInProfileAnalyzer, lastFrameIndex, "Last Frame index is not " + k_LastFrameInProfileAnalyzer);

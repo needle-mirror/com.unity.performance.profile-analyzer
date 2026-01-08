@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditorInternal;
-using System.Text.RegularExpressions;
 using System;
+using System.Threading.Tasks;
+using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
@@ -15,41 +16,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         List<string> m_threadNames = new List<string>();
         ProfileAnalysis m_analysis;
 
-        public ProfileAnalyzer()
-        {
-        }
-
-        public void QuickScan()
-        {
-            var frameData = new ProfilerFrameDataIterator();
-
-            m_threadNames.Clear();
-            int frameIndex = 0;
-            int threadCount = frameData.GetThreadCount(0);
-            frameData.SetRoot(frameIndex, 0);
-
-            Dictionary<string, int> threadNameCount = new Dictionary<string, int>();
-            for (int threadIndex = 0; threadIndex < threadCount; ++threadIndex)
-            {
-                frameData.SetRoot(frameIndex, threadIndex);
-
-                var threadName = frameData.GetThreadName();
-                var groupName = frameData.GetGroupName();
-                threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
-
-                if (!threadNameCount.ContainsKey(threadName))
-                    threadNameCount.Add(threadName, 1);
-                else
-                    threadNameCount[threadName] += 1;
-
-                string threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
-                threadNameWithIndex = ProfileData.CorrectThreadName(threadNameWithIndex);
-
-                m_threadNames.Add(threadNameWithIndex);
-            }
-
-            frameData.Dispose();
-        }
+        public ProfileAnalyzer() { }
 
         public List<string> GetThreadNames()
         {
@@ -65,6 +32,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float msFrame = frame.msFrame;
                 frameTimes.Add(msFrame);
             }
+
             frameTimes.Sort();
             median = frameTimes[frameTimes.Count / 2];
 
@@ -74,6 +42,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 total += msFrame;
             }
+
             mean = (float)(total / (double)frameTimes.Count);
 
 
@@ -89,6 +58,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     float d = msFrame - mean;
                     total += (d * d);
                 }
+
                 total /= (frameTimes.Count - 1);
                 standardDeviation = (float)Math.Sqrt(total);
             }
@@ -102,6 +72,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 Debug.Log(string.Format("Frame index {0} offset {1} < 0, clamping", frameIndex, frameOffset));
                 frameOffset = 0;
             }
+
             if (frameOffset >= profileData.GetFrameCount())
             {
                 Debug.Log(string.Format("Frame index {0} offset {1} >= frame count {2}, clamping", frameIndex, frameOffset, profileData.GetFrameCount()));
@@ -122,16 +93,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return false;
         }
 
-        public bool IsNullOrWhiteSpace(string s)
-        {
-            // return string.IsNullOrWhiteSpace(parentMarker);
-            if (s == null || Regex.IsMatch(s, @"^[\s]*$"))
-                return true;
-
-            return false;
-        }
-
-        public void RemoveMarkerTimeFromParents(MarkerData[] markers, ProfileData profileData, ProfileThread threadData, int markerAt)
+        public void RemoveMarkerTimeFromParents(PerFrameMarkerData[] markers, ProfileData profileData, ProfileThread threadData, int markerAt)
         {
             // Get the info for the marker we plan to remove (assume thats what we are at)
             ProfileMarker profileMarker = threadData.markers[markerAt];
@@ -145,42 +107,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if (parentMarkerData.depth == currentDepth - 1)
                 {
                     currentDepth--;
-                    if (parentMarkerData.nameIndex < markers.Length) // Had an issue where marker not yet processed(marker from another thread)
+
+                    // Had an issue where marker not yet processed(marker from another thread)
+                    // If a depth slice is applied we may not have a parent marker stored
+                    if (markers[parentMarkerData.nameIndex].globalNameIndex != -1)
                     {
-                        MarkerData parentMarker = markers[parentMarkerData.nameIndex];
-
-                        // If a depth slice is applied we may not have a parent marker stored
-                        if (parentMarker != null)
-                        {
-                            // Revise the duration of parent to remove time from there too
-                            // Note if the marker to remove is nested (i.e. parent of the same name, this could reduce the msTotal, more than we add to the timeIgnored)
-                            parentMarker.msTotal -= markerTime;
-
-                            // Reduce from the max marker time too
-                            // This could be incorrect when there are many instances that contribute the the total time
-                            if (parentMarker.msMaxIndividual > markerTime)
-                            {
-                                parentMarker.msMaxIndividual -= markerTime;
-                            }
-                            if (parentMarker.msMinIndividual > markerTime)
-                            {
-                                parentMarker.msMinIndividual -= markerTime;
-                            }
-
-                            // Revise stored frame time
-                            FrameTime frameTime = parentMarker.frames[parentMarker.frames.Count - 1];
-                            frameTime = new FrameTime(frameTime.frameIndex, frameTime.ms - markerTime, frameTime.count);
-                            parentMarker.frames[parentMarker.frames.Count - 1] = frameTime;
-
-                            // Note that we have modified the time
-                            parentMarker.timeRemoved += markerTime;
-
-                            // Note markerTime can be 0 in some cases.
-                            // Make sure timeRemoved is never left at 0.0
-                            // This makes sure we can test for non zero to indicate the marker has been removed 
-                            if (parentMarker.timeRemoved == 0.0)
-                                parentMarker.timeRemoved = double.Epsilon;
-                        }
+                        markers[parentMarkerData.nameIndex].RemoveMarkerTimeFromParent(markerTime);
                     }
                 }
             }
@@ -196,7 +128,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             // Skip children
             int currentDepth = profileMarker.depth;
-            while (at < threadData.markers.Count)
+            while (at < threadData.markers.Length)
             {
                 profileMarker = threadData.markers[at];
                 if (profileMarker.depth <= currentDepth)
@@ -211,123 +143,131 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return markerAndChildCount;
         }
 
-        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMax = 0, string removeMarker = null)
+
+
+        public void UpdateMarker(
+            MarkerData marker,
+            PerFrameMarkerData perFrameMarker,
+            int frameIndex)
         {
-            m_Progress = 0;
-            if (profileData == null)
+            marker.count += perFrameMarker.count;
+            marker.msTotal += perFrameMarker.msTotal;
+
+            // Individual marker time (not total over frame)
+            if (perFrameMarker.msMinIndividual < marker.msMinIndividual)
             {
-                return null;
-            }
-            if (profileData.GetFrameCount() <= 0)
-            {
-                return null;
+                marker.msMinIndividual = perFrameMarker.msMinIndividual;
+                marker.minIndividualFrameIndex = perFrameMarker.minIndividualFrameIndex;
             }
 
-            int frameCount = selectionIndices.Count;
-            if (frameCount < 0)
+            if (perFrameMarker.msMaxIndividual > marker.msMaxIndividual)
             {
-                return null;
+                marker.msMaxIndividual = perFrameMarker.msMaxIndividual;
+                marker.maxIndividualFrameIndex = perFrameMarker.maxIndividualFrameIndex;
             }
 
-            if (profileData.HasFrames && !profileData.HasThreads)
+            // Record highest depth found
+            if (perFrameMarker.minDepth < marker.minDepth)
+                marker.minDepth = perFrameMarker.minDepth;
+            if (perFrameMarker.maxDepth > marker.maxDepth)
+                marker.maxDepth = perFrameMarker.maxDepth;
+
+            marker.presentOnFrameCount += 1;
+            var frameTime = new FrameTime(frameIndex, perFrameMarker.msTotal, perFrameMarker.count);
+            marker.frames.Add(frameTime);
+
+            // Add all thread names this marker occurs on
+            for (int i = 0; i < perFrameMarker.threadIndexCount; i++)
             {
-                if (!ProfileData.Load(profileData.FilePath, out profileData))
+                int threadIndex = perFrameMarker.GetThreadIndex(i);
+
+                if (!marker.globalThreadIndices.Contains(threadIndex))
+                    marker.globalThreadIndices.Add(threadIndex);
+            }
+        }
+
+        internal struct FrameProcessingSettings
+        {
+            public bool ProcessMarkers { get; }
+            public List<string> ThreadFilters { get; }
+            public int DepthFilter { get; }
+            public bool FilteringByParentMarker { get; }
+            public int ParentMarkerIndex { get; }
+            public ThreadIdentifier MainThreadIdentifier { get; }
+            public bool SelfTimes { get; }
+            public string RemoveMarker { get; }
+
+            public FrameProcessingSettings(
+                ProfileData profileData,
+                List<string> threadFilters,
+                int depthFilter,
+                string parentMarker,
+                bool selfTimes = false,
+                string removeMarker = null
+            )
+            {
+                ThreadFilters = threadFilters;
+                ProcessMarkers = (threadFilters != null);
+                DepthFilter = depthFilter;
+
+                FilteringByParentMarker = false;
+                ParentMarkerIndex = -1;
+                if (!Utility.IsNullOrWhiteSpace(parentMarker))
                 {
-                    return null;
+                    // Returns -1 if this marker doesn't exist in the data set
+                    ParentMarkerIndex = profileData.GetMarkerIndex(parentMarker);
+                    FilteringByParentMarker = true;
                 }
+
+                MainThreadIdentifier = new ThreadIdentifier("Main Thread", 1);
+
+                SelfTimes = selfTimes;
+                RemoveMarker = removeMarker;
             }
+        };
 
-            bool processMarkers = (threadFilters != null);
+        static readonly ProfilerMarkerAbstracted k_ProcessFrameProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.ProcessFrame");
 
-            ProfileAnalysis analysis = new ProfileAnalysis();
-            if (selectionIndices.Count > 0)
-                analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count - 1]);
-            else
-                analysis.SetRange(0, 0);
-
-            m_threadNames.Clear();
-
-            int maxMarkerDepthFound = 0;
-            var threads = new Dictionary<string, ThreadData>();
-            var markers = new MarkerData[profileData.MarkerNameCount];
-            var removedMarkers = new Dictionary<string, double>();
-
-            var mainThreadIdentifier = new ThreadIdentifier("Main Thread", 1);
-
-            int markerCount = 0;
-
-            bool filteringByParentMarker = false;
-            int parentMarkerIndex = -1;
-            if (!IsNullOrWhiteSpace(parentMarker))
+        public void ProcessFrame(
+            ProfileData profileData,
+            int frameIndex,
+            ProfileFrame frameData,
+            FrameProcessingSettings settings,
+            PerFrameOutputData result)
+        {
+            using (k_ProcessFrameProfilerMarker.Auto())
             {
-                // Returns -1 if this marker doesn't exist in the data set
-                parentMarkerIndex = profileData.GetMarkerIndex(parentMarker);
-                filteringByParentMarker = true;
-            }
-
-            int at = 0;
-            foreach (int frameIndex in selectionIndices)
-            {
-                int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
-                var frameData = profileData.GetFrame(frameOffset);
                 if (frameData == null)
-                    continue;
-                var msFrame = frameData.msFrame;
+                    return;
 
-                if (processMarkers)
+                var msFrame = frameData.msFrame;
+                if (settings.ProcessMarkers)
                 {
                     // get the file reader in case we need to rebuild the markers rather than opening
                     // the file for every marker
-                    for (int threadIndex = 0; threadIndex < frameData.threads.Count; threadIndex++)
+                    for (int perFrameThreadIndex = 0; perFrameThreadIndex < frameData.threads.Count; perFrameThreadIndex++)
                     {
                         float msTimeOfMinDepthMarkers = 0.0f;
                         float msIdleTimeOfMinDepthMarkers = 0.0f;
 
-                        var threadData = frameData.threads[threadIndex];
+                        var threadData = frameData.threads[perFrameThreadIndex];
+                        result.threadsOnFrame[threadData.threadIndex].globalThreadIndex = threadData.threadIndex;
+
                         var threadNameWithIndex = profileData.GetThreadName(threadData);
-
-                        ThreadData thread;
-                        if (!threads.ContainsKey(threadNameWithIndex))
-                        {
-                            m_threadNames.Add(threadNameWithIndex);
-
-                            thread = new ThreadData(threadNameWithIndex);
-
-                            analysis.AddThread(thread);
-                            threads[threadNameWithIndex] = thread;
-
-                            // Update threadsInGroup for all thread records of the same group name
-                            foreach (var threadAt in threads.Values)
-                            {
-                                if (threadAt == thread)
-                                    continue;
-
-                                if (thread.threadGroupName == threadAt.threadGroupName)
-                                {
-                                    threadAt.threadsInGroup += 1;
-                                    thread.threadsInGroup += 1;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            thread = threads[threadNameWithIndex];
-                        }
-
-                        bool include = MatchThreadFilter(threadNameWithIndex, threadFilters);
+                        bool include = MatchThreadFilter(threadNameWithIndex, settings.ThreadFilters);
 
                         int parentMarkerDepth = -1;
 
-                        if (threadData.markers.Count != threadData.markerCount)
+                        if (threadData.markers.Length != threadData.markerCount)
                         {
                             if (!threadData.ReadMarkers(profileData.FilePath))
                             {
-                                Debug.LogError("failed to read markers");
+                                Debug.LogError($"failed to read markers from {profileData.FilePath}");
                             }
                         }
 
                         int markerAndChildCount = 0;
-                        for (int markerAt = 0, n = threadData.markers.Count; markerAt < n; markerAt++)
+                        for (int markerAt = 0, n = threadData.markers.Length; markerAt < n; markerAt++)
                         {
                             var markerData = threadData.markers[markerAt];
 
@@ -336,10 +276,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                             string markerName = null;
 
-                            float ms = markerData.msMarkerTotal - (selfTimes ? markerData.msChildren : 0);
+                            float ms = markerData.msMarkerTotal - (settings.SelfTimes ? markerData.msChildren : 0);
                             var markerDepth = markerData.depth;
-                            if (markerDepth > maxMarkerDepthFound)
-                                maxMarkerDepthFound = markerDepth;
+                            if (markerDepth > result.maxMarkerDepthFound)
+                                result.maxMarkerDepthFound = markerDepth;
 
                             if (markerDepth == 1)
                             {
@@ -350,24 +290,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                     msTimeOfMinDepthMarkers += ms;
                             }
 
-                            if (removeMarker != null)
+                            if (settings.RemoveMarker != null)
                             {
-                                if (markerAndChildCount <= 0)   // If we are already removing markers - don't focus on other occurances in the children
+                                if (markerAndChildCount <= 0) // If we are already removing markers - don't focus on other occurances in the children
                                 {
                                     if (markerName == null)
                                         markerName = profileData.GetMarkerName(markerData);
 
-                                    if (markerName == removeMarker)
+                                    if (markerName == settings.RemoveMarker)
                                     {
                                         float removeMarkerTime = markerData.msMarkerTotal;
 
                                         // Remove this markers time from frame time (if its on the main thread)
-                                        if (thread.threadNameWithIndex == mainThreadIdentifier.threadNameWithIndex)
+                                        if (threadNameWithIndex == settings.MainThreadIdentifier.threadNameWithIndex)
                                         {
                                             msFrame -= removeMarkerTime;
                                         }
 
-                                        if (selfTimes == false) // (Self times would not need thread or parent adjustments)
+                                        if (settings.SelfTimes == false) // (Self times would not need thread or parent adjustments)
                                         {
                                             // And from thread time
                                             if (markerName == "Idle")
@@ -376,7 +316,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                                 msTimeOfMinDepthMarkers -= removeMarkerTime;
 
                                             // And from parents
-                                            RemoveMarkerTimeFromParents(markers, profileData, threadData, markerAt);
+                                            RemoveMarkerTimeFromParents(result.markersOnFrame, profileData, threadData, markerAt);
                                         }
 
                                         markerAndChildCount = RemoveMarker(threadData, markerAt);
@@ -388,10 +328,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 continue;
 
                             // If only looking for markers below the parent
-                            if (filteringByParentMarker)
+                            if (settings.FilteringByParentMarker)
                             {
                                 // If found the parent marker
-                                if (markerData.nameIndex == parentMarkerIndex)
+                                if (markerData.nameIndex == settings.ParentMarkerIndex)
                                 {
                                     // And we are not already below the parent higher in the depth tree
                                     if (parentMarkerDepth < 0)
@@ -413,136 +353,405 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                     continue;
                             }
 
-                            if (depthFilter != kDepthAll && markerDepth != depthFilter)
+                            if (settings.DepthFilter != kDepthAll && markerDepth != settings.DepthFilter)
                                 continue;
 
-                            MarkerData marker = markers[markerData.nameIndex];
-                            if (marker != null)
+                            if (result.markersOnFrame[markerData.nameIndex].globalNameIndex == -1)
                             {
-                                if (!marker.threads.Contains(threadNameWithIndex))
-                                    marker.threads.Add(threadNameWithIndex);
-                            }
-                            else
-                            {
-                                if (markerName == null)
-                                    markerName = profileData.GetMarkerName(markerData);
-                                marker = new MarkerData(markerName);
-                                marker.firstFrameIndex = frameIndex;
-                                marker.minDepth = markerDepth;
-                                marker.maxDepth = markerDepth;
-                                marker.threads.Add(threadNameWithIndex);
-                                analysis.AddMarker(marker);
-                                markers[markerData.nameIndex] = marker;
-                                markerCount += 1;
-                            }
-                            marker.count += 1;
-
-                            if (markerAndChildCount > 0)
-                            {
-                                marker.timeIgnored += ms;
-
-                                // Note ms can be 0 in some cases.
-                                // Make sure timeIgnored is never left at 0.0
-                                // This makes sure we can test for non zero to indicate the marker has been ignored 
-                                if (marker.timeIgnored == 0.0)
-                                    marker.timeIgnored = double.Epsilon;
-
-                                // zero out removed marker time
-                                // so we don't record in the individual marker times, marker frame times or min/max times
-                                // ('min/max times' is calculated later from marker frame times)
-                                ms = 0f;
+                                result.markersOnFrame[markerData.nameIndex].globalNameIndex = markerData.nameIndex;
+                                result.markersOnFrame[markerData.nameIndex].minDepth = markerDepth;
+                                result.markersOnFrame[markerData.nameIndex].maxDepth = markerDepth;
                             }
 
-                            marker.msTotal += ms;
-
-                            // Individual marker time (not total over frame)
-                            if (ms < marker.msMinIndividual)
-                            {
-                                marker.msMinIndividual = ms;
-                                marker.minIndividualFrameIndex = frameIndex;
-                            }
-                            if (ms > marker.msMaxIndividual)
-                            {
-                                marker.msMaxIndividual = ms;
-                                marker.maxIndividualFrameIndex = frameIndex;
-                            }
-
-                            // Record highest depth foun
-                            if (markerDepth < marker.minDepth)
-                                marker.minDepth = markerDepth;
-                            if (markerDepth > marker.maxDepth)
-                                marker.maxDepth = markerDepth;
-
-                            FrameTime frameTime;
-                            if (frameIndex != marker.lastFrame)
-                            {
-                                marker.presentOnFrameCount += 1;
-                                frameTime = new FrameTime(frameIndex, ms, 1);
-                                marker.frames.Add(frameTime);
-                                marker.lastFrame = frameIndex;
-                            }
-                            else
-                            {
-                                frameTime = marker.frames[marker.frames.Count - 1];
-                                frameTime = new FrameTime(frameTime.frameIndex, frameTime.ms + ms, frameTime.count + 1);
-                                marker.frames[marker.frames.Count - 1] = frameTime;
-                            }
+                            result.markersOnFrame[markerData.nameIndex].SetValue(threadData.threadIndex, frameIndex, ms, markerDepth, markerAndChildCount);
                         }
 
                         if (include)
-                            thread.frames.Add(new ThreadFrameTime(frameIndex, msTimeOfMinDepthMarkers, msIdleTimeOfMinDepthMarkers));
+                        {
+                            result.threadsOnFrame[threadData.threadIndex].FrameTime = new ThreadFrameTime(frameIndex, msTimeOfMinDepthMarkers, msIdleTimeOfMinDepthMarkers);
+                        }
+                    }
+
+                    result.msFrame = msFrame;
+                }
+            }
+        }
+
+        internal unsafe struct PerFrameMarkerData
+        {
+            public int globalNameIndex;
+
+            public float msTotal; // total time of this marker on a frame
+            public float msMinIndividual; // min individual function call
+            public float msMaxIndividual; // max individual function call
+            public int minIndividualFrameIndex;
+            public int maxIndividualFrameIndex;
+
+            public int count; // total number of marker calls in the frame
+            public int minDepth;
+            public int maxDepth;
+            const int staticThreadIndexStoreSize = 10;
+            fixed int threadIndices[staticThreadIndexStoreSize];    // Index into the threads list for the frame
+            List<int> extendedThreadIndices;                        // Index into the threads list for the frame if more than the static size
+            public int threadIndexCount { get; private set; }
+
+            public double timeRemoved;
+            public double timeIgnored;
+
+            public void Init()
+            {
+                globalNameIndex = -1;
+                msMinIndividual = float.MaxValue;
+                msMaxIndividual = float.MinValue;
+                threadIndexCount = 0;
+            }
+
+            bool ContainsThreadIndex(int threadIndex)
+            {
+                if (threadIndexCount == 0)
+                    return false;
+
+                int max = threadIndexCount > staticThreadIndexStoreSize ? staticThreadIndexStoreSize : threadIndexCount;
+                for (int i = 0; i < max; i++)
+                {
+                    if (threadIndices[i] == threadIndex)
+                        return true;
+                }
+
+                if (extendedThreadIndices != null)
+                {
+                    for (int i = 0; i < extendedThreadIndices.Count; i++)
+                    {
+                        if (extendedThreadIndices[i] == threadIndex)
+                            return true;
                     }
                 }
 
-                analysis.UpdateSummary(frameIndex, msFrame);
-
-                at++;
-                m_Progress = (100 * at) / frameCount;
+                return false;
             }
 
-            analysis.GetFrameSummary().totalMarkers = profileData.MarkerNameCount;
-            analysis.Finalise(timeScaleMax, maxMarkerDepthFound);
-
-            /*
-            foreach (int frameIndex in selectionIndices)
+            void AddThreadIndexInternal(int threadIndex)
             {
-                int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
-
-                var frameData = profileData.GetFrame(frameOffset);
-                foreach (var threadData in frameData.threads)
+                if (threadIndexCount < staticThreadIndexStoreSize)
                 {
-                    var threadNameWithIndex = profileData.GetThreadName(threadData);
+                    threadIndices[threadIndexCount] = threadIndex;
+                }
+                else
+                {
+                    extendedThreadIndices ??= new List<int>(1);
+                    extendedThreadIndices.Add(threadIndex);
+                }
+                threadIndexCount++;
+            }
 
-                    if (filterThreads && threadFilter != threadNameWithIndex)
-                        continue;
+            void AddThreadIndex(int threadIndex)
+            {
+                if (!ContainsThreadIndex(threadIndex))
+                    AddThreadIndexInternal(threadIndex);
+            }
 
-                    const bool enterChildren = true;
-                    foreach (var markerData in threadData.markers)
+            public int GetThreadIndex(int index)
+            {
+                if (index >= threadIndexCount)
+                    return -1;
+
+                if (index < staticThreadIndexStoreSize)
+                    return threadIndices[index];
+
+                return extendedThreadIndices[index - 10];
+            }
+
+            public void SetValue(
+                int threadIndex,
+                int frameIndex,
+                float ms,
+                int markerDepth,
+                int markerAndChildCount)
+            {
+                count += 1;
+
+                if (markerAndChildCount > 0)
+                {
+                    timeIgnored += ms;
+
+                    // Note ms can be 0 in some cases.
+                    // Make sure timeIgnored is never left at 0.0
+                    // This makes sure we can test for non zero to indicate the marker has been ignored
+                    if (timeIgnored == 0.0)
+                        timeIgnored = double.Epsilon;
+
+                    // zero out removed marker time
+                    // so we don't record in the individual marker times, marker frame times or min/max times
+                    // ('min/max times' is calculated later from marker frame times)
+                    ms = 0f;
+                }
+
+                msTotal += ms;
+
+                // Individual marker time (not total over frame)
+                if (ms < msMinIndividual)
+                {
+                    msMinIndividual = ms;
+                    minIndividualFrameIndex = frameIndex;
+                }
+
+                if (ms > msMaxIndividual)
+                {
+                    msMaxIndividual = ms;
+                    maxIndividualFrameIndex = frameIndex;
+                }
+
+                // Record highest depth found
+                if (markerDepth < minDepth)
+                    minDepth = markerDepth;
+                if (markerDepth > maxDepth)
+                    maxDepth = markerDepth;
+
+                AddThreadIndex(threadIndex);
+            }
+
+            public void RemoveMarkerTimeFromParent(float markerTime)
+            {
+                // Revise the duration of parent to remove time from there too
+                // Note if the marker to remove is nested (i.e. parent of the same name, this could reduce the msTotal, more than we add to the timeIgnored)
+                msTotal -= markerTime;
+
+                // Reduce from the max marker time too
+                // This could be incorrect when there are many instances that contribute to the total time
+                if (msMaxIndividual > markerTime)
+                {
+                    msMaxIndividual -= markerTime;
+                }
+
+                if (msMinIndividual > markerTime)
+                {
+                    msMinIndividual -= markerTime;
+                }
+
+                // Note that we have modified the time
+                timeRemoved += markerTime;
+
+                // Note markerTime can be 0 in some cases.
+                // Make sure timeRemoved is never left at 0.0
+                // This makes sure we can test for non zero to indicate the marker has been removed
+                if (timeRemoved == 0.0)
+                    timeRemoved = double.Epsilon;
+            }
+
+        }
+
+        internal struct PerFrameThreadData
+        {
+            public int globalThreadIndex;
+            public ThreadFrameTime FrameTime { get; set; }
+        }
+
+        internal class PerFrameOutputData
+        {
+            public PerFrameThreadData[] threadsOnFrame;
+            public PerFrameMarkerData[] markersOnFrame;
+            public int maxMarkerDepthFound;
+            public float msFrame;
+
+            public PerFrameOutputData(int threadCount, int markerCount)
+            {
+                threadsOnFrame = new PerFrameThreadData[threadCount];
+                for (int i = 0; i < threadCount; i++)
+                {
+                    threadsOnFrame[i].globalThreadIndex = -1;
+                }
+
+                markersOnFrame = new PerFrameMarkerData[markerCount];
+                for (int i = 0; i < markerCount; i++)
+                {
+                    markersOnFrame[i].Init();
+                }
+
+                maxMarkerDepthFound = 0;
+            }
+        }
+
+        static readonly ProfilerMarkerAbstracted k_AllocateFrameResultsStorageProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.AllocateFrameResultsStorage");
+
+        public List<PerFrameOutputData> AllocateFrameResultsStorage(int threadCount, int frameCount, int markerCount)
+        {
+            using (k_AllocateFrameResultsStorageProfilerMarker.Auto())
+            {
+                List<PerFrameOutputData> frameResults = new List<PerFrameOutputData>(frameCount);
+                for (int frameIndex = 0; frameIndex < frameCount; frameIndex++)
+                    frameResults.Add(new PerFrameOutputData(threadCount, markerCount));
+
+                return frameResults;
+            }
+        }
+
+
+        static readonly ProfilerMarkerAbstracted k_MergeMarkersProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.MergeMarkers");
+        static readonly ProfilerMarkerAbstracted k_FinaliseProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.Finalise");
+
+        public ProfileAnalysis MergeMarkers(ProfileData profileData, List<int> selectionIndices, List<PerFrameOutputData> frameResults, float timeScaleMin, float timeScaleMax)
+        {
+            int frameCount = selectionIndices.Count;
+            if (frameCount < 0)
+            {
+                return null;
+            }
+
+            ProfileAnalysis analysis = new ProfileAnalysis(profileData.MarkerNameCount);
+            int maxMarkerDepthFound = 0;
+
+            using (k_MergeMarkersProfilerMarker.Auto())
+            {
+                if (selectionIndices.Count > 0)
+                    analysis.SetRange(selectionIndices[0], selectionIndices[selectionIndices.Count - 1]);
+                else
+                    analysis.SetRange(0, 0);
+
+                m_threadNames.Clear();
+
+                // Merge frames
+                for (int selectionAt = 0; selectionAt < frameCount; selectionAt++)
+                {
+                    int frameIndex = selectionIndices[selectionAt];
+                    foreach (var threadOnFrame in frameResults[selectionAt].threadsOnFrame)
                     {
-                        var markerName = markerData.name;
-                        var ms = markerData.msFrame;
-                        var markerDepth = markerData.depth;
-                        if (depthFilter != kDepthAll && markerDepth != depthFilter)
+                        if (threadOnFrame.globalThreadIndex == -1) // Skip missing threads
                             continue;
 
-                        MarkerData marker = markers[markerName];
-                        bucketIndex = (range > 0) ? (int)(((marker.buckets.Length-1) * (ms - first)) / range) : 0;
-                        if (bucketIndex<0 || bucketIndex > (marker.buckets.Length - 1))
+                        var threadNameWithIndex = profileData.GetThreadNameFromIndex(threadOnFrame.globalThreadIndex);
+                        var threadData = analysis.GetThreadByName(threadNameWithIndex);
+                        if (threadData == null)
                         {
-                            // This can happen if a single marker range is longer than the frame start end (which could occur if running on a separate thread)
-                            // Debug.Log(string.Format("Marker {0} : {1}ms exceeds range {2}-{3} on frame {4}", marker.name, ms, first, last, frameIndex));
-                            if (bucketIndex > (marker.buckets.Length - 1))
-                                bucketIndex = (marker.buckets.Length - 1);
-                            else
-                                bucketIndex = 0;
+                            threadData = new ThreadData(threadNameWithIndex);
+                            threadData.frames.Add(threadOnFrame.FrameTime);
+                            analysis.AddThread(threadData);
                         }
-                        marker.individualBuckets[bucketIndex] += 1;
+
+                        threadData.frames.Add(threadOnFrame.FrameTime);
                     }
+
+                    foreach (var markerOnFrame in frameResults[selectionAt].markersOnFrame)
+                    {
+                        if (markerOnFrame.globalNameIndex == -1) // Skip missing markers
+                            continue;
+
+                        var markerName = profileData.GetMarkerNameFromIndex(markerOnFrame.globalNameIndex);
+                        var marker = analysis.GetMarkerByName(markerName);
+                        if (marker == null)
+                        {
+                            marker = new MarkerData(markerName, markerOnFrame.threadIndexCount);
+                            marker.firstFrameIndex = frameIndex;
+                            marker.minDepth = markerOnFrame.minDepth;
+                            marker.maxDepth = markerOnFrame.maxDepth;
+                            analysis.AddMarker(marker);
+                        }
+
+                        // Merge data
+                        UpdateMarker(marker, markerOnFrame, frameIndex);
+                    }
+
+                    if (frameResults[selectionAt].maxMarkerDepthFound > maxMarkerDepthFound)
+                        maxMarkerDepthFound = frameResults[selectionAt].maxMarkerDepthFound;
+                }
+
+                // Generate summary
+                for (int selectionAt = 0; selectionAt < frameCount; selectionAt++)
+                {
+                    int frameIndex = selectionIndices[selectionAt];
+                    analysis.UpdateSummary(frameIndex, frameResults[selectionAt].msFrame);
+                }
+
+                analysis.GetFrameSummary().totalMarkers = profileData.MarkerNameCount;
+
+                // Store thread names
+                foreach (var thread in analysis.GetThreads())
+                {
+                    if (!m_threadNames.Contains(thread.threadNameWithIndex))
+                        m_threadNames.Add(thread.threadNameWithIndex);
                 }
             }
-*/
-            m_Progress = 100;
+
+            using (k_FinaliseProfilerMarker.Auto())
+            {
+                analysis.Finalise(timeScaleMin, timeScaleMax, maxMarkerDepthFound);
+            }
+
             return analysis;
+        }
+
+        static readonly ProfilerMarkerAbstracted k_AnalyzeProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.Analyze");
+
+        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMin = 0, float timeScaleMax = 0, string removeMarker = null)
+        {
+            using (k_AnalyzeProfilerMarker.Auto())
+            {
+                m_Progress = 0;
+                if (profileData == null)
+                {
+                    return null;
+                }
+
+                if (profileData.GetFrameCount() <= 0)
+                {
+                    return null;
+                }
+
+                int frameCount = selectionIndices.Count;
+                if (frameCount < 0)
+                {
+                    return null;
+                }
+
+                if (profileData.HasFrames && !profileData.HasThreads)
+                {
+                    if (!ProfileData.Load(profileData.FilePath, out profileData))
+                    {
+                        return null;
+                    }
+                }
+
+                int threadCount = profileData.GetThreadCount();
+                int markerCount = profileData.MarkerNameCount;
+
+                List<PerFrameOutputData> frameResults = AllocateFrameResultsStorage(threadCount, frameCount, markerCount);
+
+                var frameProcessingSettings = new FrameProcessingSettings(
+                    profileData,
+                    threadFilters,
+                    depthFilter,
+                    parentMarker,
+                    selfTimes,
+                    removeMarker);
+
+                int completedFrames = 0;
+
+                Parallel.For(0, frameCount, selectionAt =>
+                    {
+                        int frameIndex = selectionIndices[selectionAt];
+
+                        int frameOffset = profileData.DisplayFrameToOffset(frameIndex);
+                        var frameData = profileData.GetFrame(frameOffset);
+                        if (frameData == null)
+                            return;
+
+                        ProcessFrame(
+                            profileData,
+                            frameIndex,
+                            frameData,
+                            frameProcessingSettings,
+                            frameResults[selectionAt]
+                        );
+
+                        completedFrames++;
+                        m_Progress = (100 * completedFrames) / frameCount;
+                    }
+                );
+
+                var analysis = MergeMarkers(profileData, selectionIndices, frameResults, timeScaleMin, timeScaleMax);
+
+                m_Progress = 100;
+                return analysis;
+            }
         }
 
         public int GetProgress()

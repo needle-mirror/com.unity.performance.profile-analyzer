@@ -8,7 +8,7 @@ For information on navigating the window, see the [Profile Analyzer window navig
 
 ## Loading data
 
-To load data into the **Single** view, select the **Pull Data** button in the frame control pane, and the Profile Analyzer pulls in any data in the [Profiler](https://docs.unity3d.com/Manual/Profiler.html) window. Alternatively, select the **Load** button to load Profile Analyzer (.pdata) data you have saved from a previous session. 
+To load data into the **Single** view, select the **Pull Data** button in the frame control pane, and the Profile Analyzer pulls in any data in the [Profiler](https://docs.unity3d.com/Manual/Profiler.html) window. Alternatively, select the **Load** button to load Profile Analyzer (.pdata) data you have saved from a previous session.
 
 >[!NOTE]
 >If you select the **Load** option, the data must be in the Profile Analyzer .pdata format. If you have data from the Profiler in the .data file format, open it in the Profiler first, and then select the **Pull Data** button in the Profile Analyzer.
@@ -26,15 +26,15 @@ You can filter the columns in the **Marker details** to a more relevant set. Thi
 By default, the **Marker columns** dropdown in the **Filters** pane has six preset column layouts that you can use to adjust the layout of the **Marker details** pane. They are:
 
 * **Time and count:** Displays information on the average timings and number of times the markers were called.
-* **Time:** Displays information on the average timings of the markers. 
+* **Time:** Displays information on the average timings of the markers.
 * **Totals:** Displays information about the total amount of time the markers took on the whole data set.
-* **Time with totals:** Displays information about both the average and total times of the markers. 
+* **Time with totals:** Displays information about both the average and total times of the markers.
 * **Count totals:** Displays information about the total number of times the markers were called.
-* **Count per frame:** Displays information on the average total per frame the markers were called. 
+* **Count per frame:** Displays information on the average total per frame the markers were called.
 * **Depths:** Displays information on where the markers are in the Hierarchy. For more information, see the documentation on Depth Slices in [Filters pane](filtering-system.html#depth-slice).
 * **Threads:** Displays the name of the thread that the markers appear on. For more information, see the documentation on the Thread window in [Filters pane](filtering-system.html#thread-window).
 
-You can also use the **Custom** column layout, to select your own custom mix of columns to add to the layout. To do this, right-click on the header of any column, and manually enable or disable any of the columns as necessary. 
+You can also use the **Custom** column layout, to select your own custom mix of columns to add to the layout. To do this, right-click on the header of any column, and manually enable or disable any of the columns as necessary.
 
 The following table shows the columns that the Profile Analyzer displays when you select that layout.
 

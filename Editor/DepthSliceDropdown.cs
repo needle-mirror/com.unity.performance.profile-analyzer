@@ -48,6 +48,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_CurrentDepthSliceB = currentDepthSliceB;
             m_Callback = callback;
             m_DepthDiff = depthDiff;
+
+            // Note this reflection code is here as the IMGUI AdvancedDropdown doesn't support setting the selection after inserting the elements.
+            // You can set 'enable' to false on some of the entries to get a similar result but it won't match the check mark visualisation.
             if (m_DataSourceFieldInfo == null || m_DataSourceFieldInfo == null || m_SelectedIdsFieldInfo == null)
             {
                 Assembly assem = typeof(AdvancedDropdown).Assembly;

@@ -49,7 +49,6 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         Assert.IsTrue(marker.count == 0);
         Assert.IsTrue(marker.firstFrameIndex == -1);
         Assert.IsTrue(marker.frames.Count == 10);
-        Assert.IsTrue(marker.lastFrame == -1);
         Assert.IsTrue(marker.maxDepth == 0);
         Assert.IsTrue(marker.maxFrameIndex == 9);
         Assert.IsTrue(marker.maxIndividualFrameIndex == 0);
@@ -131,7 +130,9 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
             analysis.UpdateSummary(i, 1.0f * i);
         }
 
-        analysis.SetupFrameBuckets(20);
+        float timeScaleMin = 0f;
+        float timeScaleMax = 20f;
+        analysis.SetupFrameBuckets(timeScaleMin, timeScaleMax);
 
         var summary = analysis.GetFrameSummary();
 

@@ -142,9 +142,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         bool m_IsOrderedByFrameDuration;
 
-        List<Data> m_Values = new List<Data> {};
-        List<int> m_LastSelectedFrameOffsets = new List<int> {};
-        int[] m_FrameOffsetToDataOffsetMapping = new int[] {};
+        List<Data> m_Values = new List<Data> { };
+        List<int> m_LastSelectedFrameOffsets = new List<int> { };
+        int[] m_FrameOffsetToDataOffsetMapping = new int[] { };
         SetRange m_SetRange;
         SetActive m_SetActive;
 
@@ -639,11 +639,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 int x = (int)(e.mousePosition.x - xStart);
 
-                int dataOffset =  GetDataOffsetForXUnclamped(x, width, dataLength);
+                int dataOffset = GetDataOffsetForXUnclamped(x, width, dataLength);
                 if (m_Moving)
                     dataOffset -= m_MoveHandleOffset;
                 dataOffset = ClampToRange(dataOffset, 0, dataLength - 1);
-                int frameOffsetBeforeNext = Math.Max(dataOffset,  GetDataOffsetForX(x + 1, width, dataLength) - 1);
+                int frameOffsetBeforeNext = Math.Max(dataOffset, GetDataOffsetForX(x + 1, width, dataLength) - 1);
 
                 if (m_Dragging)
                 {
@@ -976,11 +976,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             m_Bars.Clear();
 
-            int nextDataOffset =  GetDataOffsetForX(0, (int)width, frames);
+            int nextDataOffset = GetDataOffsetForX(0, (int)width, frames);
             for (int barX = 0; barX < width; barX++)
             {
                 int startDataOffset = nextDataOffset;
-                nextDataOffset =  GetDataOffsetForX(barX + 1, (int)width, frames);
+                nextDataOffset = GetDataOffsetForX(barX + 1, (int)width, frames);
                 int endDataOffset = Math.Max(startDataOffset, nextDataOffset - 1);
 
                 float min = m_Values[startDataOffset].ms;
@@ -1419,7 +1419,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         void ShowThreads(float height, float yRange, BarData bar, bool full,
             List<ThreadData> threads, bool subsetSelected, int selectedFirstOffset, int selectedLastOffset,
-            int offsetToIndexMapping,  Dictionary<int, int> frameOffsetToSelectionIndex)
+            int offsetToIndexMapping, Dictionary<int, int> frameOffsetToSelectionIndex)
         {
             float max = float.MinValue;
             bool selected = false;
@@ -1478,7 +1478,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         void ShowSelectedMarker(float height, float yRange, BarData bar, bool full,
             MarkerData selectedMarker, bool subsetSelected, int selectedFirstOffset, int selectedLastOffset,
-            int offsetToIndexMapping,  Dictionary<int, int> frameOffsetToSelectionIndex)
+            int offsetToIndexMapping, Dictionary<int, int> frameOffsetToSelectionIndex)
         {
             float max = 0f;
             bool selected = false;

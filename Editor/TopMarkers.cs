@@ -22,7 +22,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public RangeSettings(ProfileDataView dataView, int depthFilter, List<string> nameFilters, List<string> nameExcludes, TimingOptions.TimingOption timingOption, int threadSelectionCount, bool hideRemovedMarkers)
             {
                 // Make a copy rather than keeping a reference
-                this.dataView = dataView==null ? new ProfileDataView() : new ProfileDataView(dataView);
+                this.dataView = dataView == null ? new ProfileDataView() : new ProfileDataView(dataView);
                 this.depthFilter = depthFilter;
                 this.nameFilters = nameFilters;
                 this.nameExcludes = nameExcludes;
@@ -121,7 +121,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return true;
             }
 
-            public static bool operator==(RangeSettings a, RangeSettings b)
+            public static bool operator ==(RangeSettings a, RangeSettings b)
             {
                 // If both are null, or both are same instance, return true.
                 if (System.Object.ReferenceEquals(a, b))
@@ -138,21 +138,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return a.IsEqual(b);
             }
 
-            public static bool operator!=(RangeSettings a, RangeSettings b)
+            public static bool operator !=(RangeSettings a, RangeSettings b)
             {
                 return !(a == b);
             }
         }
 
         internal class Settings
-        {   
+        {
             public readonly int barCount;
             public readonly float timeRange;
 
             public readonly bool includeOthers;
             public readonly bool includeUnaccounted;
 
-            public RangeSettings rangeSettings { get ; private set ; }
+            public RangeSettings rangeSettings { get; private set; }
 
             public Settings(RangeSettings rangeSettings, int barCount, float timeRange, bool includeOthers, bool includeUnaccounted)
             {
@@ -211,7 +211,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return true;
             }
 
-            public static bool operator==(Settings a, Settings b)
+            public static bool operator ==(Settings a, Settings b)
             {
                 // If both are null, or both are same instance, return true.
                 if (System.Object.ReferenceEquals(a, b))
@@ -228,7 +228,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return a.IsEqual(b);
             }
 
-            public static bool operator!=(Settings a, Settings b)
+            public static bool operator !=(Settings a, Settings b)
             {
                 return !(a == b);
             }
@@ -580,14 +580,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return menu;
         }
-        
+
         public GUIContent ConstructTimeRangeText()
         {
             StringBuilder sb = new StringBuilder();
 
             ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
             int depthFilter = m_CurrentSettings.rangeSettings.depthFilter;
-            
+
             FrameSummary frameSummary = analysis.GetFrameSummary();
 
             string frameTimeString = ToDisplayUnits(frameSummary.msMedian, true, 0);
@@ -612,15 +612,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 else
                 {
                     sb.Append("\n");
-                    sb.AppendFormat(Content.selfTimeAllDepths,accountedTimeString);
+                    sb.AppendFormat(Content.selfTimeAllDepths, accountedTimeString);
                 }
             }
-            else 
+            else
             {
                 if (m_CurrentSettings.rangeSettings.timingOption == TimingOptions.TimingOption.Self)
                 {
                     sb.Append("\n");
-                    sb.AppendFormat(Content.selfTimeAtSpecificDepth,accountedTimeString, depthFilter);
+                    sb.AppendFormat(Content.selfTimeAtSpecificDepth, accountedTimeString, depthFilter);
                     if (singleThread)
                     {
                         sb.Append("\n\n");
@@ -642,7 +642,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             string timeRangeString = ToDisplayUnits(m_CurrentSettings.timeRange, true);
             return new GUIContent(timeRangeString, sb.ToString());
-        } 
+        }
 
         public void Draw(Rect rect, Color barColor, int barCount, float timeRange, Color selectedBackground, Color selectedBorder, Color selectedText, bool includeOthers, bool includeUnaccounted)
         {
@@ -668,7 +668,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 return;
 
             ProfileAnalysis analysis = m_CurrentSettings.rangeSettings.dataView.analysis;
-            
+
             FrameSummary frameSummary = analysis.GetFrameSummary();
             if (frameSummary == null)
                 return;

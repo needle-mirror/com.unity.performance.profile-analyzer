@@ -2,7 +2,7 @@
 
 You can use the **Filters** pane in the [Single](single-view.md) and [Compare](compare-view.md) view to reduce and filter the working data set. You can limit the data set by filters such as partial marker name match, a specific thread, or a specific stack level. As well as filtering by match, you can set the filter to exclude any markers by name. This is particularly useful to exclude markers the might distort the view, or aren't statistically relevant.
 
-![Filter pane](images/profile-analyzer-filters-pane.png)<br/>*Single view Filters pane (above) and Compare view Filters pane (below). Note the addition of further Depth Slice controls in the Compare view.* 
+![Filter pane](images/profile-analyzer-filters-pane.png)<br/>*Single view Filters pane (above) and Compare view Filters pane (below). Note the addition of further Depth Slice controls in the Compare view.*
 
 The pane has the following controls:
 
@@ -26,7 +26,7 @@ By default, the Profile Analyzer displays the markers on the main thread in the 
 
 To add more threads to the analysis, enable the checkboxes next to their names, then click the **Apply** button. The Profile Analyzer then updates the data set. There are two pre-defined sets of threads: **Main Only** and **Common Set**. **Main Only** selects just the Main Thread, and the **Common Set** selects the Main Thread, plus the Render and Jobs threads.
 
-Click the **Clear** button to clear all of the threads you've selected, and **Reset** to reset the selection back to the previous thread set. 
+Click the **Clear** button to clear all of the threads you've selected, and **Reset** to reset the selection back to the previous thread set.
 
 ## Depth Slice
 
@@ -38,11 +38,11 @@ When you select a **Depth Slice** level in the dropdown, it corresponds to the l
 
 In the Compare view, the Profile Analyzer automatically aligns the depth of the two data sets so that the top level markers are aligned correctly. The value of the offset is displayed in brackets after the **Auto Right** checkbox.
 
-To override the automatic depth alignment, disable the **Auto Right** checkbox and then manually set the depth levels for the left (blue) and right (orange) sets. This is useful if you're comparing data sets from different versions of Unity. 
+To override the automatic depth alignment, disable the **Auto Right** checkbox and then manually set the depth levels for the left (blue) and right (orange) sets. This is useful if you're comparing data sets from different versions of Unity.
 
 ## Parent Marker
 
-To filter the dataset by a specific marker and its children, right click on the marker in the **Marker Details/Comparison** pane and then select **Set As Parent Marker Filter**. You can visualize this in the Profiler window as follows: 
+To filter the dataset by a specific marker and its children, right click on the marker in the **Marker Details/Comparison** pane and then select **Set As Parent Marker Filter**. You can visualize this in the Profiler window as follows:
 
 ![Parent marker](images/filters-parent-marker-comparison-profile-analyzer.png)<br/>*The Profile Analyzer in the Single view with the data filtered by the parent marker of BehaviourUpdate.*
 ![Parent marker](images/filters-parent-marker-comparison-profiler.png)<br/>*The same frame opened in the Profiler window, with this thread highlighted. Note that the markers in the Timeline view correspond to those filtered in the Profile Analyzer.*

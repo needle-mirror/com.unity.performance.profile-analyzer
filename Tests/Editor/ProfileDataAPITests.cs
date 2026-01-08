@@ -26,10 +26,10 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
             };
 
             int expectedIndex = i % markerNames.Count;
-            data.AddMarkerName(markerNames[expectedIndex], marker);
+            data.AddMarkerName(markerNames[expectedIndex], ref marker);
             markerList.Add(marker);
 
-            Assert.IsTrue(expectedIndex == marker.nameIndex, "Index mismatch at: " + i + " , " + marker.nameIndex);;
+            Assert.IsTrue(expectedIndex == marker.nameIndex, "Index mismatch at: " + i + " , " + marker.nameIndex); ;
         }
 
         for (int i = 0; i < markerList.Count; ++i)
@@ -64,15 +64,8 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
                 threadDict.Add(threadName, thread);
             }
 
-            var marker = new ProfileMarker()
-            {
-                msMarkerTotal = 0.5f,
-                depth = i
-            };
-
-            thread.markers.Add(marker);
             data.AddThreadName(threadName, thread);
-            Assert.IsTrue(expectedIndex == thread.threadIndex, "Index mismatch at: " + i + " , " + thread.threadIndex);;
+            Assert.IsTrue(expectedIndex == thread.threadIndex, "Index mismatch at: " + i + " , " + thread.threadIndex); ;
         }
 
         foreach (var curThread in threadDict)

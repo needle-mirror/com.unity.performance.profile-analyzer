@@ -5,13 +5,15 @@ using UnityEditorInternal;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
+using UnityEditor.Profiling;
+using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
     internal class ProfileData
     {
-        static int latestVersion = 7;
+        public static readonly int latestVersion = 7;
         /*
         Version 1 - Initial version. Thread names index:threadName (Some invalid thread names count:threadName index)
         Version 2 - Added frame start time.
@@ -21,25 +23,30 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Version 6 - fixed msStartTime (previously was 'seconds')
         Version 7 - Data now only skips the frame at the end
         */
-        static Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
+        static readonly Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
         public int Version { get; private set; }
         public int FrameIndexOffset { get; private set; }
         public bool FirstFrameIncomplete;
         public bool LastFrameIncomplete;
-        List<ProfileFrame> frames = new List<ProfileFrame>();
-        List<string> markerNames = new List<string>();
-        List<string> threadNames = new List<string>();
-        Dictionary<string, int> markerNamesDict = new Dictionary<string, int>();
-        Dictionary<string, int> threadNameDict = new Dictionary<string, int>();
+        List<ProfileFrame> frames;
+        List<string> markerNames;
+        List<string> threadNames;
+        Dictionary<string, int> markerNamesDict = new();
+        Dictionary<string, int> threadNameDict = new();
         public string FilePath { get; private set; }
         public int MarkerNameCount => markerNames.Count;
-        static float s_Progress = 0;
+        static float s_Progress;
+        internal static readonly int k_FileStreamBufferSize = 16384; // Default would be 4096,
 
         public ProfileData()
         {
             FrameIndexOffset = 0;
             FilePath = string.Empty;
             Version = latestVersion;
+
+            frames = new List<ProfileFrame>();
+            markerNames = new List<string>();
+            threadNames = new List<string>();
         }
 
         public ProfileData(string filename)
@@ -47,50 +54,56 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             FrameIndexOffset = 0;
             FilePath = filename;
             Version = latestVersion;
-        }
 
-        void Read()
-        {
             if (string.IsNullOrEmpty(FilePath))
-                throw new Exception("File path is invalid");
-
-            using (var reader = new BinaryReader(File.Open(FilePath, FileMode.Open)))
             {
-                s_Progress = 0;
-                Version = reader.ReadInt32();
-                if (Version < 0 || Version > latestVersion)
-                {
-                    throw new Exception(String.Format("File version unsupported: {0} != {1} expected, at path: {2}", Version, latestVersion, FilePath));
-                }
+                frames = new List<ProfileFrame>();
+                markerNames = new List<string>();
+                threadNames = new List<string>();
 
-                FrameIndexOffset = reader.ReadInt32();
-                int frameCount = reader.ReadInt32();
-                frames.Clear();
-                for (int frame = 0; frame < frameCount; frame++)
-                {
-                    frames.Add(new ProfileFrame(reader, Version));
-                    s_Progress = (float)frame / frameCount;
-                }
+                throw new Exception("File path is invalid");
+            }
 
-                int markerCount = reader.ReadInt32();
-                markerNames.Clear();
-                for (int marker = 0; marker < markerCount; marker++)
-                {
-                    markerNames.Add(reader.ReadString());
-                    s_Progress = (float)marker / markerCount;
-                }
+            using var stream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, k_FileStreamBufferSize);
+            using var reader = new BinaryReader(stream);
+            s_Progress = 0;
+            Version = reader.ReadInt32();
+            if (Version < 0 || Version > latestVersion)
+            {
+                frames = new List<ProfileFrame>();
+                markerNames = new List<string>();
+                threadNames = new List<string>();
 
-                int threadCount = reader.ReadInt32();
-                threadNames.Clear();
-                for (int thread = 0; thread < threadCount; thread++)
-                {
-                    var threadNameWithIndex = reader.ReadString();
+                throw new Exception(String.Format("File version unsupported: {0} != {1} expected, at path: {2}", Version, latestVersion, FilePath));
+            }
 
-                    threadNameWithIndex = CorrectThreadName(threadNameWithIndex);
+            FrameIndexOffset = reader.ReadInt32();
+            int frameCount = reader.ReadInt32();
+            frames = new List<ProfileFrame>(frameCount);
+            for (int frame = 0; frame < frameCount; frame++)
+            {
+                frames.Add(new ProfileFrame(reader, Version));
+                s_Progress = 1f / 3f * ((float)frame / frameCount);
+            }
 
-                    threadNames.Add(threadNameWithIndex);
-                    s_Progress = (float)thread / threadCount;
-                }
+            int markerCount = reader.ReadInt32();
+            markerNames = new List<string>(markerCount);
+            for (int marker = 0; marker < markerCount; marker++)
+            {
+                markerNames.Add(reader.ReadString());
+                s_Progress = 1f / 3f + (1f / 3f * ((float)marker / markerCount));
+            }
+
+            int threadCount = reader.ReadInt32();
+            threadNames = new List<string>(threadCount);
+            for (int thread = 0; thread < threadCount; thread++)
+            {
+                var threadNameWithIndex = reader.ReadString();
+
+                threadNameWithIndex = CorrectThreadName(threadNameWithIndex);
+
+                threadNames.Add(threadNameWithIndex);
+                s_Progress = 2f / 3f + (1f / 3f * ((float)thread / threadCount));
             }
         }
 
@@ -200,7 +213,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             thread.threadIndex = index;
         }
 
-        public void AddMarkerName(string markerName, ProfileMarker marker)
+        public void AddMarkerName(string markerName, ref ProfileMarker marker)
         {
             int index = -1;
             if (!markerNamesDict.TryGetValue(markerName, out index))
@@ -216,12 +229,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public string GetThreadName(ProfileThread thread)
         {
-            return threadNames[thread.threadIndex];
+            return GetThreadNameFromIndex(thread.threadIndex);
+        }
+        public string GetThreadNameFromIndex(int threadIndex)
+        {
+            if (threadIndex < 0 || threadIndex >= threadNames.Count)
+                return null;
+
+            return threadNames[threadIndex];
         }
 
         public string GetMarkerName(ProfileMarker marker)
         {
-            return markerNames[marker.nameIndex];
+            return GetMarkerNameFromIndex(marker.nameIndex);
+        }
+        public string GetMarkerNameFromIndex(int nameIndex)
+        {
+            if (nameIndex < 0 || nameIndex >= markerNames.Count)
+                return null;
+
+            return markerNames[nameIndex];
         }
 
         public int GetMarkerIndex(string markerName)
@@ -268,11 +295,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        internal void Write()
+        internal void Write(string filename)
         {
             //ensure that we can always write to the temp location at least
-            if (string.IsNullOrEmpty(FilePath))
-                FilePath = ProfileAnalyzerWindow.TmpPath;
+            FilePath = string.IsNullOrEmpty(filename) ? ProfileAnalyzerWindow.TmpPath : filename;
 
             WriteInternal(FilePath);
         }
@@ -376,7 +402,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             get
             {
                 if (frames.Count > 0 && frames[0].threads.Count > 0)
-                    return frames[0].threads[0].markers.Count != frames[0].threads[0].markerCount;
+                    return frames[0].threads[0].markers.Length != frames[0].threads[0].markerCount;
 
                 return false;
             }
@@ -395,113 +421,107 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var json = JsonUtility.ToJson(data);
                 File.WriteAllText(filename, json);
             }
-            else if (filename.EndsWith(".padata"))
-            {
-                FileStream stream = File.Create(filename);
-                var formatter = new BinaryFormatter();
-                formatter.Serialize(stream, data);
-                stream.Close();
-            }
             else if (filename.EndsWith(".pdata"))
             {
                 data.WriteTo(filename);
             }
-
-            return true;
-        }
-
-        public static bool Load(string filename, out ProfileData data)
-        {
-            if (filename.EndsWith(".json"))
-            {
-                string json = File.ReadAllText(filename);
-                data = JsonUtility.FromJson<ProfileData>(json);
-            }
-            else if (filename.EndsWith(".padata"))
-            {
-                FileStream stream = File.OpenRead(filename);
-                var formatter = new BinaryFormatter();
-                data = (ProfileData)formatter.Deserialize(stream);
-                stream.Close();
-
-                if (data.Version != latestVersion)
-                {
-                    Debug.Log(String.Format("Unable to load file. Incorrect file version in {0} : (file {1} != {2} expected", filename, data.Version, latestVersion));
-                    data = null;
-                    return false;
-                }
-            }
-            else if (filename.EndsWith(".pdata"))
-            {
-                if (!File.Exists(filename))
-                {
-                    data = null;
-                    return false;
-                }
-
-                try
-                {
-                    data = new ProfileData(filename);
-                    data.Read();
-                }
-                catch (Exception e)
-                {
-                    var message = e.Message;
-                    if (!string.IsNullOrEmpty(message))
-                        Debug.Log(e.Message);
-                    data = null;
-                    return false;
-                }
-            }
             else
             {
-                string errorMessage;
-                if (filename.EndsWith(".data"))
-                {
-                    errorMessage = "Unable to load file. Profiler captures (.data) should be loaded in the Profiler Window and then pulled into the Analyzer via its Pull Data button.";
-                }
-                else
-                {
-                    errorMessage = string.Format("Unable to load file. Unsupported file format: '{0}'.", Path.GetExtension(filename));
-                }
-
-                Debug.Log(errorMessage);
-                data = null;
+                Debug.Log(string.Format("Unable to save file. Unsupported file extension (.pdata and .json are the only supported formats): '{0}'.", Path.GetExtension(filename)));
                 return false;
             }
 
-            data.Finalise();
             return true;
         }
 
-        void PushMarker(Stack<ProfileMarker> markerStack, ProfileMarker markerData)
+        static readonly ProfilerMarkerAbstracted k_LoadProfilerMarker = new ProfilerMarkerAbstracted("ProfileData.Load");
+
+        public static bool Load(string filename, out ProfileData data)
         {
-            Debug.Assert(markerData.depth == markerStack.Count + 1);
-            markerStack.Push(markerData);
+            using (k_LoadProfilerMarker.Auto())
+            {
+                if (filename.EndsWith(".json"))
+                {
+                    string json = File.ReadAllText(filename);
+                    data = JsonUtility.FromJson<ProfileData>(json);
+                }
+                else if (filename.EndsWith(".pdata"))
+                {
+                    if (!File.Exists(filename))
+                    {
+                        data = null;
+                        return false;
+                    }
+
+                    try
+                    {
+                        data = new ProfileData(filename);
+                    }
+                    catch (Exception e)
+                    {
+                        var message = e.Message;
+                        if (!string.IsNullOrEmpty(message))
+                            Debug.Log(e.Message);
+                        data = null;
+                        return false;
+                    }
+                }
+                else
+                {
+                    string errorMessage;
+                    if (filename.EndsWith(".data"))
+                    {
+                        errorMessage = "Unable to load file. Profiler captures (.data) should be loaded in the Profiler Window and then pulled into the Analyzer via its Pull Data button.";
+                    }
+                    else if (filename.EndsWith(".padata"))
+                    {
+                        errorMessage = "Unable to load file. Old profile analyzer captures (.padata) can only be loaded in versions 1.2.4 and prior. Please use the old package to load and save out in the .pdata format to use this old format.";
+                    }
+                    else
+                    {
+                        errorMessage = string.Format("Unable to load file. Unsupported file format: '{0}'.", Path.GetExtension(filename));
+                    }
+
+                    Debug.Log(errorMessage);
+                    data = null;
+                    return false;
+                }
+
+                data.Finalise();
+                return true;
+            }
         }
 
-        ProfileMarker PopMarkerAndRecordTimeInParent(Stack<ProfileMarker> markerStack)
+        void PushMarker(ProfileMarker[] threadMarkers, Stack<int> markerStack, int markerIndex)
         {
-            ProfileMarker child = markerStack.Pop();
-
-            ProfileMarker parentMarker = (markerStack.Count > 0) ? markerStack.Peek() : null;
-
-            // Record the last markers time in its parent
-            if (parentMarker != null)
-                parentMarker.msChildren += child.msMarkerTotal;
-
-            return parentMarker;
+            Debug.Assert(threadMarkers[markerIndex].depth == markerStack.Count + 1);
+            markerStack.Push(markerIndex);
         }
 
+        static readonly ProfilerMarkerAbstracted k_FinaliseProfilerMarker = new ProfilerMarkerAbstracted("ProfileData.Finalise");
         public void Finalise()
         {
-            CalculateMarkerChildTimes();
-            markerNamesDict.Clear();
+            using (k_FinaliseProfilerMarker.Auto())
+            {
+                CalculateMarkerChildTimes();
+                markerNamesDict.Clear();
+            }
+        }
+
+        void PopMarkerAndRecordTimeInParent(ProfileMarker[] threadMarkers, Stack<int> markerStack)
+        {
+            int childIndex = markerStack.Pop();
+
+            if (markerStack.Count > 0)
+            {
+                int parentIndex = markerStack.Peek();
+                threadMarkers[parentIndex].msChildren += threadMarkers[childIndex].msMarkerTotal;
+            }
         }
 
         void CalculateMarkerChildTimes()
         {
-            var markerStack = new Stack<ProfileMarker>();
+            var markerStack = new Stack<int>();
 
             for (int frameOffset = 0; frameOffset <= frames.Count; ++frameOffset)
             {
@@ -516,16 +536,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     // The markers are in depth first order and the depth is known
                     // So we can infer a parent child relationship
                     // Zero them first
-                    foreach (ProfileMarker markerData in threadData.markers)
+                    for (int markerIndex = 0; markerIndex < threadData.markers.Length; markerIndex++)
                     {
-                        markerData.msChildren = 0.0f;
+                        threadData.markers[markerIndex].msChildren = 0.0f;
                     }
 
                     // Update the child times
                     markerStack.Clear();
-                    foreach (ProfileMarker markerData in threadData.markers)
+                    for (int markerIndex = 0; markerIndex < threadData.markers.Length; markerIndex++)
                     {
-                        int depth = markerData.depth;
+                        int depth = threadData.markers[markerIndex].depth;
 
                         // Update depth stack and record child times in the parent
                         if (depth >= markerStack.Count)
@@ -533,7 +553,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             // If at same level then remove the last item at this level
                             if (depth == markerStack.Count)
                             {
-                                PopMarkerAndRecordTimeInParent(markerStack);
+                                PopMarkerAndRecordTimeInParent(threadData.markers, markerStack);
                             }
 
                             // Assume we can't move down depth without markers between levels.
@@ -543,11 +563,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             // We can move up depth several layers so need to pop off all those markers
                             while (markerStack.Count >= depth)
                             {
-                                PopMarkerAndRecordTimeInParent(markerStack);
+                                PopMarkerAndRecordTimeInParent(threadData.markers, markerStack);
                             }
                         }
 
-                        PushMarker(markerStack, markerData);
+                        PushMarker(threadData.markers, markerStack, markerIndex);
+                    }
+
+                    // Cascade up the final results
+                    while (markerStack.Count > 0)
+                    {
+                        PopMarkerAndRecordTimeInParent(threadData.markers, markerStack);
                     }
                 }
             }
@@ -562,12 +588,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     [Serializable]
     internal class ProfileFrame
     {
-        public List<ProfileThread> threads = new List<ProfileThread>();
+        public List<ProfileThread> threads;
         public double msStartTime;
         public float msFrame;
 
         public ProfileFrame()
         {
+            threads = new List<ProfileThread>();
             msStartTime = 0.0;
             msFrame = 0f;
         }
@@ -619,7 +646,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             msFrame = reader.ReadSingle();
             int threadCount = reader.ReadInt32();
-            threads.Clear();
+            threads = new List<ProfileThread>(threadCount);
             for (int thread = 0; thread < threadCount; thread++)
             {
                 threads.Add(new ProfileThread(reader, fileVersion));
@@ -631,25 +658,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     internal class ProfileThread
     {
         [NonSerialized]
-        public List<ProfileMarker> markers = new List<ProfileMarker>();
+        public ProfileMarker[] markers;
         public int threadIndex;
         public long streamPos;
-        public int markerCount = 0;
+        public int markerCount;
         public int fileVersion;
 
         public ProfileThread()
         {
+            markers = new ProfileMarker[0];
+            threadIndex = -1;
         }
 
         public void Write(BinaryWriter writer)
         {
             writer.Write(threadIndex);
-            writer.Write(markers.Count);
+            writer.Write(markers.Length);
             foreach (var marker in markers)
             {
                 marker.Write(writer);
             }
-            ;
         }
 
         public ProfileThread(BinaryReader reader, int fileversion)
@@ -658,70 +686,52 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             fileVersion = fileversion;
             threadIndex = reader.ReadInt32();
             markerCount = reader.ReadInt32();
-            markers.Clear();
+            markers = new ProfileMarker[markerCount];
             for (int marker = 0; marker < markerCount; marker++)
             {
-                markers.Add(new ProfileMarker(reader, fileVersion));
+                markers[marker] = new ProfileMarker(reader, fileVersion);
             }
         }
 
         public bool ReadMarkers(string path)
         {
             if (streamPos == 0)
-                return false; // the stream positions havent been written yet.
-            var stream = File.OpenRead(path);
-            BinaryReader br = new BinaryReader(stream);
+                return false; // the stream positions haven't been written yet.
+
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, ProfileData.k_FileStreamBufferSize);
+            using var br = new BinaryReader(stream);
 
             br.BaseStream.Position = streamPos;
+
             threadIndex = br.ReadInt32();
             markerCount = br.ReadInt32();
 
-            markers.Clear();
+            markers = new ProfileMarker[markerCount];
             for (int marker = 0; marker < markerCount; marker++)
             {
-                markers.Add(new ProfileMarker(br, fileVersion));
+                markers[marker] = new ProfileMarker(br, fileVersion);
             }
 
             br.Close();
+
             return true;
         }
 
-        public void AddMarker(ProfileMarker markerData)
+        public void AddMarkerArray(ProfileMarker[] markerArray)
         {
-            markers.Add(markerData);
-            markerCount++;
-        }
-
-        public void RebuildMarkers(string path)
-        {
-            if (!File.Exists(path)) return;
-            FileStream stream = File.OpenRead(path);
-            using (var reader = new BinaryReader(stream))
-            {
-                reader.BaseStream.Position = streamPos;
-                threadIndex = reader.ReadInt32();
-                markerCount = reader.ReadInt32();
-                markers.Clear();
-                for (int marker = 0; marker < markerCount; marker++)
-                {
-                    markers.Add(new ProfileMarker(reader, fileVersion));
-                }
-            }
+            markers = markerArray;
+            markerCount = markerArray.Length;
         }
     }
 
     [Serializable]
-    internal class ProfileMarker
+    internal struct ProfileMarker
     {
         public int nameIndex;
         public float msMarkerTotal;
         public int depth;
         [NonSerialized]
         public float msChildren;        // Recalculated on load so not saved in file
-
-        public ProfileMarker()
-        {
-        }
 
         public static ProfileMarker Create(float durationMS, int depth)
         {

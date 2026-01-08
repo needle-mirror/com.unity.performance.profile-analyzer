@@ -17,6 +17,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public bool inSyncWithProfilerData;
         public bool containsWaitForFPS { get; private set; }
         public bool containsWaitForPresent { get; private set; }
+        public bool containsWaitForRenderThread { get; private set; }
 
         public ProfileDataView()
         {
@@ -34,12 +35,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             inSyncWithProfilerData = dataView.inSyncWithProfilerData;
             containsWaitForFPS = dataView.containsWaitForFPS;
             containsWaitForPresent = dataView.containsWaitForPresent;
+            containsWaitForRenderThread = dataView.containsWaitForRenderThread;
         }
 
         public void FindKeyMarkers()
         {
             containsWaitForFPS = data.GetMarkerIndex("WaitForTargetFPS") != -1;
             containsWaitForPresent = data.GetMarkerIndex("Gfx.WaitForPresentOnGfxThread") != -1;
+            containsWaitForRenderThread = data.GetMarkerIndex("Gfx.WaitForRenderThread") != -1;
         }
 
         public bool IsDataValid()

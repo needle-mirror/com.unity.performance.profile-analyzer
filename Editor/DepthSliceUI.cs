@@ -9,13 +9,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     public class DepthSliceUI
     {
         [SerializeField] int m_DepthFilter = ProfileAnalyzer.kDepthAll;
-        public int depthFilter {get { return m_DepthFilter; }}
+        public int depthFilter { get { return m_DepthFilter; } }
 
         [SerializeField] int m_DepthFilter1 = ProfileAnalyzer.kDepthAll;
-        public int depthFilter1 {get { return m_DepthFilter1; }}
+        public int depthFilter1 { get { return m_DepthFilter1; } }
 
         [SerializeField] int m_DepthFilter2 = ProfileAnalyzer.kDepthAll;
-        public int depthFilter2 {get { return m_DepthFilter2; }}
+        public int depthFilter2 { get { return m_DepthFilter2; } }
 
         [SerializeField] bool m_DepthFilterAuto = true;
 
@@ -66,7 +66,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         void DrawDepthFilterDropdown(GUIContent title, bool enabled, ProfileDataView view, Action<int, int, int> callback,
             ViewType viewType, ProfileDataView profileSingleView, ProfileDataView profileLeftView, ProfileDataView profileRightView)
         {
-            if(title !=null)
+            if (title != null)
                 EditorGUILayout.LabelField(title, GUILayout.Width(ProfileAnalyzerWindow.LayoutSize.FilterOptionsEnumWidth));
 
             int depthFilter = ProfileAnalyzer.kDepthAll;
@@ -145,7 +145,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 // The depths can change because the data changed, not just because the user selected a different option in the dropdown
                 // in that case, the depth filters need to perform a refresh
-                if(oldDepthFilter != depthFilter || viewType == ViewType.Locked && oldDepthFilterOtherLocked != depthFilterOther)
+                if (oldDepthFilter != depthFilter || viewType == ViewType.Locked && oldDepthFilterOtherLocked != depthFilterOther)
                 {
                     UpdateDepthFilters(viewType == ViewType.Single, profileSingleView, profileLeftView, profileRightView);
                     m_UpdateActiveTabCallback(true);
@@ -158,7 +158,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             return mostCommonDepthDiff > 0 ?
                 filterDepthRight + Math.Max(0, filterDepthLeft - rightMax + (rightMax > 0 ? mostCommonDepthDiff : filterDepthLeft > 0 ? 1 : 0)) :
-                filterDepthLeft + Math.Max(0, filterDepthRight - leftMax - (leftMax > 0 ? mostCommonDepthDiff : filterDepthRight > 0 ? -1 :0));
+                filterDepthLeft + Math.Max(0, filterDepthRight - leftMax - (leftMax > 0 ? mostCommonDepthDiff : filterDepthRight > 0 ? -1 : 0));
         }
 
         void CalcAutoSlicesFromMenuEntryIndex(int depthSlcieMenuEntryIndex, ref int filterDepthLeft, ref int filterDepthRight, int leftMax, int rightMax)
@@ -292,7 +292,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (m_DepthFilterAuto)
                     {
                         var newDepthFilter2 = m_DepthFilter;
-                        ClampDepthFilterForAutoRespectingDiff(ref m_DepthFilter1, ref newDepthFilter2,  profileLeftView, profileRightView);
+                        ClampDepthFilterForAutoRespectingDiff(ref m_DepthFilter1, ref newDepthFilter2, profileLeftView, profileRightView);
 
                         if (m_DepthFilter2 != newDepthFilter2)
                         {
@@ -447,7 +447,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public static string DepthFilterToString(int depthSliceLeft, int depthSliceRight, bool leftIsMain)
         {
-            if(depthSliceLeft != depthSliceRight)
+            if (depthSliceLeft != depthSliceRight)
             {
                 if (leftIsMain)
                     return string.Format("{0} ({1}{2})", DepthFilterToString(depthSliceLeft), ProfileAnalyzerWindow.Styles.rightDepthTitle.text, DepthFilterToString(depthSliceRight));

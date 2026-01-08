@@ -143,7 +143,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                         // "Escape" marker names in case it has commas in it.
                         file.Write("\"{0}\";", markerName);
-                        file.Write(string.Format(CultureInfo.InvariantCulture,"{0};{1};{2};",
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};{2};",
                             marker.msMedian, marker.msMin, marker.msMax));
                         file.Write("{0};{1};{2};",
                             medianFrameIndex, minFrameIndex, maxFrameIndex);

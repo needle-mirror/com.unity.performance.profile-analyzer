@@ -4,6 +4,26 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-08
+
+### Added
+
+* Added extra 'remove' marker in the list. "Render Wait" entry removes the Gfx.WaitForRenderThread
+* Fixed self times for the last few markers in the list (when the depth did not return to 1).
+
+### Changed
+
+* Performance optimization to the loading and analysis phases, saving time to open and analyse. Also reduces memory usage.
+* Added more functional tests
+* Removed support for the old .padata format which was rarely used. To load these files you must load them into the older 1.2.4 version to resave as .pdata format to be able to use going forward.
+* Updated frame histogram and box and whisker to be min based rather than zero based to match the marker view
+
+## [1.2.4] - 2025-02-06
+
+### Changed
+
+* Updated the TreeView for Unity 6.3.
+
 ## [1.2.3] - 2024-12-13
 
 ### Fixed
@@ -25,7 +45,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.2.0] - 2023-01-02
 
-### Added 
+### Added
 
 * Added support for removing vsync time, so we can see actual CPU duration over multiple frames. A drop down has been added to 'remove' a marker from the analysis and has entries for "FPS Wait", "Present Wait" and "Custom" where you can select any marker from the table using the right click context menu to "Remove Marker".
 * Added optional standard deviation (SD) column into marker table (on single view) for sorting data based on variation of marker timings in over the frames.
@@ -73,7 +93,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-* Used the new `EditorWindow.docked` API on 2020.1 and later to replace reflection usage.  
+* Used the new `EditorWindow.docked` API on 2020.1 and later to replace reflection usage.
 * Made the **Thread Selection** window a utility window.
 * Added a progress bar, which shows data loading progress.
 * **All** no longer collapses in the thread view because it was superfluous and held no discernible purpose.
@@ -123,9 +143,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixes
 
-* Fixed "median marker time (in currently selected frames)" in tooltip for 'Top 10 markers'. 
+* Fixed "median marker time (in currently selected frames)" in tooltip for 'Top 10 markers'.
 * Fixed profile analyzer 5.6 support
-* Fixed minor visual artefact when no marker selection 
+* Fixed minor visual artefact when no marker selection
 * Fixed issue where frame time graph tooltips were not always appearing when hovering
 * Marker Summary - Count Values are now correctly sorted in descending order
 * Hiding selected marker in comparison view if lacking 2 valid data sets
@@ -136,7 +156,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [1.0.0] - 2020-06-02
 
 ### Changes
-* Export window updates. Includes tooltips, better on screen positioning. 
+* Export window updates. Includes tooltips, better on screen positioning.
   * If opened and then new data set loaded. New data set now correctly exported.
 * Frame Time graph now shows border when selected
   * Keys 1 and 2 select the first or second frame time graph to take keyboard focus
@@ -151,7 +171,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [0.7.0-preview.4] - 2020-05-29
 
 ### Changes
-* Thread selection window 
+* Thread selection window
   * Now only applys thread selection changes when clicking 'Apply'. Closing the window no longer applies the changes automatically.
   * Now contains buttons to Reset to previous thread selection, Select just "Main Thread" or "Common" set selection (Main, Render and Jobs).
   * Apply button is now greyed out while analysis is running.
@@ -181,7 +201,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * Clamped selected region shown when zoomed in on frame time graph
 * Frame Control value no longer overlaps with drop-down list when Units are set to Microseconds
 * Fixed thread count text when analysis completes after swapping single/compare tabs during analysis
-* Fixed Frame View's tooltip "total time" when rapidly changing frames 
+* Fixed Frame View's tooltip "total time" when rapidly changing frames
 * Fixed overlapping text when selecting single frame when zoomed in
 * Histogram frame count now lists "1 frame" when single frame rather than "1 frames"
 * Mode: text in top bar now same size as rest of text.
@@ -201,10 +221,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * Selected marker refocused in marker list when table is regenerated (e.g. when selecting all frames containing the marker).
 * Column by which the Marker Details is sorted by is now maintained  when entering Play Mode
 * Updated frame time graph context menu to make hotkeys more consistent with out Unity UI layouts
-* Percent symbol no longer cut off in Mean frame contribution when the value is 100% 
+* Percent symbol no longer cut off in Mean frame contribution when the value is 100%
 * Frame time graph now scales up when zooming when comparing data with different frame amounts
 * Changing 'Auto Right' tick box no longer causes re-analysis if depth settings unchanged
-* Most tooltips now show values without rounding, so its more obvious when low values give non zero deltas. 
+* Most tooltips now show values without rounding, so its more obvious when low values give non zero deltas.
 * Fixed individual max tooltip
 * Disabled 'Pull data' button when Unity profiler is still capturing data (as the pull would not complete).
 * Fixed right frame index in exported comparison CSV file.
@@ -213,7 +233,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * Fixed frame index button heights when alternative (Verdana) font used.
 * Fixed cache styles to be updated when changing theme (to fix text colour in filters area)
 * Single click (without drag) now always single frame rather than the group of frames in the pixel wide area.
-* Split frame range into start and end rows to display more information when values large 
+* Split frame range into start and end rows to display more information when values large
 * Marker Summary comparison times are now limited to 5 digits to prevent text clipping off
 
 ### Enhancements
@@ -221,7 +241,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 * Optimised thread name summary display
 
 ## [0.6.0-preview.1] - 2020-02-04
-* Fixed a crash with the thread selection API in Unity 2020.1 
+* Fixed a crash with the thread selection API in Unity 2020.1
 * Fixed marker and thread scroll bars
 * Added extra documentation for public API elements
 
@@ -230,13 +250,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.5.0-preview.1] - 2019-09-18
 
-### Features 
+### Features
 * Added self time option to display 'exclusive' time of markers excluding time in children.
 * Added ability to filter to a parent marker to reduce the marker list to a part of the tree.
 * Added option to filter the column list to set groups (including custom).
 * Added column for total marker time over the frame
 * Added copy to clipboard on table entries
-* Added export option for marker table 
+* Added export option for marker table
 
 ### Enhancements
 * Improved Top N Markers graph to make it clearer this is for the median frames of each data set.
@@ -267,7 +287,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [0.4.0-preview.3] - 2019-04-01
 
-* First public release of Profile Analyzer. 
+* First public release of Profile Analyzer.
 
 ## [0.1.0-preview] - 2018-12-07
 

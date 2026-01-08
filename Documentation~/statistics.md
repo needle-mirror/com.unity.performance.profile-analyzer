@@ -1,6 +1,6 @@
 # Statistics in the Profile Analyzer
 
-The Profile Analyzer displays a number of statistics about the data you're analyzing in the Frame, Thread, and Marker Summary panes.. 
+The Profile Analyzer displays a number of statistics about the data you're analyzing in the Frame, Thread, and Marker Summary panes..
 
 ## Available statistics
 

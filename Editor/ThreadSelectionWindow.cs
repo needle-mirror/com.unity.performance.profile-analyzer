@@ -2,7 +2,16 @@ using UnityEngine;
 using System.IO;
 using System;
 using System.Collections.Generic;
+
+#if UNITY_6000_2_OR_NEWER
 using UnityEditor.IMGUI.Controls;
+using TreeView = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+using TreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+using UnityEditor.IMGUI.Controls;
+#endif
+
 using UnityEngine.Assertions;
 using System.Linq;
 
@@ -203,7 +212,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             var top = new ThreadTreeViewItem(-1, depth, m_AllThreadIdentifier.name, m_AllThreadIdentifier);
             root.AddChild(top);
 
-            var expandList = new List<int>() {-1};
+            var expandList = new List<int>() { -1 };
             string lastThreadName = "";
             TreeViewItem node = root;
 
@@ -562,49 +571,49 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             switch (column)
             {
                 case MyColumns.ThreadName:
-                {
-                    args.rowRect = cellRect;
-                    // base.RowGUI(args);    // Required to show tree indenting
-
-                    // Draw manually to keep indenting while add a tooltip
-                    Rect rect = cellRect;
-                    if (Event.current.rawType == EventType.Repaint)
                     {
-                        string text;
-                        string tooltip;
-                        GetThreadTreeViewItemInfo(item, out text, out tooltip);
-                        var content = new GUIContent(text, tooltip);
+                        args.rowRect = cellRect;
+                        // base.RowGUI(args);    // Required to show tree indenting
 
-                        if (activeLineStyle == null)
+                        // Draw manually to keep indenting while add a tooltip
+                        Rect rect = cellRect;
+                        if (Event.current.rawType == EventType.Repaint)
                         {
-                            // activeLineStyle = DefaultStyles.boldLabel;
-                            activeLineStyle = new GUIStyle(DefaultStyles.label);
-                            activeLineStyle.normal.textColor = DefaultStyles.boldLabel.onActive.textColor;
+                            string text;
+                            string tooltip;
+                            GetThreadTreeViewItemInfo(item, out text, out tooltip);
+                            var content = new GUIContent(text, tooltip);
+
+                            if (activeLineStyle == null)
+                            {
+                                // activeLineStyle = DefaultStyles.boldLabel;
+                                activeLineStyle = new GUIStyle(DefaultStyles.label);
+                                activeLineStyle.normal.textColor = DefaultStyles.boldLabel.onActive.textColor;
+                            }
+
+                            // rect = DrawIndent(rect, item, ref args);
+
+                            //bool mouseOver = rect.Contains(Event.current.mousePosition);
+                            //DefaultStyles.label.Draw(rect, content, mouseOver, false, args.selected, args.focused);
+
+                            // Must use this call to draw tooltip
+                            EditorGUI.LabelField(rect, content, args.selected ? activeLineStyle : DefaultStyles.label);
                         }
-
-                        // rect = DrawIndent(rect, item, ref args);
-
-                        //bool mouseOver = rect.Contains(Event.current.mousePosition);
-                        //DefaultStyles.label.Draw(rect, content, mouseOver, false, args.selected, args.focused);
-
-                        // Must use this call to draw tooltip
-                        EditorGUI.LabelField(rect, content, args.selected ? activeLineStyle : DefaultStyles.label);
                     }
-                }
-                break;
+                    break;
                 case MyColumns.GroupName:
-                {
-                    Rect rect = cellRect;
-                    if (Event.current.rawType == EventType.Repaint)
                     {
-                        rect = DrawIndent(rect, item, ref args);
+                        Rect rect = cellRect;
+                        if (Event.current.rawType == EventType.Repaint)
+                        {
+                            rect = DrawIndent(rect, item, ref args);
 
-                        string groupName = GetItemGroupName(item);
-                        var content = new GUIContent(groupName, groupName);
-                        EditorGUI.LabelField(rect, content);
+                            string groupName = GetItemGroupName(item);
+                            var content = new GUIContent(groupName, groupName);
+                            EditorGUI.LabelField(rect, content);
+                        }
                     }
-                }
-                break;
+                    break;
                 case MyColumns.State:
                     bool oldState = GetThreadSelectedState(item.threadIdentifier) == ThreadSelected.Selected;
                     bool newState = EditorGUI.Toggle(cellRect, oldState);

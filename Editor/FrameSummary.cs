@@ -29,5 +29,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public int[] buckets = new int[20];   // Each bucket contains 'number of frames' for frametime in that range
         public List<FrameTime> frames = new List<FrameTime>();
+
+        public FrameSummary()
+        {
+            msMin = float.MaxValue;
+
+            for (int b = 0; b < buckets.Length; b++)
+                buckets[b] = 0;
+        }
     }
 }

@@ -17,7 +17,7 @@ For more information on how to pull data into the Profile Analyzer, see the work
 
 ## Marker Comparison list
 
-The **Marker Comparison** pane contains a sortable list of markers with a number of useful statistics, including the difference between the two sets. The proportional graphs with the `<` and `>` labels visualize the values of each marker, so you can see the difference between the timings of both samples.  
+The **Marker Comparison** pane contains a sortable list of markers with a number of useful statistics, including the difference between the two sets. The proportional graphs with the `<` and `>` labels visualize the values of each marker, so you can see the difference between the timings of both samples.
 
 If you select a marker in the list, the **Marker Summary** panel displays in depth information on the marker. Each marker in the list is an aggregation of all the instances of that marker, across all filtered threads and in all ranged frames.
 

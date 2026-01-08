@@ -53,7 +53,8 @@ Right click on the Frame Control graph to bring up the context menu.
 
 |**Menu item**|**Function**|
 |---|---|
-|**Clear Selection**|Clears the selected range. The Profile Analyzer then performs the analysis on the whole data set.|
+|**Select All**|Selects all frames. The Profile Analyzer then performs the analysis on the whole data set.|
+|**Clear Selection**|Clears the selected range. The Profile Analyzer results will be empty, until a new selection is made.|
 |**Invert Selection**|Inverts the selected range.|
 |**Select Shortest Frame**|Selects the frame with the shortest time.|
 |**Select Longest Frame**|Selects the frame with the longest time.|

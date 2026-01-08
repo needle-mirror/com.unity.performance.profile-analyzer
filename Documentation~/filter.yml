@@ -35,9 +35,4 @@ apiRules:
     - exclude:
         uidRegex: .*Fixture$
         type: Type
-    - exclude:
-        uidRegex: UnityEditor.Performance.ProfileAnalyzer.DepthSliceUI
-        type: Type
-    - exclude:
-        uidRegex: GetUIThreadName
-        type: Method
+

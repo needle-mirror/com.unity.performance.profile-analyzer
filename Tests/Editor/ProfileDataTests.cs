@@ -35,4 +35,15 @@ public class ProfileDataTests
 
         Assert.IsFalse(success, "Calling ProfileData.Save with an empty filename should return false.");
     }
+
+    [Test]
+    public void Save_WithInvalidFilExtension_ReturnsFalse()
+    {
+        string filename = "filename.invalid";
+        var profileData = new ProfileData();
+
+        bool success = ProfileData.Save(filename, profileData);
+
+        Assert.IsFalse(success, "Calling ProfileData.Save with an invalid file extension should return false.");
+    }
 }

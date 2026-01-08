@@ -1,6 +1,6 @@
 # Comparing frames from different data sets
 
-This workflow explains how to compare two frames from different data sets. In this example, it shows how to compare the median frames from each data set. Comparing the median frames helps you understand what might be happening in a frame that is central to the distribution for each data set. 
+This workflow explains how to compare two frames from different data sets. In this example, it shows how to compare the median frames from each data set. Comparing the median frames helps you understand what might be happening in a frame that is central to the distribution for each data set.
 
 ## Step 1: Collect performance data to analyze
 

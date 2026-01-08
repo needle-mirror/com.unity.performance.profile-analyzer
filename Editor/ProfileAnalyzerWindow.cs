@@ -1,16 +1,22 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+
+#if UNITY_6000_2_OR_NEWER
 using UnityEditor.IMGUI.Controls;
+using TreeView = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+using TreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+using UnityEditor.IMGUI.Controls;
+#endif
+
 using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Profiling;
 using Debug = UnityEngine.Debug;
-using ProfilerCommon = UnityEditorInternal.ProfilerDriver;
 using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
@@ -63,6 +69,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         ShowAll,
         HideWaitForFPS,
         HideWaitForPresent,
+        HideWaitForRenderThread,
         Custom,
     };
 
@@ -150,6 +157,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 new GUIContent("None", "All markers shown. None removed."),
                 new GUIContent("FPS Wait", "Remove the WaitForTargetFPS marker which represents targeted FPS (*) time\n\n(*) Via Application.targetFrameRate API usage (common on Mobile)"),
                 new GUIContent("Present Wait", "Remove the Gfx.WaitForPresentOnGfxThread marker which represents time waiting for GPU to complete (common on consoles)"),
+                new GUIContent("Render Wait", "Remove the Gfx.WaitForRenderThread marker which represents time waiting for CPU render thread to complete sending data to GPU"),
                 new GUIContent("Custom", "Right click on a marker in the table and select 'Remove Marker' to remove a specific marker (and all children too)")
             };
 
@@ -460,8 +468,30 @@ To compare two data sets:
         [SerializeField]
         int m_TopNBars = 10;
 
+        enum LoadInUpdatePhase
+        {
+            None,
+            InitiateLoad,
+            Load,
+            WaitFrameAfterLoad,
+            EndProfiling,
+            Complete
+        }
+
+        enum AnalyzeInUpdatePhase
+        {
+            None,
+            InitiateAnalysis,
+            Analyze,
+            WaitFrameAfterAnalysis,
+            EndProfiling,
+            Complete
+        }
+
+        bool m_EnableLoadProfiling = false;
         bool m_EnableAnalysisProfiling = false;
-        int m_AnalyzeInUpdatePhase = 0;
+        AnalyzeInUpdatePhase m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.None;
+        LoadInUpdatePhase m_LoadInUpdatePhase = LoadInUpdatePhase.None;
 
         string m_LastAnalysisTime = "";
         string m_LastCompareTime = "";
@@ -1061,6 +1091,96 @@ To compare two data sets:
             }
         }
 
+        ThreadActivity CompleteAsyncOperation(ThreadActivity activity)
+        {
+            switch (activity)
+            {
+                case ThreadActivity.AnalyzeDone:
+                    // Create table when analysis complete
+                    UpdateAnalysisFromAsyncProcessing(m_ProfileSingleView, m_FullAnalysisRequired);
+                    m_FullAnalysisRequired = false;
+
+                    UpdateThreadNames();
+                    BuildRemoveMarkerList();
+
+                    if (m_ProfileSingleView.analysis != null)
+                    {
+                        CreateProfileTable();
+                        m_RequestRepaint = true;
+                    }
+                    activity = ThreadActivity.None;
+
+                    if (m_NewDataLoaded)
+                    {
+                        if (m_ProfileSingleView.IsDataValid())
+                        {
+                            // Don't bother sending an analytic if the data set is empty (should never occur anyway but consistent with comparison flow)
+                            ProfileAnalyzerAnalytics.SendUIUsageModeEvent(ProfileAnalyzerAnalytics.UIUsageMode.Single, m_LastAnalysisTimeMilliseconds / 1000f);
+                        }
+                        m_NewDataLoaded = false;
+                    }
+
+                    SelectMarker(m_SelectedMarker.name);
+                    break;
+
+                case ThreadActivity.CompareDone:
+                    UpdateAnalysisFromAsyncProcessing(m_ProfileLeftView, m_FullCompareRequired);
+                    UpdateAnalysisFromAsyncProcessing(m_ProfileRightView, m_FullCompareRequired);
+                    m_FullCompareRequired = false;
+                    m_Pairings = m_PairingsNew;
+                    m_TotalCombinedMarkerCount = m_TotalCombinedMarkerCountNew;
+
+                    UpdateThreadNames();
+                    BuildRemoveMarkerList();
+
+                    if (m_ProfileLeftView.analysis != null && m_ProfileRightView.analysis != null)
+                    {
+                        CreateComparisonTable();
+                        m_RequestRepaint = true;
+                    }
+                    activity = ThreadActivity.None;
+
+                    if (m_NewComparisonDataLoaded)
+                    {
+                        if (m_ProfileLeftView.IsDataValid() && m_ProfileRightView.IsDataValid())
+                        {
+                            // Don't bother sending an analytic when one (or more) of the data sets is blank (as no comparison is really made)
+                            ProfileAnalyzerAnalytics.SendUIUsageModeEvent(ProfileAnalyzerAnalytics.UIUsageMode.Comparison, m_LastCompareTimeMilliseconds / 1000f);
+                        }
+                        m_NewComparisonDataLoaded = false;
+                    }
+
+                    SelectMarker(m_SelectedMarker.name);
+                    break;
+
+                case ThreadActivity.LoadDone:
+                    SetView(GetActiveView, m_ProfilerData, m_Path, GetActiveFrameTimeGraph);
+                    switch (m_ActiveTab)
+                    {
+                        case ActiveTab.Compare:
+                            // Remove pairing if both left/right point at the same data
+                            if (m_ProfileLeftView.path == m_ProfileRightView.path)
+                            {
+                                SetFrameTimeGraphPairing(false);
+                            }
+
+                            m_FullCompareRequired = true;
+                            m_RequestCompare = true;
+                            break;
+                        case ActiveTab.Summary:
+                            m_RequestAnalysis = true;
+                            m_FullAnalysisRequired = true;
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
+                    activity = ThreadActivity.None;
+                    break;
+            }
+
+            return activity;
+        }
+
         void Update()
         {
             CheckScreenSizeChanges();
@@ -1113,90 +1233,7 @@ To compare two data sets:
                 m_ThreadSelectionSummary = CalculateSelectedThreadsSummary();
             }
 
-            switch (m_ThreadActivity)
-            {
-                case ThreadActivity.AnalyzeDone:
-                    // Create table when analysis complete
-                    UpdateAnalysisFromAsyncProcessing(m_ProfileSingleView, m_FullAnalysisRequired);
-                    m_FullAnalysisRequired = false;
-
-                    UpdateThreadNames();
-                    BuildRemoveMarkerList();
-
-                    if (m_ProfileSingleView.analysis != null)
-                    {
-                        CreateProfileTable();
-                        m_RequestRepaint = true;
-                    }
-                    m_ThreadActivity = ThreadActivity.None;
-
-                    if (m_NewDataLoaded)
-                    {
-                        if (m_ProfileSingleView.IsDataValid())
-                        {
-                            // Don't bother sending an analytic if the data set is empty (should never occur anyway but consistent with comparison flow)
-                            ProfileAnalyzerAnalytics.SendUIUsageModeEvent(ProfileAnalyzerAnalytics.UIUsageMode.Single, m_LastAnalysisTimeMilliseconds / 1000f);
-                        }
-                        m_NewDataLoaded = false;
-                    }
-
-                    SelectMarker(m_SelectedMarker.name);
-                    break;
-
-                case ThreadActivity.CompareDone:
-                    UpdateAnalysisFromAsyncProcessing(m_ProfileLeftView, m_FullCompareRequired);
-                    UpdateAnalysisFromAsyncProcessing(m_ProfileRightView, m_FullCompareRequired);
-                    m_FullCompareRequired = false;
-                    m_Pairings = m_PairingsNew;
-                    m_TotalCombinedMarkerCount = m_TotalCombinedMarkerCountNew;
-
-                    UpdateThreadNames();
-                    BuildRemoveMarkerList();
-
-                    if (m_ProfileLeftView.analysis != null && m_ProfileRightView.analysis != null)
-                    {
-                        CreateComparisonTable();
-                        m_RequestRepaint = true;
-                    }
-                    m_ThreadActivity = ThreadActivity.None;
-
-                    if (m_NewComparisonDataLoaded)
-                    {
-                        if (m_ProfileLeftView.IsDataValid() && m_ProfileRightView.IsDataValid())
-                        {
-                            // Don't bother sending an analytic when one (or more) of the data sets is blank (as no comparison is really made)
-                            ProfileAnalyzerAnalytics.SendUIUsageModeEvent(ProfileAnalyzerAnalytics.UIUsageMode.Comparison, m_LastCompareTimeMilliseconds / 1000f);
-                        }
-                        m_NewComparisonDataLoaded = false;
-                    }
-
-                    SelectMarker(m_SelectedMarker.name);
-                    break;
-
-                case ThreadActivity.LoadDone:
-                    SetView(GetActiveView, m_ProfilerData, m_Path, GetActiveFrameTimeGraph);
-                    switch (m_ActiveTab)
-                    {
-                        case ActiveTab.Compare:
-                            // Remove pairing if both left/right point at the same data
-                            if (m_ProfileLeftView.path == m_ProfileRightView.path)
-                            {
-                                SetFrameTimeGraphPairing(false);
-                            }
-
-                            m_FullCompareRequired = true;
-                            m_RequestCompare = true;
-                            break;
-                        case ActiveTab.Summary:
-                            m_RequestAnalysis = true;
-                            m_FullAnalysisRequired = true;
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
-                    m_ThreadActivity = ThreadActivity.None;
-                    break;
-            }
+            m_ThreadActivity = CompleteAsyncOperation(m_ThreadActivity);
 
             if (m_RequestAnalysis)
             {
@@ -1221,29 +1258,63 @@ To compare two data sets:
                 m_RequestRepaint = false;
             }
 
-            if (m_AnalyzeInUpdatePhase > 0)
+            if (m_LoadInUpdatePhase != LoadInUpdatePhase.None)
+            {
+                switch (m_LoadInUpdatePhase)
+                {
+                    case LoadInUpdatePhase.InitiateLoad:
+                        UnityEditorInternal.ProfilerDriver.profileEditor = true;
+                        UnityEngine.Profiling.Profiler.enabled = true;
+                        UnityEditorInternal.ProfilerDriver.enabled = true;
+                        m_LoadInUpdatePhase = LoadInUpdatePhase.Load;
+                        return;
+                    case LoadInUpdatePhase.Load:
+                        ProfileData.Load(m_Path, out m_ProfilerData);
+                        m_LoadInUpdatePhase = LoadInUpdatePhase.WaitFrameAfterLoad;
+                        return;
+                    case LoadInUpdatePhase.WaitFrameAfterLoad:
+                        m_LoadInUpdatePhase = LoadInUpdatePhase.EndProfiling;
+                        return;
+                    case LoadInUpdatePhase.EndProfiling:
+                        UnityEngine.Profiling.Profiler.enabled = false;
+                        m_LoadInUpdatePhase = LoadInUpdatePhase.Complete;
+
+                        CompleteAsyncOperation(ThreadActivity.LoadDone);
+                        return;
+                    default:
+                        m_LoadInUpdatePhase = LoadInUpdatePhase.None;
+                        break;
+                }
+            }
+
+
+            if (m_AnalyzeInUpdatePhase != AnalyzeInUpdatePhase.None)
             {
                 switch (m_AnalyzeInUpdatePhase)
                 {
-                    case 1:
+                    case AnalyzeInUpdatePhase.InitiateAnalysis:
+                        UnityEditorInternal.ProfilerDriver.profileEditor = true;
                         UnityEngine.Profiling.Profiler.enabled = true;
-                        m_AnalyzeInUpdatePhase++;
+                        UnityEditorInternal.ProfilerDriver.enabled = true;
+                        m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.Analyze;
                         return;
-                    case 2:
+                    case AnalyzeInUpdatePhase.Analyze:
                         AnalyzeSync();
                         UpdateAnalysisFromAsyncProcessing(m_ProfileSingleView, m_FullAnalysisRequired);
                         m_FullAnalysisRequired = false;
-                        m_AnalyzeInUpdatePhase++;
+                        m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.WaitFrameAfterAnalysis;
                         return;
-                    case 3:
-                        m_AnalyzeInUpdatePhase++;
+                    case AnalyzeInUpdatePhase.WaitFrameAfterAnalysis:
+                        m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.EndProfiling;
                         return;
-                    case 4:
+                    case AnalyzeInUpdatePhase.EndProfiling:
                         UnityEngine.Profiling.Profiler.enabled = false;
-                        m_AnalyzeInUpdatePhase++;
+                        m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.Complete;
+
+                        CompleteAsyncOperation(ThreadActivity.AnalyzeDone);
                         return;
                     default:
-                        m_AnalyzeInUpdatePhase = 0;
+                        m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.None;
                         break;
                 }
             }
@@ -1307,7 +1378,7 @@ To compare two data sets:
 
             bool removeFrameSyncTime = false;
             int removeMarkerIndex = -1;
-            ThreadIdentifier mainThreadSelection = new ThreadIdentifier("Main Thread", 1);;
+            ThreadIdentifier mainThreadSelection = new ThreadIdentifier("Main Thread", 1); ;
 
             string removeMarker = GetRemoveMarker();
             if (removeMarker != null)
@@ -1337,7 +1408,7 @@ To compare two data sets:
                                     continue;
 
                                 // May be multiple instances of this marker in the 'custom' case (so we can't just break out of marker loop here)
-                                ms-= marker.msMarkerTotal;
+                                ms -= marker.msMarkerTotal;
                             }
                             break;
                         }
@@ -1356,7 +1427,16 @@ To compare two data sets:
             if (m_Path.Length != 0)
             {
                 m_ActiveLoadingView = ActiveView.Single;
-                BeginAsyncAction(ThreadActivity.Load);
+
+                if (m_EnableLoadProfiling)
+                {
+                    m_LoadInUpdatePhase = LoadInUpdatePhase.InitiateLoad;
+                    return;
+                }
+                else
+                {
+                    BeginAsyncAction(ThreadActivity.Load);
+                }
             }
             GUIUtility.ExitGUI();
         }
@@ -1632,12 +1712,13 @@ To compare two data sets:
             m_ThreadPhases = 2 /*scan left and right*/ + updateDepthPhase + 2 /*fullLeftPhase and fullRightPhase*/ + 2 /*analyze left and right*/;
 
             bool selfTimes = IsSelfTime();
+            string removeMarker = m_hideRemovedMarkers ? GetRemoveMarker() : null;
 
             // First scan just the frames
             m_ThreadPhase = 0;
-            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker);
             m_ThreadPhase++;
-            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker);
             m_ThreadPhase++;
 
             if (leftAnalysisNew == null || rightAnalysisNew == null)
@@ -1647,15 +1728,17 @@ To compare two data sets:
             }
 
             // Calculate the max frame time of the two scans
+            float timeScaleMin = Math.Min(leftAnalysisNew.GetFrameSummary().msMin, rightAnalysisNew.GetFrameSummary().msMin);
             float timeScaleMax = Math.Max(leftAnalysisNew.GetFrameSummary().msMax, rightAnalysisNew.GetFrameSummary().msMax);
+
 
             // Need to recalculate the depth difference when thread filters change
             // For now do it always if the depth is auto and not 'all'
             if (updateDepthPhase != 0)
             {
-                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
                 m_ThreadPhase++;
-                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
                 m_ThreadPhase++;
 
                 var pairings = GeneratePairings(leftAnalysis, rightAnalysis);
@@ -1682,7 +1765,7 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
@@ -1697,15 +1780,15 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
 
-            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
             m_ThreadPhase++;
 
-            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMax, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
             m_ThreadPhase++;
 
             m_TotalCombinedMarkerCountNew = GetTotalCombinedMarkerCount(m_ProfileLeftView.data, m_ProfileRightView.data);
@@ -1739,10 +1822,7 @@ To compare two data sets:
             else
             {
                 CompareSync();
-
-                UpdateAnalysisFromAsyncProcessing(m_ProfileLeftView, m_FullCompareRequired);
-                UpdateAnalysisFromAsyncProcessing(m_ProfileRightView, m_FullCompareRequired);
-                m_FullCompareRequired = false;
+                CompleteAsyncOperation(ThreadActivity.CompareDone);
             }
         }
 
@@ -1941,20 +2021,21 @@ To compare two data sets:
             m_ThreadPhases = 1 + fullPhase;
 
             bool selfTimes = IsSelfTime();
+            string removeMarker = m_hideRemovedMarkers ? GetRemoveMarker() : null;
 
             m_ThreadPhase = 0;
             if (fullPhase == 1)
             {
-                List<int> selection = new List<int>();
+                List<int> selection = new List<int>(m_ProfileSingleView.data.GetFrameCount());
                 for (int frameOffset = 0; frameOffset < m_ProfileSingleView.data.GetFrameCount(); frameOffset++)
                 {
                     selection.Add(m_ProfileSingleView.data.OffsetToDisplayFrame(frameOffset));
                 }
 
-                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker);
                 m_ThreadPhase++;
             }
-            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, m_hideRemovedMarkers ? GetRemoveMarker() : null);
+            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker);
             m_ThreadPhase++;
             stopwatch.Stop();
             m_LastAnalysisTimeMilliseconds = stopwatch.ElapsedMilliseconds;
@@ -1972,7 +2053,7 @@ To compare two data sets:
         {
             if (m_EnableAnalysisProfiling)
             {
-                m_AnalyzeInUpdatePhase = 1;
+                m_AnalyzeInUpdatePhase = AnalyzeInUpdatePhase.InitiateAnalysis;
                 return;
             }
 
@@ -1987,6 +2068,12 @@ To compare two data sets:
                 AnalyzeSync();
                 UpdateAnalysisFromAsyncProcessing(m_ProfileSingleView, m_FullAnalysisRequired);
                 m_FullAnalysisRequired = false;
+
+                UpdateThreadNames();
+                BuildRemoveMarkerList();
+                CreateProfileTable();
+                m_RequestRepaint = true;
+                SelectMarker(m_SelectedMarker.name);
             }
         }
 
@@ -2371,29 +2458,29 @@ To compare two data sets:
             switch (operation)
             {
                 default:
-                //case NameFilterOperation.All:
-                {
-                    foreach (string subString in nameFilters)
+                    //case NameFilterOperation.All:
                     {
-                        // As soon as name doesn't match one in the list then return false
-                        if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) < 0)
-                            return false;
-                    }
+                        foreach (string subString in nameFilters)
+                        {
+                            // As soon as name doesn't match one in the list then return false
+                            if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) < 0)
+                                return false;
+                        }
 
-                    // Name is matching all the filters in the list
-                    return true;
-                }
+                        // Name is matching all the filters in the list
+                        return true;
+                    }
                 case NameFilterOperation.Any:
-                {
-                    foreach (string subString in nameFilters)
                     {
-                        // As soon as names matches one in the list then return true
-                        if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0)
-                            return true;
-                    }
+                        foreach (string subString in nameFilters)
+                        {
+                            // As soon as names matches one in the list then return true
+                            if (name.IndexOf(subString, StringComparison.OrdinalIgnoreCase) >= 0)
+                                return true;
+                        }
 
-                    return false;
-                }
+                        return false;
+                    }
             }
         }
 
@@ -3283,7 +3370,7 @@ To compare two data sets:
                 GUIContent entry = new GUIContent(Styles.removeMarkerOperation[value]);
 
                 bool found = true;
-                switch(filterOperation)
+                switch (filterOperation)
                 {
                     case RemoveMarkerOperation.HideWaitForFPS:
                         {
@@ -3310,6 +3397,21 @@ To compare two data sets:
                                     break;
                                 case ActiveTab.Compare:
                                     if (!m_ProfileLeftView.containsWaitForPresent && !m_ProfileRightView.containsWaitForPresent)
+                                        found = false;
+                                    break;
+                            }
+                        }
+                        break;
+                    case RemoveMarkerOperation.HideWaitForRenderThread:
+                        {
+                            switch (m_ActiveTab)
+                            {
+                                case ActiveTab.Summary:
+                                    if (!m_ProfileSingleView.containsWaitForRenderThread)
+                                        found = false;
+                                    break;
+                                case ActiveTab.Compare:
+                                    if (!m_ProfileLeftView.containsWaitForRenderThread && !m_ProfileRightView.containsWaitForRenderThread)
                                         found = false;
                                     break;
                             }
@@ -3366,18 +3468,18 @@ To compare two data sets:
                 case RemoveMarkerOperation.ShowAll:
                     EditorGUILayout.LabelField("");
                     break;
-/*
-                // Could make custom marker editable, but we don't support multiple markers yet
-                // So currently we limit this to being set by right click context menu
-                case removeMarkerOperation.Custom:
-                    string removeMarkerCustomRemoveMarker = EditorGUILayout.DelayedTextField(m_removeMarkerCustomRemoveMarker, GUILayout.MinWidth(200 - LayoutSize.removeMarkerOptionsEnumWidth));
-                    if (removeMarkerCustomRemoveMarker != m_removeMarkerCustomRemoveMarker)
-                    {
-                        m_removeMarkerCustomRemoveMarker = removeMarkerCustomRemoveMarker;
-                        update = true;
-                    }
-                    break;
-*/
+                /*
+                                // Could make custom marker editable, but we don't support multiple markers yet
+                                // So currently we limit this to being set by right click context menu
+                                case removeMarkerOperation.Custom:
+                                    string removeMarkerCustomRemoveMarker = EditorGUILayout.DelayedTextField(m_removeMarkerCustomRemoveMarker, GUILayout.MinWidth(200 - LayoutSize.removeMarkerOptionsEnumWidth));
+                                    if (removeMarkerCustomRemoveMarker != m_removeMarkerCustomRemoveMarker)
+                                    {
+                                        m_removeMarkerCustomRemoveMarker = removeMarkerCustomRemoveMarker;
+                                        update = true;
+                                    }
+                                    break;
+                */
                 default:
                     EditorGUILayout.LabelField(GetRemoveMarker());
                     break;
@@ -3427,8 +3529,10 @@ To compare two data sets:
                 case RemoveMarkerOperation.HideWaitForPresent:
                     // Gfx.WaitForPresentOnGfxThread is seen on consoles
                     return "Gfx.WaitForPresentOnGfxThread";
+                case RemoveMarkerOperation.HideWaitForRenderThread:
+                    return "Gfx.WaitForRenderThread";
                 case RemoveMarkerOperation.Custom:
-                    if (m_removeMarkerCustomRemoveMarker == null || m_removeMarkerCustomRemoveMarker=="")
+                    if (m_removeMarkerCustomRemoveMarker == null || m_removeMarkerCustomRemoveMarker == "")
                         m_removeMarkerCustomRemoveMarker = "WaitForTargetFPS";
                     return m_removeMarkerCustomRemoveMarker;
             }
@@ -4098,8 +4202,8 @@ To compare two data sets:
                     int leftBucketCount = leftFrameSummary.buckets.Length;
                     int rightBucketCount = rightFrameSummary.buckets.Length;
 
+                    float msFrameMin = Math.Min(leftFrameSummary.msMin, rightFrameSummary.msMin);
                     float msFrameMax = Math.Max(leftFrameSummary.msMax, rightFrameSummary.msMax);
-                    float yRange = msFrameMax;
 
                     if (leftBucketCount != rightBucketCount)
                     {
@@ -4107,7 +4211,8 @@ To compare two data sets:
                     }
                     else
                     {
-                        DrawComparisonHistogram(40, 0, yRange, leftBucketCount, leftFrameSummary.buckets, rightFrameSummary.buckets, leftFrameSummary.count, rightFrameSummary.count, true, true, m_DisplayUnits);
+                        // buckets have been calculated with range min to max in SetupFrameBuckets during Analysis phase
+                        DrawComparisonHistogram(40, msFrameMin, msFrameMax, leftBucketCount, leftFrameSummary.buckets, rightFrameSummary.buckets, leftFrameSummary.count, rightFrameSummary.count, true, true, m_DisplayUnits);
                     }
 
                     BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, m_DisplayUnits.Units);
@@ -4116,13 +4221,13 @@ To compare two data sets:
                     float plotHeight = 40;
                     plotWidth /= 2.0f;
                     boxAndWhiskerPlot.Draw(plotWidth, plotHeight, leftFrameSummary.msMin, leftFrameSummary.msLowerQuartile,
-                        leftFrameSummary.msMedian, leftFrameSummary.msUpperQuartile, leftFrameSummary.msMax, 0, yRange,
+                        leftFrameSummary.msMedian, leftFrameSummary.msUpperQuartile, leftFrameSummary.msMax, msFrameMin, msFrameMax,
                         UIColor.boxAndWhiskerLineColorLeft, UIColor.boxAndWhiskerBoxColorLeft);
                     boxAndWhiskerPlot.Draw(plotWidth, plotHeight, rightFrameSummary.msMin, rightFrameSummary.msLowerQuartile,
-                        rightFrameSummary.msMedian, rightFrameSummary.msUpperQuartile, rightFrameSummary.msMax, 0, yRange,
+                        rightFrameSummary.msMedian, rightFrameSummary.msUpperQuartile, rightFrameSummary.msMax, msFrameMin, msFrameMax,
                         UIColor.boxAndWhiskerLineColorRight, UIColor.boxAndWhiskerBoxColorRight);
 
-                    boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, 0, yRange,
+                    boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, msFrameMin, msFrameMax,
                         "Min frame time for selected frames in the 2 data sets",
                         "Max frame time for selected frames in the 2 data sets");
 
@@ -4754,7 +4859,7 @@ To compare two data sets:
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 
                 EditorGUILayout.LabelField("Mode:", GUILayout.Width(40));
-                ActiveTab newTab = (ActiveTab)GUILayout.Toolbar((int)m_ActiveTab, new string[] {"Single", "Compare"},
+                ActiveTab newTab = (ActiveTab)GUILayout.Toolbar((int)m_ActiveTab, new string[] { "Single", "Compare" },
                     EditorStyles.toolbarButton, GUILayout.ExpandWidth(false));
                 if (newTab != m_ActiveTab)
                 {
@@ -5169,7 +5274,7 @@ To compare two data sets:
 
         GUIContent GetLastFrameText(ProfileDataView context)
         {
-            var frameSummary =  context.analysis.GetFrameSummary();
+            var frameSummary = context.analysis.GetFrameSummary();
 
             string text;
             string tooltip;
@@ -5199,7 +5304,7 @@ To compare two data sets:
                 {
                     text = string.Format("{0}*", GetRemappedUIFrameIndex(frameSummary.last, context));
                     var ranges = RangesText(context);
-                    tooltip = string.Format("{0} frames selected\n\nframe ranges: {1} \n\nNot a consecutive sequence", frameSummary.count, ranges);;
+                    tooltip = string.Format("{0} frames selected\n\nframe ranges: {1} \n\nNot a consecutive sequence", frameSummary.count, ranges); ;
                 }
             }
 
@@ -5258,15 +5363,18 @@ To compare two data sets:
 
                     EditorGUILayout.BeginHorizontal();
                     Histogram histogram = new Histogram(m_2D, m_DisplayUnits.Units);
-                    histogram.Draw(LayoutSize.HistogramWidth, 40, frameSummary.buckets, frameSummary.count, 0, frameSummary.msMax, UIColor.bar);
+                    // buckets have been calculated with range min to max in SetupFrameBuckets during Analysis phase
+                    histogram.Draw(LayoutSize.HistogramWidth, 40, frameSummary.buckets, frameSummary.count, frameSummary.msMin, frameSummary.msMax, UIColor.bar);
 
                     BoxAndWhiskerPlot boxAndWhiskerPlot = new BoxAndWhiskerPlot(m_2D, m_DisplayUnits.Units);
 
+                    float yAxisStart = frameSummary.msMin;
+                    float yAxisEnd = frameSummary.msMax;
                     float plotWidth = 40 + GUI.skin.box.padding.horizontal;
                     float plotHeight = 40;
-                    boxAndWhiskerPlot.Draw(plotWidth, plotHeight, frameSummary.msMin, frameSummary.msLowerQuartile, frameSummary.msMedian, frameSummary.msUpperQuartile, frameSummary.msMax, 0, frameSummary.msMax, UIColor.standardLine, UIColor.standardLine);
+                    boxAndWhiskerPlot.Draw(plotWidth, plotHeight, frameSummary.msMin, frameSummary.msLowerQuartile, frameSummary.msMedian, frameSummary.msUpperQuartile, frameSummary.msMax, yAxisStart, yAxisEnd, UIColor.standardLine, UIColor.standardLine);
 
-                    boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, frameSummary.msMin, frameSummary.msMax,
+                    boxAndWhiskerPlot.DrawText(m_Columns.GetColumnWidth(3), plotHeight, yAxisStart, yAxisEnd,
                         "Min frame time for selected frames",
                         "Max frame time for selected frames");
 

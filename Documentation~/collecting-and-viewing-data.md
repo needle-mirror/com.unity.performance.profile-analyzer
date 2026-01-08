@@ -1,6 +1,6 @@
 # Collecting and viewing data
 
-This workflow explains how to populate the [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) and Profile Analyzer with data. Note that the Profile Analyzer only analyzes CPU data from the Profiler. 
+This workflow explains how to populate the [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) and Profile Analyzer with data. Note that the Profile Analyzer only analyzes CPU data from the Profiler.
 
 ## Step 1: Open the Unity Profiler
 

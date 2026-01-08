@@ -2,7 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+
+#if UNITY_6000_2_OR_NEWER
 using UnityEditor.IMGUI.Controls;
+using TreeView = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+using TreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+using UnityEditor.IMGUI.Controls;
+#endif
+
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -166,7 +175,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if (m_HideRemovedMarkers && marker.IsFullyIgnored())
                     continue;
 
-               var item = new ProfileTreeViewItem(index, 0, marker.name, marker);
+                var item = new ProfileTreeViewItem(index, 0, marker.name, marker);
                 root.AddChild(item);
                 float ms = item.data.msMedian;
                 if (ms > m_MaxMedian)
@@ -243,14 +252,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         string GetThreadName(ProfileTreeViewItem item)
         {
-            return m_ProfileAnalyzerWindow.GetUIThreadName(item.data.threads[0]);
+            var globalThreadIndex = item.data.globalThreadIndices[0];
+            string threadNameWithIndex = m_DataView.data.GetThreadNameFromIndex(globalThreadIndex);
+
+            return m_ProfileAnalyzerWindow.GetUIThreadName(threadNameWithIndex);
         }
 
         string GetThreadNames(ProfileTreeViewItem item)
         {
             var uiNames = new List<string>();
-            foreach (string threadNameWithIndex in item.data.threads)
+            foreach (var globalThreadIndex in item.data.globalThreadIndices)
             {
+                string threadNameWithIndex = m_DataView.data.GetThreadNameFromIndex(globalThreadIndex);
                 string uiName = m_ProfileAnalyzerWindow.GetUIThreadName(threadNameWithIndex);
 
                 uiNames.Add(uiName);
@@ -643,13 +656,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             switch (column)
             {
                 case MyColumns.Name:
-                {
-                    args.rowRect = cellRect;
-                    //base.RowGUI(args);
-                    //content = new GUIContent(item.data.name, item.data.name);
-                    ShowText(cellRect, content);
-                }
-                break;
+                    {
+                        args.rowRect = cellRect;
+                        //base.RowGUI(args);
+                        //content = new GUIContent(item.data.name, item.data.name);
+                        ShowText(cellRect, content);
+                    }
+                    break;
 
                 case MyColumns.State:
                 case MyColumns.Mean:

@@ -9,7 +9,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public string name;
         public int nameLowerCaseHash;   // lower case name hash for faster comparisons
 
-        public double msTotal;          // total time of this marker on a frame
+        public double msTotal;          // total time of this marker over all frames in the timeline
         public int count;               // total number of marker calls in the timeline (multiple per frame)
         public int countMin;            // min count per frame
         public int countMax;            // max count per frame
@@ -18,7 +18,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int countLowerQuartile;  // over all frames
         public int countUpperQuartile;  // over all frames
         public float countStandardDeviation;
-        public int lastFrame;
         public int presentOnFrameCount; // number of frames containing this marker
         public int firstFrameIndex;
         public float msMean;            // mean over all frames
@@ -38,7 +37,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int maxFrameIndex;
         public int minDepth;
         public int maxDepth;
-        public List<string> threads;
+        public List<int> globalThreadIndices;   // Index into profileData.GetThreadNameFromIndex
 
         const int bucketCount = 20;
         public int[] buckets;           // Each bucket contains 'number of frames' for 'sum of markers in the frame' in that range
@@ -48,12 +47,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public double timeRemoved;
         public double timeIgnored;
 
-        public MarkerData(string markerName)
+        public MarkerData(string markerName, int threadCount = 1)
         {
             buckets = new int[bucketCount];
             countBuckets = new int[bucketCount];
-            frames = new List<FrameTime>();
-            threads = new List<string>();
+            frames = new List<FrameTime>(1);    // Minimum of 1
+            globalThreadIndices = new List<int>(threadCount);
 
             name = markerName;
             nameLowerCaseHash = markerName.ToLower().GetHashCode();
@@ -66,7 +65,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             countLowerQuartile = 0;
             countUpperQuartile = 0;
             countStandardDeviation = 0f;
-            lastFrame = -1;
             presentOnFrameCount = 0;
             firstFrameIndex = -1;
             msMean = 0f;
@@ -214,11 +212,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     countBuckets[bucketIndex] = countBuckets[0];
                 }
             }
-        }
-
-        public static string GetFirstThread(MarkerData marker)
-        {
-            return marker != null ? marker.threads[0] : "";
         }
 
         public static float GetMsMax(MarkerData marker)

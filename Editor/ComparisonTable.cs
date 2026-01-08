@@ -3,7 +3,16 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using UnityEditor;
+
+#if UNITY_6000_2_OR_NEWER
 using UnityEditor.IMGUI.Controls;
+using TreeView = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItem = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+using TreeViewState = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+using UnityEditor.IMGUI.Controls;
+#endif
+
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -349,7 +358,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => Diff(l), ascending);
                         break;
                     case SortOption.ReverseDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => - Diff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => -Diff(l), ascending);
                         break;
                     case SortOption.DiffPercent:
                         orderedQuery = orderedQuery.ThenBy(l => DiffPercent(l), ascending).ThenBy(l => Diff(l), ascending);
@@ -367,7 +376,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => CountDiff(l), ascending);
                         break;
                     case SortOption.ReverseCountDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => - CountDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => -CountDiff(l), ascending);
                         break;
                     case SortOption.CountDiffPercent:
                         orderedQuery = orderedQuery.ThenBy(l => CountDiffPercent(l), ascending).ThenBy(l => CountDiff(l), ascending);
@@ -385,7 +394,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => CountMeanDiff(l), ascending);
                         break;
                     case SortOption.ReverseCountMeanDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => - CountMeanDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => -CountMeanDiff(l), ascending);
                         break;
                     case SortOption.CountMeanDiffPercent:
                         orderedQuery = orderedQuery.ThenBy(l => CountMeanDiffPercent(l), ascending).ThenBy(l => CountMeanDiff(l), ascending);
@@ -403,7 +412,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         orderedQuery = orderedQuery.ThenBy(l => TotalDiff(l), ascending);
                         break;
                     case SortOption.ReverseTotalDiff:
-                        orderedQuery = orderedQuery.ThenBy(l => - TotalDiff(l), ascending);
+                        orderedQuery = orderedQuery.ThenBy(l => -TotalDiff(l), ascending);
                         break;
                     case SortOption.TotalDiffPercent:
                         orderedQuery = orderedQuery.ThenBy(l => TotalDiffPercent(l), ascending).ThenBy(l => TotalDiff(l), ascending);
@@ -465,24 +474,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return GetRightMarker(item.data);
         }
 
-        string LeftFirstThread(ComparisonTreeViewItem item)
-        {
-            return m_ProfileAnalyzerWindow.GetUIThreadName(MarkerData.GetFirstThread(GetLeftMarker(item)));
-        }
-
-        string RightFirstThread(ComparisonTreeViewItem item)
-        {
-            return m_ProfileAnalyzerWindow.GetUIThreadName(MarkerData.GetFirstThread(GetRightMarker(item)));
-        }
-
-        string GetThreadNames(MarkerData marker)
+        string GetThreadNames(MarkerData marker, ProfileDataView view)
         {
             if (marker == null)
                 return "";
 
-            var uiNames = new List<string>();
-            foreach (string threadNameWithIndex in marker.threads)
+            var uiNames = new List<string>(marker.globalThreadIndices.Count);
+            foreach (int globalThreadIndex in marker.globalThreadIndices)
             {
+                string threadNameWithIndex = view.data.GetThreadNameFromIndex(globalThreadIndex);
                 string uiName = m_ProfileAnalyzerWindow.GetUIThreadName(threadNameWithIndex);
 
                 uiNames.Add(uiName);
@@ -505,12 +505,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         string LeftThreads(ComparisonTreeViewItem item)
         {
-            return GetThreadNames(GetLeftMarker(item));
+            return GetThreadNames(GetLeftMarker(item), m_LeftDataView);
         }
 
         string RightThreads(ComparisonTreeViewItem item)
         {
-            return GetThreadNames(GetRightMarker(item));
+            return GetThreadNames(GetRightMarker(item), m_RightDataView);
         }
 
         float LeftMedianSorting(ComparisonTreeViewItem item)
@@ -811,7 +811,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.Diff:
                     return myTypes.Order(l => Diff(l), ascending);
                 case SortOption.ReverseDiff:
-                    return myTypes.Order(l => - Diff(l), ascending);
+                    return myTypes.Order(l => -Diff(l), ascending);
                 case SortOption.DiffPercent:
                     return myTypes.Order(l => DiffPercent(l), ascending).ThenBy(l => Diff(l), ascending);
                 case SortOption.AbsDiff:
@@ -823,7 +823,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.CountDiff:
                     return myTypes.Order(l => CountDiff(l), ascending);
                 case SortOption.ReverseCountDiff:
-                    return myTypes.Order(l => - CountDiff(l), ascending);
+                    return myTypes.Order(l => -CountDiff(l), ascending);
                 case SortOption.CountDiffPercent:
                     return myTypes.Order(l => CountDiffPercent(l), ascending).ThenBy(l => CountDiff(l), ascending);
                 case SortOption.AbsCountDiff:
@@ -835,7 +835,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.CountMeanDiff:
                     return myTypes.Order(l => CountMeanDiff(l), ascending);
                 case SortOption.ReverseCountMeanDiff:
-                    return myTypes.Order(l => - CountMeanDiff(l), ascending);
+                    return myTypes.Order(l => -CountMeanDiff(l), ascending);
                 case SortOption.CountMeanDiffPercent:
                     return myTypes.Order(l => CountMeanDiffPercent(l), ascending).ThenBy(l => CountMeanDiff(l), ascending);
                 case SortOption.AbsCountMeanDiff:
@@ -847,7 +847,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case SortOption.TotalDiff:
                     return myTypes.Order(l => TotalDiff(l), ascending);
                 case SortOption.ReverseTotalDiff:
-                    return myTypes.Order(l => - TotalDiff(l), ascending);
+                    return myTypes.Order(l => -TotalDiff(l), ascending);
                 case SortOption.TotalDiffPercent:
                     return myTypes.Order(l => TotalDiffPercent(l), ascending).ThenBy(l => TotalDiff(l), ascending);
                 case SortOption.AbsTotalDiff:
@@ -1131,7 +1131,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
             }
             else
-            { 
+            {
                 item.cachedRowString[(int)MyColumns.Name] = new GUIContent(item.data.name, item.data.name);
                 item.cachedRowString[(int)MyColumns.State] = new GUIContent("", "");
             }
@@ -1203,12 +1203,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             switch (column)
             {
                 case MyColumns.Name:
-                {
-                    args.rowRect = cellRect;
-                    //base.RowGUI(args);
-                    ShowText(cellRect, content);
-                }
-                break;
+                    {
+                        args.rowRect = cellRect;
+                        //base.RowGUI(args);
+                        ShowText(cellRect, content);
+                    }
+                    break;
                 case MyColumns.State:
                 case MyColumns.LeftMedian:
                 case MyColumns.Diff:

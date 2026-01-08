@@ -29,18 +29,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (m_Material == null)
             {
                 var shader = Shader.Find(m_ShaderName);
-				if (shader == null)
-				{
-					Debug.LogFormat("Unable to locate shader {0}", m_ShaderName);
-					return false;
-				}
-				
-				m_Material = new Material(shader);
-				if (m_Material == null)
-				{
-					Debug.LogFormat("Unable to create material for {0}", m_ShaderName);
-					return false;
-				}
+                if (shader == null)
+                {
+                    Debug.LogFormat("Unable to locate shader {0}", m_ShaderName);
+                    return false;
+                }
+
+                m_Material = new Material(shader);
+                if (m_Material == null)
+                {
+                    Debug.LogFormat("Unable to create material for {0}", m_ShaderName);
+                    return false;
+                }
             }
 
             return true;
@@ -70,10 +70,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ClipRectEnabled = true;
 
             if (CheckAndSetupMaterial())
-			{
-				m_Material.SetFloat("_UseClipRect", m_ClipRectEnabled ? 1f : 0f);
-				m_Material.SetVector("_ClipRect", m_ClipRect);
-			}
+            {
+                m_Material.SetFloat("_UseClipRect", m_ClipRectEnabled ? 1f : 0f);
+                m_Material.SetVector("_ClipRect", m_ClipRect);
+            }
         }
 
         public void ClearClipRect()
@@ -81,10 +81,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ClipRectEnabled = false;
 
             if (CheckAndSetupMaterial())
-			{
-				m_Material.SetFloat("_UseClipRect", m_ClipRectEnabled ? 1f : 0f);
-				m_Material.SetVector("_ClipRect", m_ClipRect);
-			}
+            {
+                m_Material.SetFloat("_UseClipRect", m_ClipRectEnabled ? 1f : 0f);
+                m_Material.SetVector("_ClipRect", m_ClipRect);
+            }
         }
 
         public Rect GetClipRect()

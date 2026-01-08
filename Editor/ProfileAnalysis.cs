@@ -1,35 +1,26 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
     [Serializable]
     internal class ProfileAnalysis
     {
-        FrameSummary m_FrameSummary = new FrameSummary();
-        List<MarkerData> m_Markers = new List<MarkerData>();
-        List<ThreadData> m_Threads = new List<ThreadData>();
+        FrameSummary m_FrameSummary = new();
+        List<MarkerData> m_Markers;
+        List<ThreadData> m_Threads = new();
+        Dictionary<string, MarkerData> m_MarkersByName = new();
+        Dictionary<string, ThreadData> m_ThreadsByName = new();
 
-        public ProfileAnalysis()
+        public ProfileAnalysis() : this(0)
         {
-            m_FrameSummary.first = 0;
-            m_FrameSummary.last = 0;
-            m_FrameSummary.count = 0;
-            m_FrameSummary.msTotal = 0.0;
-            m_FrameSummary.msMin = float.MaxValue;
-            m_FrameSummary.msMax = 0.0f;
-            m_FrameSummary.minFrameIndex = 0;
-            m_FrameSummary.maxFrameIndex = 0;
-            m_FrameSummary.maxMarkerDepth = 0;
-            m_FrameSummary.totalMarkers = 0;
-            m_FrameSummary.markerCountMax = 0;
-            m_FrameSummary.markerCountMaxMean = 0.0f;
-            for (int b = 0; b < m_FrameSummary.buckets.Length; b++)
-                m_FrameSummary.buckets[b] = 0;
+        }
 
-            m_Markers.Clear();
-            m_Threads.Clear();
+        public ProfileAnalysis(int markerCount)
+        {
+            m_Markers = new List<MarkerData>(markerCount);
         }
 
         public void SetRange(int firstFrameIndex, int lastFrameIndex)
@@ -46,11 +37,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public void AddMarker(MarkerData marker)
         {
             m_Markers.Add(marker);
+            m_MarkersByName[marker.name] = marker;
         }
 
         public void AddThread(ThreadData thread)
         {
             m_Threads.Add(thread);
+            m_ThreadsByName[thread.threadNameWithIndex] = thread;
         }
 
         public void UpdateSummary(int frameIndex, float msFrame)
@@ -176,7 +169,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 marker.countUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).count;
 
                 marker.countMean = marker.presentOnFrameCount > 0 ? (float)marker.count / marker.presentOnFrameCount : 0f;
-                marker.frames.Sort(FrameTime.CompareMs);
+                //marker.frames.Sort(FrameTime.CompareMs);
+                marker.frames.Sort();   // Default is to sort by ms using the IComparable
                 marker.msMedian = GetPercentageOffset(marker.frames, 50, out marker.medianFrameIndex).ms;
                 marker.msLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).ms;
                 marker.msUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).ms;
@@ -204,9 +198,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public void SetupFrameBuckets(float timeScaleMax)
+        public void SetupFrameBuckets(float timeScaleMin, float timeScaleMax)
         {
-            float first = 0;
+            float first = timeScaleMin;
             float last = timeScaleMax;
             float range = last - first;
 
@@ -278,7 +272,31 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        public void Finalise(float timeScaleMax, int maxMarkerDepth)
+        public void UpdateThreadCounts()
+        {
+            foreach (var thread in m_Threads)
+            {
+                foreach (var otherThread in m_Threads)
+                {
+                    if (thread == otherThread)
+                        continue;
+
+                    if (thread.threadGroupIndex == otherThread.threadGroupIndex)
+                    {
+                        otherThread.threadsInGroup += 1;
+                        thread.threadsInGroup += 1;
+                    }
+                }
+            }
+        }
+
+        static readonly ProfilerMarkerAbstracted k_SetupMarkers = new ProfilerMarkerAbstracted("ProfileAnalysis.SetupMarkers");
+        static readonly ProfilerMarkerAbstracted k_SetupMarkerBuckets = new ProfilerMarkerAbstracted("ProfileAnalysis.SetupMarkerBuckets");
+        static readonly ProfilerMarkerAbstracted k_SetupFrameBuckets = new ProfilerMarkerAbstracted("ProfileAnalysis.SetupFrameBuckets");
+        static readonly ProfilerMarkerAbstracted k_UpdateThreadCounts = new ProfilerMarkerAbstracted("ProfileAnalysis.UpdateThreadCounts");
+        static readonly ProfilerMarkerAbstracted k_CalculateMedians = new ProfilerMarkerAbstracted("ProfileAnalysis.CalculateMedians");
+
+        public void Finalise(float timeScaleMin, float timeScaleMax, int maxMarkerDepth)
         {
             if (m_FrameSummary.frames.Count > 0)
             {
@@ -303,6 +321,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             //m_frameSummary.msFrame.Clear();
             m_FrameSummary.maxMarkerDepth = maxMarkerDepth;
 
+            if (timeScaleMin <= 0.0f)
+            {
+                // If max frame time range not specified then use the min frame value found.
+                timeScaleMin = m_FrameSummary.msMin;
+            }
+            else if (timeScaleMin > m_FrameSummary.msMin)
+            {
+                Debug.Log(string.Format("Expanding timeScaleMin {0} to match min value found {1}", timeScaleMin, m_FrameSummary.msMin));
+
+                // If max frame time range too small we must expand it.
+                timeScaleMin = m_FrameSummary.msMin;
+            }
+
             if (timeScaleMax <= 0.0f)
             {
                 // If max frame time range not specified then use the max frame value found.
@@ -316,14 +347,33 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 timeScaleMax = m_FrameSummary.msMax;
             }
 
-            SetupMarkers();
-            SetupMarkerBuckets();
-            SetupFrameBuckets(timeScaleMax);
+            using (k_SetupMarkers.Auto())
+            {
+                SetupMarkers();
+            }
+
+            using (k_SetupMarkerBuckets.Auto())
+            {
+                SetupMarkerBuckets();
+            }
+
+            using (k_SetupFrameBuckets.Auto())
+            {
+                SetupFrameBuckets(timeScaleMin, timeScaleMax);
+            }
+
+            using (k_UpdateThreadCounts.Auto())
+            {
+                UpdateThreadCounts();
+            }
 
             // Sort in median order (highest first)
             m_Markers.Sort(SortByAtMedian);
 
-            CalculateThreadMedians();
+            using (k_CalculateMedians.Auto())
+            {
+                CalculateThreadMedians();
+            }
         }
 
         int SortByAtMedian(MarkerData a, MarkerData b)
@@ -346,10 +396,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public ThreadData GetThreadByName(string threadNameWithIndex)
         {
-            foreach (var thread in m_Threads)
+            if (m_ThreadsByName.TryGetValue(threadNameWithIndex, out ThreadData thread))
             {
-                if (thread.threadNameWithIndex == threadNameWithIndex)
-                    return thread;
+                return thread;
             }
 
             return null;
@@ -390,13 +439,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (markerName == null)
                 return null;
 
-            for (int index = 0; index < m_Markers.Count; index++)
+            if (m_MarkersByName.TryGetValue(markerName, out MarkerData marker))
             {
-                var marker = m_Markers[index];
-                if (marker.name == markerName)
-                {
-                    return marker;
-                }
+                return marker;
             }
 
             return null;
