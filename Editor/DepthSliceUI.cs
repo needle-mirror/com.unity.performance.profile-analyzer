@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Video;
+using System.ComponentModel;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    [EditorBrowsable(EditorBrowsableState.Never)]
     [Serializable]
     public class DepthSliceUI
     {

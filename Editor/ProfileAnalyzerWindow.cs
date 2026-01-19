@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.ComponentModel;
 
 #if UNITY_6000_2_OR_NEWER
 using UnityEditor.IMGUI.Controls;
@@ -2082,6 +2083,7 @@ To compare two data sets:
             GetThreadNames(profleData, null, out threadUINames, out threadFilters, out threadNameToUIName);
         }
 
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public string GetUIThreadName(string threadNameWithIndex)
         {
             string threadName = "";
