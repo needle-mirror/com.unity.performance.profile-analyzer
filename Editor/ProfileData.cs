@@ -10,6 +10,69 @@ using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
 namespace UnityEditor.Performance.ProfileAnalyzer
 {
+    static class ReinterpretBits
+    {
+        public static UInt32 AsUInt32(float value)
+        {
+            unsafe
+            {
+                return *(UInt32*)&value;
+            }
+        }
+
+        public static UInt64 AsUInt64(double value)
+        {
+            unsafe
+            {
+                return *(UInt64*)&value;
+            }
+        }
+
+        public static float AsFloat(UInt32 value)
+        {
+            unsafe
+            {
+                return *(float*)&value;
+            }
+        }
+
+        public static double AsDouble(UInt64 value)
+        {
+            unsafe
+            {
+                return *(double*)&value;
+            }
+        }
+    }
+
+    internal static class BinaryReaderWriterExtensions
+    {
+        // It's really important that we do not write any floats or doubles to BinaryWriter because mono's implementation of
+        // BinaryWriter will convert floats and doubles to a byte array during endianness swapping which generates a ton of
+        // gc allocations. When pulling data for a profiling session in a large profile capture (gigabytes), these gc allocs
+        // can cost significant amounts of time (maybe 5 seconds out of 20 seconds of loading).
+        internal static void WriteSingleNoGC(this BinaryWriter writer, float value)
+        {
+            writer.Write(ReinterpretBits.AsUInt32(value));
+        }
+
+        internal static void WriteDoubleNoGC(this BinaryWriter writer, double value)
+        {
+            writer.Write(ReinterpretBits.AsUInt64(value));
+        }
+
+        // Would love to just name this ReadSingle() but BinaryReader.ReadSingle() already exists...
+        internal static float ReadSingleNoGC(this BinaryReader reader)
+        {
+            return ReinterpretBits.AsFloat(reader.ReadUInt32());
+        }
+
+        internal static double ReadDoubleNoGC(this BinaryReader reader)
+        {
+            return ReinterpretBits.AsDouble(reader.ReadUInt64());
+        }
+    }
+
     [Serializable]
     internal class ProfileData
     {
@@ -619,8 +682,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void Write(BinaryWriter writer)
         {
-            writer.Write(msStartTime);
-            writer.Write(msFrame);
+            writer.WriteDoubleNoGC(msStartTime);
+            writer.WriteSingleNoGC(msFrame);
             writer.Write(threads.Count);
             foreach (var thread in threads)
             {
@@ -635,16 +698,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 if (fileVersion >= 6)
                 {
-                    msStartTime = reader.ReadDouble();
+                    msStartTime = reader.ReadDoubleNoGC();
                 }
                 else
                 {
-                    double sStartTime = reader.ReadDouble();
+                    double sStartTime = reader.ReadDoubleNoGC();
                     msStartTime = sStartTime * 1000.0;
                 }
             }
 
-            msFrame = reader.ReadSingle();
+            msFrame = reader.ReadSingleNoGC();
             int threadCount = reader.ReadInt32();
             threads = new List<ProfileThread>(threadCount);
             for (int thread = 0; thread < threadCount; thread++)
@@ -753,17 +816,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public void Write(BinaryWriter writer)
         {
             writer.Write(nameIndex);
-            writer.Write(msMarkerTotal);
+            writer.WriteSingleNoGC(msMarkerTotal);
             writer.Write(depth);
         }
 
         public ProfileMarker(BinaryReader reader, int fileVersion)
         {
             nameIndex = reader.ReadInt32();
-            msMarkerTotal = reader.ReadSingle();
+            msMarkerTotal = reader.ReadSingleNoGC();
             depth = reader.ReadInt32();
             if (fileVersion == 3)   // In this version we saved the msChildren value but we don't need to as we now recalculate on load
-                msChildren = reader.ReadSingle();
+                msChildren = reader.ReadSingleNoGC();
             else
                 msChildren = 0.0f;
         }

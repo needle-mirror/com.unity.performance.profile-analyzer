@@ -22,6 +22,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         const float k_NsToMs = 1000000;
         ProgressBarDisplay m_progressBar;
 
+        // We used to create a new ProfilerFrameDataIterator in GetThreadCountForFrame() which caused a lot
+        // of GC overhead and caused SyncWithProfilerWindow() to spend a lot more time than necessary.
+        // To avoid this, we cache the iterator here and reuse it.
+        ProfilerFrameDataIterator m_cachedFrameDataToAvoidGC = new ProfilerFrameDataIterator();
+
+
         [NonSerialized] bool m_SendingSelectionEventToProfilerWindowInProgress = false;
         [NonSerialized] int m_LastSelectedFrameInProfilerWindow = 0;
 
@@ -283,9 +289,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!IsReady())
                 return 0;
 
-            ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
-            frameData.SetRoot(frameIndex, 0);
-            return frameData.GetThreadCount(frameIndex);
+            m_cachedFrameDataToAvoidGC.SetRoot(frameIndex, 0);
+            return m_cachedFrameDataToAvoidGC.GetThreadCount(frameIndex);
         }
 
         public ProfileFrame GetProfileFrameForThread(int frameIndex, int threadIndex)
