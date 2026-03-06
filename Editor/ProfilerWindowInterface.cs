@@ -43,7 +43,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         FieldInfo m_SelectedNameFieldInfo;
         FieldInfo m_SelectedTimeFieldInfo;
         FieldInfo m_SelectedDurationFieldInfo;
-        FieldInfo m_SelectedInstanceIdFieldInfo;
         FieldInfo m_SelectedFrameIdFieldInfo;
         FieldInfo m_SelectedThreadIndexFieldInfo;
         FieldInfo m_SelectedNativeIndexFieldInfo;
@@ -92,7 +91,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 m_SelectedNameFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("name", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedTimeFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("time", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedDurationFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("duration", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                m_SelectedInstanceIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("instanceId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 m_SelectedFrameIdFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("frameId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 // confusingly this is called threadId but is the thread _index_
                 m_SelectedThreadIndexFieldInfo = m_SelectedEntryFieldInfo.FieldType.GetField("threadId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -553,8 +551,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             {
                                 int displayIndex = data.OffsetToDisplayFrame(frameIndex);
 
-                                Debug.LogFormat("Ignoring Invalid marker time found for {0} on frame {1} on thread {2} ({3} < 0) : Instance id : {4}",
-                                    frameData.name, displayIndex, threadName, frameData.durationMS, frameData.instanceId);
+                                Debug.LogFormat("Ignoring Invalid marker time found for {0} on frame {1} on thread {2} ({3} < 0)",
+                                    frameData.name, displayIndex, threadName, frameData.durationMS);
 
                                 firstError = false;
                             }
@@ -642,13 +640,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             frameData.Dispose();
         }
 
-        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out int outNativeIndex, out float time, out float duration, out int instanceId)
+        bool GetMarkerInfo(string markerName, int frameIndex, List<string> threadFilters, out int outThreadIndex, out int outNativeIndex, out float time, out float duration)
         {
             outThreadIndex = 0;
             outNativeIndex = 0;
             time = 0.0f;
             duration = 0.0f;
-            instanceId = 0;
             bool found = false;
 
             var iterator = GetNextThreadIndexFittingThreadFilters(frameIndex, threadFilters);
@@ -661,7 +658,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         time = iterator.Current.frameData.startTimeMS;
                         duration = iterator.Current.frameData.durationMS;
-                        instanceId = iterator.Current.frameData.instanceId;
                         outNativeIndex = iterator.Current.frameData.sampleId;
                         outThreadIndex = iterator.Current.threadIndex;
                         found = true;
@@ -732,24 +728,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     int currentFrameIndex = (int)m_CurrentFrameFieldInfo.GetValue(m_ProfilerWindow);
                     float time;
                     float duration;
-                    int instanceId;
                     int nativeIndex;
                     int threadIndex;
-                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out nativeIndex, out time, out duration, out instanceId))
+                    if (GetMarkerInfo(markerName, currentFrameIndex, threadFilters, out threadIndex, out nativeIndex, out time, out duration))
                     {
-                        /*
-                        Debug.Log(string.Format("Setting profiler to {0} on {1} at frame {2} at {3}ms for {4}ms ({5})",
-                                                markerName, currentFrameIndex, threadFilter, time, duration, instanceId));
-                         */
-
                         if (m_SelectedNameFieldInfo != null)
                             m_SelectedNameFieldInfo.SetValue(selectedEntry, markerName);
                         if (m_SelectedTimeFieldInfo != null)
                             m_SelectedTimeFieldInfo.SetValue(selectedEntry, time);
                         if (m_SelectedDurationFieldInfo != null)
                             m_SelectedDurationFieldInfo.SetValue(selectedEntry, duration);
-                        if (m_SelectedInstanceIdFieldInfo != null)
-                            m_SelectedInstanceIdFieldInfo.SetValue(selectedEntry, instanceId);
                         if (m_SelectedFrameIdFieldInfo != null)
                             m_SelectedFrameIdFieldInfo.SetValue(selectedEntry, currentFrameIndex);
                         if (m_SelectedNativeIndexFieldInfo != null)
