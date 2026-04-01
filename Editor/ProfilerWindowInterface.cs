@@ -323,6 +323,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 int threadIndex = 0;
 
                 threadNameCount.Clear();
+
+                // Marker IDs from RawFrameDataView.GetSampleMarkerId() are not guaranteed
+                // to be stable across frames (e.g. when loading from .data files), so the
+                // ID-to-name cache must be rebuilt each frame.
+                markerIdToNameIndex.Clear();
+	
                 ProfileFrame frame = null;
                 while (true)
                 {
