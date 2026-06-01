@@ -20,4 +20,22 @@ The Frame Summary pane is a good way for you to see at an overview what frames m
 |**Lower Quartile**|Displays the lower [quartile](https://en.wikipedia.org/wiki/Quartile) of the data set. In Compare view, the Diff column shows the difference between the Right and Left timings.|
 |**Min**|The smallest (minimum) frame time in the data selection. In Compare view, the Diff column shows the difference between the Right and Left timings.|
 
-Underneath the statistics, the Profile Analyzer displays the timings as a histogram and box and whisker plot. For further information on the statistics available and how to analyze them, see the documentation on [Statistics in the Profile Analyzer](statistics.md).
+Underneath the statistics, the Profile Analyzer displays the timings as a histogram and box and whisker plot. For further information on the statistics available and how to analyze them, refer to [Statistics reference](statistics.md).
+
+## Frame GC Allocation Summary
+
+Directly below the Frame Summary, the **Frame GC Allocation Summary** foldout reports the equivalent statistics for **GC allocation bytes per frame** over the selected frame range. The Profile Analyzer derives these from the `GC.Alloc` profiler marker, so the panel reports per-frame totals across all sampled threads, not just the main thread.
+
+In Single view, each row shows the statistic, the value (formatted by `EditorUtility.FormatBytes`), and, where applicable, the frame index that produced the value. In Compare view the panel uses the same Left / Right / Diff layout as the rest of the Compare view summaries.
+
+|**Statistic**|**Description**|
+|---|---|
+|**Max**|The largest single-frame GC allocation in the selected range. Click the frame button next to the value to jump to that frame in the Profiler.|
+|**Upper Quartile**|The upper [quartile](https://en.wikipedia.org/wiki/Quartile) of per-frame allocation bytes.|
+|**Median**|The [median](https://en.wikipedia.org/wiki/Median) per-frame allocation, with a jump-to-frame button on the frame where the median value occurs.|
+|**Mean**|The [mean](https://en.wikipedia.org/wiki/Arithmetic_mean) per-frame allocation across the selected frames.|
+|**Lower Quartile**|The lower [quartile](https://en.wikipedia.org/wiki/Quartile) of per-frame allocation bytes.|
+|**Min**|The smallest per-frame GC allocation in the selected range, with a jump-to-frame button. A frame with no GC allocations reports 0 bytes; click the button to jump to the first such frame.|
+|**Total**|The sum of GC allocation bytes across all selected frames.|
+
+If the loaded capture has no `GC.Alloc` marker, for example when the capture predates the marker or it was filtered out before recording, the panel displays **"No GC allocation data in capture"** instead. In Compare view this message appears only when **neither** data set has GC allocation data; if one side has it and the other does not, the missing side's values render as zero.

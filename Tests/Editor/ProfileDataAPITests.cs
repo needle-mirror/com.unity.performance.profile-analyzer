@@ -19,13 +19,8 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
         var markerList = new List<ProfileMarker>();
         for (int i = 0; i < 10; ++i)
         {
-            var marker = new ProfileMarker()
-            {
-                msMarkerTotal = 0.5f,
-                depth = i
-            };
-
             int expectedIndex = i % markerNames.Count;
+            var marker = ProfileMarker.Create(0.5f, i);
             data.AddMarkerName(markerNames[expectedIndex], ref marker);
             markerList.Add(marker);
 
@@ -60,12 +55,11 @@ public class ProfileDataAPITests : ProfileAnalyzerBaseTest
 
             if (!threadDict.TryGetValue(threadName, out thread))
             {
-                thread = new ProfileThread();
+                thread = new ProfileThread(data.AddThreadName(threadName));
                 threadDict.Add(threadName, thread);
             }
 
-            data.AddThreadName(threadName, thread);
-            Assert.IsTrue(expectedIndex == thread.threadIndex, "Index mismatch at: " + i + " , " + thread.threadIndex); ;
+            Assert.IsTrue(expectedIndex == thread.threadIndex, "Index mismatch at: " + i + " , " + thread.threadIndex);
         }
 
         foreach (var curThread in threadDict)

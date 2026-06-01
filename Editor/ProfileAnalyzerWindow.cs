@@ -92,6 +92,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent median = new GUIContent("Median", "The central value in the data set");
             public static readonly GUIContent lowerQuartile = new GUIContent("Lower Quartile", "The middle number between the smallest number and the median of the data set. I.e. at 25% of the ordered data.");
             public static readonly GUIContent min = new GUIContent("Min", "The minimum value in the data set");
+            public static readonly GUIContent total = new GUIContent("Total", "Accumulated total over all selected frames");
             public static readonly GUIContent individualMin = new GUIContent("Individual Min", "The minimum value in the data set for an individual marker instance (not the total in the frame)");
             public static readonly GUIContent individualMax = new GUIContent("Individual Max", "The maximum value in the data set for an individual marker instance (not the total in the frame)");
 
@@ -115,6 +116,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public static readonly GUIContent frameCount = new GUIContent("Frame Count", "Frame Count");
             public static readonly GUIContent frameStart = new GUIContent("Start", "Frame Start");
             public static readonly GUIContent frameEnd = new GUIContent("End", "Frame End");
+            public static readonly GUIContent frameGcAllocSummary = new GUIContent("Frame GC Allocation Summary", "");
             public static readonly GUIContent threadSummary = new GUIContent("Thread Summary", "");
             public static readonly GUIContent threadGraphScale = new GUIContent("Graph Scale : ", "");
             public static readonly GUIContent[] threadRanges =
@@ -125,6 +127,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             };
 
             public static readonly GUIContent markerSummary = new GUIContent("Marker Summary", "");
+            public static readonly GUIContent markerGcAllocSummary = new GUIContent("Marker GC Allocation Summary", "");
             public static readonly GUIContent filters = new GUIContent("Filters", "");
             public static readonly GUIContent profileTable = new GUIContent("Marker Details for currently selected range", "");
             public static readonly GUIContent comparisonTable = new GUIContent("Marker Comparison for currently selected range", "");
@@ -282,7 +285,6 @@ To compare two data sets:
         ThreadSelection m_ThreadSelectionNew;
         string m_ThreadSelectionSummary;
 
-        [SerializeField]
         DisplayUnits m_DisplayUnits = new DisplayUnits(Units.Milliseconds);
         string[] m_UnitNames;
 
@@ -291,9 +293,7 @@ To compare two data sets:
         [SerializeField]
         string m_NameExclude = "";
 
-        [SerializeField]
         MarkerColumnFilter m_SingleModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
-        [SerializeField]
         MarkerColumnFilter m_CompareModeFilter = new MarkerColumnFilter(MarkerColumnFilter.Mode.TimeAndCount);
 
         [SerializeField]
@@ -326,9 +326,13 @@ To compare two data sets:
         [SerializeField]
         bool m_ShowFrameSummary = true;
         [SerializeField]
+        bool m_ShowFrameMemorySummary = true;
+        [SerializeField]
         bool m_ShowThreadSummary = false;
         [SerializeField]
         bool m_ShowMarkerSummary = true;
+        [SerializeField]
+        bool m_ShowMarkerGcAllocSummary = true;
         [SerializeField]
         bool m_ShowMarkerTable = true;
 
@@ -423,10 +427,10 @@ To compare two data sets:
         internal static class LayoutSize
         {
             public static readonly int WidthColumn0 = 100;
-            public static readonly int WidthColumn1 = 52;       // +2 to prevent some
-            public static readonly int WidthColumn2 = 52;
-            public static readonly int WidthColumn3 = 52;
-            public static readonly int WidthRHS = 290;        // Column widths + label padding between (276) + scrollbar width
+            public static readonly int WidthColumn1 = 66;
+            public static readonly int WidthColumn2 = 66;
+            public static readonly int WidthColumn3 = 66;
+            public static readonly int WidthRHS = 332;        // Column widths + label padding between + scrollbar width
             public static readonly int FilterOptionsLeftLabelWidth = 100;
             public static readonly int FilterOptionsEnumWidth = 50;
             public static readonly int RemoveMarkerOptionsEnumWidth = 100;
@@ -502,11 +506,8 @@ To compare two data sets:
         bool m_NewComparisonDataLoaded = false;
 
         Vector2 m_HelpScroll = new Vector2(0, 0);
-        Vector2 m_ThreadScroll = new Vector2(0, 0);
-        Vector2 m_MarkerSummaryScroll = new Vector2(0, 0);
-
-        Rect m_ThreadsAreaRect = new Rect();
-        Rect m_ComparisonThreadsAreaRect = new Rect();
+        Vector2 m_RightColumnScroll = new Vector2(0, 0);
+        float m_RightColumnViewportHeight = 800f;
 
         Vector2 m_LastScreenSize = new Vector2(0, 0);
         bool m_ScreenSizeChanged;
@@ -3061,6 +3062,13 @@ To compare two data sets:
             return m_DisplayUnits.ToGUIContentWithTooltips(ms, showUnits, 5, frameIndex);
         }
 
+        internal GUIContent ToMemoryUnits(long bytes, bool showUnits = false, int frameIndex = -1)
+        {
+            string label = bytes < 0 ? $"-{EditorUtility.FormatBytes(-bytes)}" : EditorUtility.FormatBytes(bytes);
+            string tooltip = frameIndex >= 0 ? $"{bytes} B on frame {frameIndex}" : $"{bytes} B";
+            return new GUIContent(label, tooltip);
+        }
+
         void SetUnits(Units units)
         {
             m_DisplayUnits = new DisplayUnits(units);
@@ -3807,7 +3815,7 @@ To compare two data sets:
                                 EditorGUILayout.BeginHorizontal();
                                 FrameSummary frameSummary = m_ProfileSingleView.analysis.GetFrameSummary();
                                 if (frameSummary.count > 0)
-                                    DrawFrameIndexButton(frameSummary.medianFrameIndex, m_ProfileSingleView);
+                                    DrawFrameIndexButton(frameSummary.msMedianFrameIndex, m_ProfileSingleView);
                                 else
                                     GUILayout.Label("", GUILayout.MinWidth(50));
 
@@ -3871,11 +3879,24 @@ To compare two data sets:
 
                 EditorGUILayout.EndVertical();
 
-                EditorGUILayout.BeginVertical(GUILayout.Width(LayoutSize.WidthRHS));
+                float singleRightScrollBarWidth = GUI.skin.verticalScrollbar.fixedWidth +
+                    GUI.skin.verticalScrollbar.border.horizontal +
+                    GUI.skin.verticalScrollbar.margin.horizontal +
+                    GUI.skin.verticalScrollbar.padding.horizontal;
+                EditorGUILayout.BeginVertical(GUILayout.Width(LayoutSize.WidthRHS + singleRightScrollBarWidth));
                 GUILayout.Space(4);
+                m_RightColumnScroll = EditorGUILayout.BeginScrollView(m_RightColumnScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
+                Rect singleRightClipRect = new Rect(m_RightColumnScroll.x, m_RightColumnScroll.y, LayoutSize.WidthRHS, m_RightColumnViewportHeight);
+                m_2D.SetClipRect(singleRightClipRect);
                 DrawFrameSummary();
+                DrawFrameMemorySummary();
                 DrawThreadSummary();
                 DrawSelected();
+                DrawSelectedGcAllocSummary();
+                m_2D.ClearClipRect();
+                EditorGUILayout.EndScrollView();
+                if (Event.current.type == EventType.Repaint)
+                    m_RightColumnViewportHeight = GUILayoutUtility.GetLastRect().height;
                 EditorGUILayout.EndVertical();
 
                 EditorGUILayout.EndHorizontal();
@@ -4190,12 +4211,12 @@ To compare two data sets:
                     string units = GetDisplayUnits();
                     m_Columns.Draw4("", units, units, units);
 
-                    Draw4DiffMs(Styles.max, leftFrameSummary.msMax, leftFrameSummary.maxFrameIndex, rightFrameSummary.msMax, rightFrameSummary.maxFrameIndex);
+                    Draw4DiffMs(Styles.max, leftFrameSummary.msMax, leftFrameSummary.msMaxFrameIndex, rightFrameSummary.msMax, rightFrameSummary.msMaxFrameIndex);
                     Draw4DiffMs(Styles.upperQuartile, leftFrameSummary.msUpperQuartile, rightFrameSummary.msUpperQuartile);
-                    Draw4DiffMs(Styles.median, leftFrameSummary.msMedian, leftFrameSummary.medianFrameIndex, rightFrameSummary.msMedian, rightFrameSummary.medianFrameIndex);
+                    Draw4DiffMs(Styles.median, leftFrameSummary.msMedian, leftFrameSummary.msMedianFrameIndex, rightFrameSummary.msMedian, rightFrameSummary.msMedianFrameIndex);
                     Draw4DiffMs(Styles.mean, leftFrameSummary.msMean, rightFrameSummary.msMean);
                     Draw4DiffMs(Styles.lowerQuartile, leftFrameSummary.msLowerQuartile, rightFrameSummary.msLowerQuartile);
-                    Draw4DiffMs(Styles.min, leftFrameSummary.msMin, leftFrameSummary.minFrameIndex, rightFrameSummary.msMin, rightFrameSummary.minFrameIndex);
+                    Draw4DiffMs(Styles.min, leftFrameSummary.msMin, leftFrameSummary.msMinFrameIndex, rightFrameSummary.msMin, rightFrameSummary.msMinFrameIndex);
 
                     GUIStyle style = GUI.skin.label;
                     GUILayout.Space(style.lineHeight);
@@ -4246,6 +4267,59 @@ To compare two data sets:
             if (m_ShowFrameSummary != lastShowFrameSummary)
             {
                 ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Frames, analytic.GetDurationInSeconds(), m_ShowFrameSummary);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        void DrawComparisonFrameMemorySummary()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
+
+            bool lastShowFrameMemorySummary = m_ShowFrameMemorySummary;
+            m_ShowFrameMemorySummary = BoldFoldout(m_ShowFrameMemorySummary, Styles.frameGcAllocSummary);
+            var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+            if (m_ShowFrameMemorySummary)
+            {
+                EditorGUILayout.BeginVertical();
+
+                if (IsAnalysisValid())
+                {
+                    bool leftHasGc = m_ProfileLeftView.data != null && m_ProfileLeftView.data.gcAllocMarkerNameIndex != -1;
+                    bool rightHasGc = m_ProfileRightView.data != null && m_ProfileRightView.data.gcAllocMarkerNameIndex != -1;
+
+                    if (leftHasGc || rightHasGc)
+                    {
+                        var leftFrameSummary = m_ProfileLeftView.analysis.GetFrameSummary();
+                        var rightFrameSummary = m_ProfileRightView.analysis.GetFrameSummary();
+
+                        m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
+                        m_Columns.Draw4("", "Left", "Right", "Diff");
+
+                        Draw4DiffBytes(Styles.max, leftFrameSummary.bytesMax, leftFrameSummary.bytesMaxFrameIndex, rightFrameSummary.bytesMax, rightFrameSummary.bytesMaxFrameIndex);
+                        Draw4DiffBytes(Styles.upperQuartile, leftFrameSummary.bytesUpperQuartile, rightFrameSummary.bytesUpperQuartile);
+                        Draw4DiffBytes(Styles.median, leftFrameSummary.bytesMedian, leftFrameSummary.bytesMedianFrameIndex, rightFrameSummary.bytesMedian, rightFrameSummary.bytesMedianFrameIndex);
+                        Draw4DiffBytes(Styles.mean, leftFrameSummary.bytesMean, rightFrameSummary.bytesMean);
+                        Draw4DiffBytes(Styles.lowerQuartile, leftFrameSummary.bytesLowerQuartile, rightFrameSummary.bytesLowerQuartile);
+                        Draw4DiffBytes(Styles.min, leftFrameSummary.bytesMin, leftFrameSummary.bytesMinFrameIndex, rightFrameSummary.bytesMin, rightFrameSummary.bytesMinFrameIndex);
+                        Draw4DiffBytes(Styles.total, leftFrameSummary.bytesTotal, rightFrameSummary.bytesTotal);
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField("No GC allocation data in capture");
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No analysis data selected");
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (m_ShowFrameMemorySummary != lastShowFrameMemorySummary)
+            {
+                ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Frames, analytic.GetDurationInSeconds(), m_ShowFrameMemorySummary);
             }
 
             EditorGUILayout.EndVertical();
@@ -4362,9 +4436,6 @@ To compare two data sets:
 
                     m_Columns.Draw3(Styles.emptyString, Styles.median, Styles.thread);
 
-                    m_ThreadScroll = EditorGUILayout.BeginScrollView(m_ThreadScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
-                    Rect clipRect = new Rect(m_ThreadScroll.x, m_ThreadScroll.y, m_ComparisonThreadsAreaRect.width, m_ComparisonThreadsAreaRect.height);
-                    m_2D.SetClipRect(clipRect);
                     for (int i = 0; i < m_ThreadUINames.Count; i++)
                     {
                         string threadNameWithIndex = m_ThreadNames[i];
@@ -4400,14 +4471,6 @@ To compare two data sets:
                         m_Columns.Draw(1, (threadRight != null) ? ToDisplayUnitsWithTooltips(threadRight.msMedian) : Styles.noThread);
                         m_Columns.Draw(2, "");
                         EditorGUILayout.EndHorizontal();
-                    }
-                    m_2D.ClearClipRect();
-                    EditorGUILayout.EndScrollView();
-
-                    if (Event.current.type == EventType.Repaint)
-                    {
-                        // This value is not valid at layout phase
-                        m_ComparisonThreadsAreaRect = GUILayoutUtility.GetLastRect();
                     }
                 }
                 else
@@ -4546,14 +4609,14 @@ To compare two data sets:
                                 {
                                     FrameSummary frameSummary = m_ProfileLeftView.analysis.GetFrameSummary();
                                     if (frameSummary.count > 0)
-                                        leftMedian = frameSummary.medianFrameIndex;
+                                        leftMedian = frameSummary.msMedianFrameIndex;
                                 }
 
                                 if (m_ProfileRightView.analysis != null)
                                 {
                                     FrameSummary frameSummary = m_ProfileRightView.analysis.GetFrameSummary();
                                     if (frameSummary.count > 0)
-                                        rightMedian = frameSummary.medianFrameIndex;
+                                        rightMedian = frameSummary.msMedianFrameIndex;
                                 }
 
                                 int maxMedian = Math.Max(leftMedian, rightMedian);
@@ -4641,11 +4704,24 @@ To compare two data sets:
 
                 EditorGUILayout.EndVertical();
 
-                EditorGUILayout.BeginVertical(GUILayout.Width(LayoutSize.WidthRHS));
+                float compareRightScrollBarWidth = GUI.skin.verticalScrollbar.fixedWidth +
+                    GUI.skin.verticalScrollbar.border.horizontal +
+                    GUI.skin.verticalScrollbar.margin.horizontal +
+                    GUI.skin.verticalScrollbar.padding.horizontal;
+                EditorGUILayout.BeginVertical(GUILayout.Width(LayoutSize.WidthRHS + compareRightScrollBarWidth));
                 GUILayout.Space(4);
+                m_RightColumnScroll = EditorGUILayout.BeginScrollView(m_RightColumnScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
+                Rect compareRightClipRect = new Rect(m_RightColumnScroll.x, m_RightColumnScroll.y, LayoutSize.WidthRHS, m_RightColumnViewportHeight);
+                m_2D.SetClipRect(compareRightClipRect);
                 DrawComparisonFrameSummary();
+                DrawComparisonFrameMemorySummary();
                 DrawComparisonThreadSummary();
                 DrawComparisonSelected();
+                DrawComparisonSelectedGcAllocSummary();
+                m_2D.ClearClipRect();
+                EditorGUILayout.EndScrollView();
+                if (Event.current.type == EventType.Repaint)
+                    m_RightColumnViewportHeight = GUILayoutUtility.GetLastRect().height;
                 EditorGUILayout.EndVertical();
 
                 EditorGUILayout.EndHorizontal();
@@ -4678,6 +4754,39 @@ To compare two data sets:
             Draw4DiffMs(Styles.individualMin, MarkerData.GetMsMinIndividual(leftMarker), MarkerData.GetMsMinIndividual(rightMarker));
         }
 
+        void DrawComparisonSelectedGcAllocStats(MarkerData leftMarker, MarkerData rightMarker)
+        {
+            long leftBytesMax = leftMarker != null && leftMarker.bytesAllocatedMax != long.MinValue ? leftMarker.bytesAllocatedMax : 0;
+            long rightBytesMax = rightMarker != null && rightMarker.bytesAllocatedMax != long.MinValue ? rightMarker.bytesAllocatedMax : 0;
+
+            long leftBytesUpperQuartile = leftMarker != null ? leftMarker.bytesAllocatedUpperQuartile : 0;
+            long rightBytesUpperQuartile = rightMarker != null ? rightMarker.bytesAllocatedUpperQuartile : 0;
+
+            long leftBytesMedian = leftMarker != null ? leftMarker.bytesAllocatedMedian : 0;
+            long rightBytesMedian = rightMarker != null ? rightMarker.bytesAllocatedMedian : 0;
+
+            long leftBytesMean = leftMarker != null ? leftMarker.bytesAllocatedMean : 0;
+            long rightBytesMean = rightMarker != null ? rightMarker.bytesAllocatedMean : 0;
+
+            long leftBytesLowerQuartile = leftMarker != null ? leftMarker.bytesAllocatedLowerQuartile : 0;
+            long rightBytesLowerQuartile = rightMarker != null ? rightMarker.bytesAllocatedLowerQuartile : 0;
+
+            long leftBytesMin = leftMarker != null && leftMarker.bytesAllocatedMin != long.MaxValue ? leftMarker.bytesAllocatedMin : 0;
+            long rightBytesMin = rightMarker != null && rightMarker.bytesAllocatedMin != long.MaxValue ? rightMarker.bytesAllocatedMin : 0;
+
+            long leftBytesTotal = leftMarker != null ? leftMarker.bytesAllocatedTotal : 0;
+            long rightBytesTotal = rightMarker != null ? rightMarker.bytesAllocatedTotal : 0;
+
+            m_Columns.Draw4("", "Left", "Right", "Diff");
+            Draw4DiffBytes(Styles.max, leftBytesMax, MarkerData.GetBytesAllocatedMaxFrameIndex(leftMarker), rightBytesMax, MarkerData.GetBytesAllocatedMaxFrameIndex(rightMarker));
+            Draw4DiffBytes(Styles.upperQuartile, leftBytesUpperQuartile, rightBytesUpperQuartile);
+            Draw4DiffBytes(Styles.median, leftBytesMedian, MarkerData.GetBytesAllocatedMedianFrameIndex(leftMarker), rightBytesMedian, MarkerData.GetBytesAllocatedMedianFrameIndex(rightMarker));
+            Draw4DiffBytes(Styles.mean, leftBytesMean, rightBytesMean);
+            Draw4DiffBytes(Styles.lowerQuartile, leftBytesLowerQuartile, rightBytesLowerQuartile);
+            Draw4DiffBytes(Styles.min, leftBytesMin, MarkerData.GetBytesAllocatedMinFrameIndex(leftMarker), rightBytesMin, MarkerData.GetBytesAllocatedMinFrameIndex(rightMarker));
+            Draw4DiffBytes(Styles.total, leftBytesTotal, rightBytesTotal);
+        }
+
         void DrawComparisonSelected()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
@@ -4700,10 +4809,6 @@ To compare two data sets:
                     {
                         if (pairingAt >= 0 && pairingAt < m_Pairings.Count)
                         {
-                            m_MarkerSummaryScroll = GUILayout.BeginScrollView(m_MarkerSummaryScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
-                            Rect clipRect = new Rect(m_MarkerSummaryScroll.x, m_MarkerSummaryScroll.y, LayoutSize.WidthRHS, 500);
-                            m_2D.SetClipRect(clipRect);
-
                             EditorGUILayout.BeginVertical();
 
                             var pairing = m_Pairings[pairingAt];
@@ -4720,14 +4825,8 @@ To compare two data sets:
 
                             EditorGUILayout.BeginHorizontal();
                             m_Columns.Draw(0, Styles.firstFrame);
-                            if (leftMarker != null)
-                                DrawFrameIndexButton(leftMarker.firstFrameIndex, m_ProfileLeftView);
-                            else
-                                m_Columns.Draw(1, Styles.emptyString);
-                            if (rightMarker != null)
-                                DrawFrameIndexButton(rightMarker.firstFrameIndex, m_ProfileRightView);
-                            else
-                                m_Columns.Draw(2, Styles.emptyString);
+                            DrawFrameIndexButtonInColumn(leftMarker != null ? leftMarker.firstFrameIndex : -1, m_ProfileLeftView, 1);
+                            DrawFrameIndexButtonInColumn(rightMarker != null ? rightMarker.firstFrameIndex : -1, m_ProfileRightView, 2);
                             EditorGUILayout.EndHorizontal();
 
                             DrawTopComparison(leftMarker, rightMarker);
@@ -4821,9 +4920,6 @@ To compare two data sets:
                             DrawComparisonSelectedStats(leftMarker, rightMarker);
 
                             EditorGUILayout.EndVertical();
-
-                            m_2D.ClearClipRect();
-                            GUILayout.EndScrollView();
                         }
                         else
                         {
@@ -4842,6 +4938,76 @@ To compare two data sets:
             if (m_ShowMarkerSummary != lastMarkerSummary)
             {
                 ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Markers, analytic.GetDurationInSeconds(), m_ShowMarkerSummary);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        void DrawComparisonSelectedGcAllocSummary()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
+
+            bool lastMarkerGcAllocSummary = m_ShowMarkerGcAllocSummary;
+            m_ShowMarkerGcAllocSummary = BoldFoldout(m_ShowMarkerGcAllocSummary, Styles.markerGcAllocSummary);
+            var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+            if (m_ShowMarkerGcAllocSummary)
+            {
+                EditorGUILayout.BeginVertical(); // To match indenting on the marker summary where a scroll area is present
+
+                if (IsAnalysisValid())
+                {
+                    List<MarkerData> leftMarkers = m_ProfileLeftView.analysis.GetMarkers();
+                    List<MarkerData> rightMarkers = m_ProfileRightView.analysis.GetMarkers();
+                    int pairingAt = m_SelectedPairing;
+                    if (leftMarkers != null && rightMarkers != null && m_Pairings != null)
+                    {
+                        if (pairingAt >= 0 && pairingAt < m_Pairings.Count)
+                        {
+                            EditorGUILayout.BeginVertical();
+
+                            var pairing = m_Pairings[pairingAt];
+
+                            var leftMarker = (pairing.leftIndex >= 0 && pairing.leftIndex < leftMarkers.Count) ? leftMarkers[pairing.leftIndex] : null;
+                            var rightMarker = (pairing.rightIndex >= 0 && pairing.rightIndex < rightMarkers.Count) ? rightMarkers[pairing.rightIndex] : null;
+
+                            EditorGUILayout.LabelField(pairing.name,
+                                GUILayout.MaxWidth(LayoutSize.WidthRHS -
+                                    (GUI.skin.box.padding.horizontal + GUI.skin.box.margin.horizontal)));
+
+                            m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
+
+                            bool leftHasGcAllocs = leftMarker != null && leftMarker.bytesAllocatedTotal > 0;
+                            bool rightHasGcAllocs = rightMarker != null && rightMarker.bytesAllocatedTotal > 0;
+                            if (leftHasGcAllocs || rightHasGcAllocs)
+                            {
+                                EditorGUILayout.BeginHorizontal();
+                                m_Columns.Draw(0, Styles.firstFrame);
+                                DrawFrameIndexButtonInColumn(leftHasGcAllocs ? leftMarker.firstFrameIndex : -1, m_ProfileLeftView, 1);
+                                DrawFrameIndexButtonInColumn(rightHasGcAllocs ? rightMarker.firstFrameIndex : -1, m_ProfileRightView, 2);
+                                EditorGUILayout.EndHorizontal();
+                            }
+
+                            DrawComparisonSelectedGcAllocStats(leftMarker, rightMarker);
+
+                            EditorGUILayout.EndVertical();
+                        }
+                        else
+                        {
+                            EditorGUILayout.LabelField("Marker not in selection");
+                        }
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No marker data selected");
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (m_ShowMarkerGcAllocSummary != lastMarkerGcAllocSummary)
+            {
+                ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Markers, analytic.GetDurationInSeconds(), m_ShowMarkerGcAllocSummary);
             }
 
             EditorGUILayout.EndVertical();
@@ -5353,12 +5519,12 @@ To compare two data sets:
                     m_Columns.Draw(0, "");
                     m_Columns.Draw3("", GetDisplayUnits(), "Frame");
 
-                    Draw3LabelMsFrame(Styles.max, frameSummary.msMax, frameSummary.maxFrameIndex, m_ProfileSingleView);
+                    Draw3LabelMsFrame(Styles.max, frameSummary.msMax, frameSummary.msMaxFrameIndex, m_ProfileSingleView);
                     Draw2LabelMs(Styles.upperQuartile, frameSummary.msUpperQuartile);
-                    Draw3LabelMsFrame(Styles.median, frameSummary.msMedian, frameSummary.medianFrameIndex, m_ProfileSingleView);
+                    Draw3LabelMsFrame(Styles.median, frameSummary.msMedian, frameSummary.msMedianFrameIndex, m_ProfileSingleView);
                     Draw2LabelMs(Styles.mean, frameSummary.msMean);
                     Draw2LabelMs(Styles.lowerQuartile, frameSummary.msLowerQuartile);
-                    Draw3LabelMsFrame(Styles.min, frameSummary.msMin, frameSummary.minFrameIndex, m_ProfileSingleView);
+                    Draw3LabelMsFrame(Styles.min, frameSummary.msMin, frameSummary.msMinFrameIndex, m_ProfileSingleView);
 
                     GUIStyle style = GUI.skin.label;
                     GUILayout.Space(style.lineHeight);
@@ -5393,6 +5559,55 @@ To compare two data sets:
             if (m_ShowFrameSummary != lastShowFrameSummary)
             {
                 ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Frames, analytic.GetDurationInSeconds(), m_ShowFrameSummary);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        void DrawFrameMemorySummary()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
+
+            bool lastShowFrameSummary = m_ShowFrameMemorySummary;
+            m_ShowFrameMemorySummary = BoldFoldout(m_ShowFrameMemorySummary, Styles.frameGcAllocSummary);
+            var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+            if (m_ShowFrameMemorySummary)
+            {
+                EditorGUILayout.BeginVertical(); // To match indenting on the marker summary where a scroll area is present
+
+                if (IsAnalysisValid())
+                {
+                    if (m_ProfileSingleView.data != null && m_ProfileSingleView.data.gcAllocMarkerNameIndex != -1)
+                    {
+                        var frameSummary = m_ProfileSingleView.analysis.GetFrameSummary();
+
+                        m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
+                        m_Columns.Draw3("", "GC Alloc", "Frame");
+
+                        Draw3LabelBytesFrame(Styles.max, frameSummary.bytesMax, frameSummary.bytesMaxFrameIndex, m_ProfileSingleView);
+                        Draw2LabelBytes(Styles.upperQuartile, frameSummary.bytesUpperQuartile);
+                        Draw3LabelBytesFrame(Styles.median, frameSummary.bytesMedian, frameSummary.bytesMedianFrameIndex, m_ProfileSingleView);
+                        Draw2LabelBytes(Styles.mean, frameSummary.bytesMean);
+                        Draw2LabelBytes(Styles.lowerQuartile, frameSummary.bytesLowerQuartile);
+                        Draw3LabelBytesFrame(Styles.min, frameSummary.bytesMin, frameSummary.bytesMinFrameIndex, m_ProfileSingleView);
+                        Draw2LabelBytes(Styles.total, frameSummary.bytesTotal);
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField("No GC allocation data in capture");
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No analysis data selected");
+                }
+
+                EditorGUILayout.EndVertical();
+            }
+
+            if (m_ShowFrameMemorySummary != lastShowFrameSummary)
+            {
+                ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Frames, analytic.GetDurationInSeconds(), m_ShowFrameMemorySummary);
             }
 
             EditorGUILayout.EndVertical();
@@ -5447,9 +5662,6 @@ To compare two data sets:
                     m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2 + LayoutSize.WidthColumn3, 0);
                     m_Columns.Draw3("", "Median", "Thread");
 
-                    m_ThreadScroll = EditorGUILayout.BeginScrollView(m_ThreadScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
-                    Rect clipRect = new Rect(m_ThreadScroll.x, m_ThreadScroll.y, m_ThreadsAreaRect.width, m_ThreadsAreaRect.height);
-                    m_2D.SetClipRect(clipRect);
                     for (int i = 0; i < m_ThreadUINames.Count; i++)
                     {
                         string threadNameWithIndex = m_ThreadNames[i];
@@ -5473,14 +5685,6 @@ To compare two data sets:
                         m_Columns.Draw(1, ToDisplayUnitsWithTooltips(thread.msMedian));
                         m_Columns.Draw(2, GetThreadNameWithGroupTooltip(thread.threadNameWithIndex, singleThread));
                         EditorGUILayout.EndHorizontal();
-                    }
-                    m_2D.ClearClipRect();
-                    EditorGUILayout.EndScrollView();
-
-                    if (Event.current.type == EventType.Repaint)
-                    {
-                        // This value is not valid at layout phase
-                        m_ThreadsAreaRect = GUILayoutUtility.GetLastRect();
                     }
                 }
                 else
@@ -5563,6 +5767,17 @@ To compare two data sets:
             return maxWidth;
         }
 
+        // Draws a frame-jump button (or an empty slot) pinned to the given column's width, so the
+        // right slot stays in place whether or not the left slot has a button.
+        void DrawFrameIndexButtonInColumn(int frameIndex, ProfileDataView frameContext, int columnIndex)
+        {
+            EditorGUILayout.BeginHorizontal(GUILayout.Width(m_Columns.GetColumnWidth(columnIndex)));
+            if (frameIndex >= 0 && frameContext != null)
+                DrawFrameIndexButton(frameIndex, frameContext);
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+        }
+
         internal void DrawFrameIndexButton(Rect rect, int frameIndex, ProfileDataView frameContext)
         {
             if (frameIndex < 0)
@@ -5606,6 +5821,23 @@ To compare two data sets:
             EditorGUILayout.EndHorizontal();
         }
 
+        void Draw3LabelBytesFrame(GUIContent col1, long bytes, int frameIndex, ProfileDataView frameContext)
+        {
+            EditorGUILayout.BeginHorizontal();
+            m_Columns.Draw(0, col1);
+            m_Columns.Draw(1, ToMemoryUnits(bytes));
+            DrawFrameIndexButton(frameIndex, frameContext);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        void Draw2LabelBytes(GUIContent col1, long bytes)
+        {
+            EditorGUILayout.BeginHorizontal();
+            m_Columns.Draw(0, col1);
+            m_Columns.Draw(1, ToMemoryUnits(bytes));
+            EditorGUILayout.EndHorizontal();
+        }
+
         void Draw4DiffMs(GUIContent col1, float msLeft, float msRight)
         {
             EditorGUILayout.BeginHorizontal();
@@ -5623,6 +5855,26 @@ To compare two data sets:
             m_Columns.Draw(1, ToDisplayUnitsWithTooltips(msLeft, false, frameIndexLeft));
             m_Columns.Draw(2, ToDisplayUnitsWithTooltips(msRight, false, frameIndexRight));
             m_Columns.Draw(3, ToDisplayUnitsWithTooltips(msRight - msLeft));
+            EditorGUILayout.EndHorizontal();
+        }
+
+        void Draw4DiffBytes(GUIContent col1, long bytesLeft, long bytesRight)
+        {
+            EditorGUILayout.BeginHorizontal();
+            m_Columns.Draw(0, col1);
+            m_Columns.Draw(1, ToMemoryUnits(bytesLeft));
+            m_Columns.Draw(2, ToMemoryUnits(bytesRight));
+            m_Columns.Draw(3, ToMemoryUnits(bytesRight - bytesLeft));
+            EditorGUILayout.EndHorizontal();
+        }
+
+        void Draw4DiffBytes(GUIContent col1, long bytesLeft, int frameIndexLeft, long bytesRight, int frameIndexRight)
+        {
+            EditorGUILayout.BeginHorizontal();
+            m_Columns.Draw(0, col1);
+            m_Columns.Draw(1, ToMemoryUnits(bytesLeft, false, frameIndexLeft));
+            m_Columns.Draw(2, ToMemoryUnits(bytesRight, false, frameIndexRight));
+            m_Columns.Draw(3, ToMemoryUnits(bytesRight - bytesLeft));
             EditorGUILayout.EndHorizontal();
         }
 
@@ -5851,7 +6103,7 @@ To compare two data sets:
             List<FrameTime> leftFrames = leftMarker != null ? topMarkerList.GetTopN(leftMarker, m_TopNumber, showCount) : new List<FrameTime>();
             List<FrameTime> rightFrames = rightMarker != null ? topMarkerList.GetTopN(rightMarker, m_TopNumber, showCount) : new List<FrameTime>();
 
-            FrameTime zeroFrameTime = new FrameTime(-1, 0.0f, 0);
+            FrameTime zeroFrameTime = new FrameTime(-1, 0.0f, 0, 0);
             for (int i = 0; i < m_TopNumber; i++)
             {
                 bool leftValid = i < leftFrames.Count;
@@ -5913,6 +6165,18 @@ To compare two data sets:
                 marker.minIndividualFrameIndex, markerContext);
         }
 
+        void DrawSelectedGcAllocStats(MarkerData marker, ProfileDataView markerContext)
+        {
+            m_Columns.Draw3("", "GC Alloc", "Frame");
+            Draw3LabelBytesFrame(Styles.max, marker.bytesAllocatedMax == long.MinValue ? 0 : marker.bytesAllocatedMax, marker.bytesAllocatedMaxFrameIndex, markerContext);
+            Draw2LabelBytes(Styles.upperQuartile, marker.bytesAllocatedUpperQuartile);
+            Draw3LabelBytesFrame(Styles.median, marker.bytesAllocatedMedian, marker.bytesAllocatedMedianFrameIndex, markerContext);
+            Draw2LabelBytes(Styles.mean, marker.bytesAllocatedMean);
+            Draw2LabelBytes(Styles.lowerQuartile, marker.bytesAllocatedLowerQuartile);
+            Draw3LabelBytesFrame(Styles.min, marker.bytesAllocatedMin == long.MaxValue ? 0 : marker.bytesAllocatedMin, marker.bytesAllocatedMinFrameIndex, markerContext);
+            Draw2LabelBytes(Styles.total, marker.bytesAllocatedTotal);
+        }
+
         void DrawSelected()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
@@ -5932,15 +6196,15 @@ To compare two data sets:
                         {
                             var marker = markers[markerAt];
 
-                            m_MarkerSummaryScroll = GUILayout.BeginScrollView(m_MarkerSummaryScroll, GUIStyle.none, GUI.skin.verticalScrollbar);
-                            Rect clipRect = new Rect(m_MarkerSummaryScroll.x, m_MarkerSummaryScroll.y, LayoutSize.WidthRHS, 500);
-                            m_2D.SetClipRect(clipRect);
-
                             EditorGUILayout.BeginVertical();
 
                             EditorGUILayout.LabelField(marker.name,
                                 GUILayout.MaxWidth(LayoutSize.WidthRHS -
                                     (GUI.skin.box.padding.horizontal + GUI.skin.box.margin.horizontal)));
+
+                            EditorGUILayout.LabelField(ToMemoryUnits(marker.bytesAllocatedTotal),
+                                GUILayout.MaxWidth(LayoutSize.WidthRHS -
+                                (GUI.skin.box.padding.horizontal + GUI.skin.box.margin.horizontal)));
 
                             DrawFrameRatio(marker);
 
@@ -5995,9 +6259,6 @@ To compare two data sets:
                             DrawSelectedStats(marker, m_ProfileSingleView);
 
                             EditorGUILayout.EndVertical();
-
-                            m_2D.ClearClipRect();
-                            GUILayout.EndScrollView();
                         }
                         else
                         {
@@ -6014,6 +6275,73 @@ To compare two data sets:
             if (m_ShowMarkerSummary != lastMarkerSummary)
             {
                 ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Markers, analytic.GetDurationInSeconds(), m_ShowMarkerSummary);
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
+        void DrawSelectedGcAllocSummary()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(LayoutSize.WidthRHS));
+
+            bool lastMarkerGcAllocSummary = m_ShowMarkerGcAllocSummary;
+            m_ShowMarkerGcAllocSummary = BoldFoldout(m_ShowMarkerGcAllocSummary, Styles.markerGcAllocSummary);
+            var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
+            if (m_ShowMarkerGcAllocSummary)
+            {
+                if (IsAnalysisValid())
+                {
+                    if (m_ProfileSingleView.data != null && m_ProfileSingleView.data.gcAllocMarkerNameIndex != -1)
+                    {
+                        List<MarkerData> markers = m_ProfileSingleView.analysis.GetMarkers();
+                        if (markers != null)
+                        {
+                            int markerAt = m_SelectedMarker.id;
+                            if (markerAt >= 0 && markerAt < markers.Count)
+                            {
+                                var marker = markers[markerAt];
+
+                                EditorGUILayout.BeginVertical();
+
+                                EditorGUILayout.LabelField(marker.name,
+                                    GUILayout.MaxWidth(LayoutSize.WidthRHS -
+                                        (GUI.skin.box.padding.horizontal + GUI.skin.box.margin.horizontal)));
+
+                                m_Columns.SetColumnSizes(LayoutSize.WidthColumn0, LayoutSize.WidthColumn1, LayoutSize.WidthColumn2, LayoutSize.WidthColumn3);
+
+                                if (marker.bytesAllocatedTotal > 0)
+                                {
+                                    EditorGUILayout.BeginHorizontal();
+                                    m_Columns.Draw(0, Styles.firstFrame);
+                                    m_Columns.Draw(1, Styles.emptyString);
+                                    DrawFrameIndexButton(marker.firstFrameIndex, m_ProfileSingleView);
+                                    EditorGUILayout.EndHorizontal();
+                                }
+
+                                DrawSelectedGcAllocStats(marker, m_ProfileSingleView);
+
+                                EditorGUILayout.EndVertical();
+                            }
+                            else
+                            {
+                                EditorGUILayout.LabelField("Marker not in selection");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField("No GC allocation data in capture");
+                    }
+                }
+                else
+                {
+                    EditorGUILayout.LabelField("No marker data selected");
+                }
+            }
+
+            if (m_ShowMarkerGcAllocSummary != lastMarkerGcAllocSummary)
+            {
+                ProfileAnalyzerAnalytics.SendUIVisibilityEvent(ProfileAnalyzerAnalytics.UIVisibility.Markers, analytic.GetDurationInSeconds(), m_ShowMarkerGcAllocSummary);
             }
 
             EditorGUILayout.EndVertical();

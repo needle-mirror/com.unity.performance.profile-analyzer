@@ -76,13 +76,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (m_ProfileDataView == null || !m_ProfileDataView.IsDataValid())
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.markerTable))
-                SaveMarkerTableCSV();
+            {
+                EditorApplication.delayCall += SaveMarkerTableCSV;
+                GUIUtility.ExitGUI();
+            }
             GUI.enabled = enabled;
 
             if (m_ProfileDataView == null || m_ProfileDataView.analysis == null)
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.singleFrameTimes))
-                SaveFrameTimesCSV();
+            {
+                EditorApplication.delayCall += SaveFrameTimesCSV;
+                GUIUtility.ExitGUI();
+            }
             GUI.enabled = enabled;
 
             GUILayout.Label("Comparison View");
@@ -90,12 +96,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (!m_ProfileAnalyzerWindow.CanExportComparisonTable())
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.comparisonTables))
-                SaveComparisonTableCSV();
+            {
+                EditorApplication.delayCall += SaveComparisonTableCSV;
+                GUIUtility.ExitGUI();
+            }
             GUI.enabled = enabled;
             if (m_LeftDataView == null || !m_LeftDataView.IsDataValid() || m_RightDataView == null || !m_RightDataView.IsDataValid())
                 GUI.enabled = false;
             if (GUILayout.Button(Styles.comparisonFrameTimes))
-                SaveComparisonFrameTimesCSV();
+            {
+                EditorApplication.delayCall += SaveComparisonFrameTimesCSV;
+                GUIUtility.ExitGUI();
+            }
             GUI.enabled = enabled;
 
             EditorGUILayout.EndVertical();
@@ -123,7 +135,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     file.Write("First Frame Index; ");
                     file.Write("Time Min Individual; Time Max Individual; ");
                     file.Write("Min Individual Frame; Max Individual Frame; ");
-                    file.WriteLine("Time at Median Frame");
+                    file.Write("Time at Median Frame; ");
+                    file.Write("GC Alloc Total (bytes); GC Alloc Count; ");
+                    file.Write("GC Alloc Mean (bytes); GC Alloc Median (bytes); ");
+                    file.Write("GC Alloc Min (bytes); GC Alloc Max (bytes); ");
+                    file.Write("GC Alloc Lower Quartile (bytes); GC Alloc Upper Quartile (bytes); ");
+                    file.WriteLine("GC Alloc Median Frame Index; GC Alloc Min Frame Index; GC Alloc Max Frame Index");
 
                     List<MarkerData> markerData = m_ProfileDataView.analysis.GetMarkers();
                     markerData.Sort();
@@ -140,6 +157,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         int firstFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.firstFrameIndex, m_ProfileDataView);
                         int minIndividualFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.minIndividualFrameIndex, m_ProfileDataView);
                         int maxIndividualFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.maxIndividualFrameIndex, m_ProfileDataView);
+                        int bytesAllocatedMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.bytesAllocatedMedianFrameIndex, m_ProfileDataView);
+                        int bytesAllocatedMinFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.bytesAllocatedMinFrameIndex, m_ProfileDataView);
+                        int bytesAllocatedMaxFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(marker.bytesAllocatedMaxFrameIndex, m_ProfileDataView);
+
+                        long bytesMin = marker.bytesAllocatedMin == long.MaxValue ? 0 : marker.bytesAllocatedMin;
+                        long bytesMax = marker.bytesAllocatedMax == long.MinValue ? 0 : marker.bytesAllocatedMax;
 
                         // "Escape" marker names in case it has commas in it.
                         file.Write("\"{0}\";", markerName);
@@ -161,7 +184,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             marker.msMinIndividual, marker.msMaxIndividual));
                         file.Write("{0};{1};",
                             minIndividualFrameIndex, maxIndividualFrameIndex);
-                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0}", marker.msAtMedian));
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};", marker.msAtMedian));
+                        file.Write("{0};{1};",
+                            marker.bytesAllocatedTotal, marker.countAllocations);
+                        file.Write("{0};{1};",
+                            marker.bytesAllocatedMean, marker.bytesAllocatedMedian);
+                        file.Write("{0};{1};",
+                            bytesMin, bytesMax);
+                        file.Write("{0};{1};",
+                            marker.bytesAllocatedLowerQuartile, marker.bytesAllocatedUpperQuartile);
+                        file.WriteLine("{0};{1};{2}",
+                            bytesAllocatedMedianFrameIndex, bytesAllocatedMinFrameIndex, bytesAllocatedMaxFrameIndex);
                     }
                 }
                 ProfileAnalyzerAnalytics.SendUIButtonEvent(ProfileAnalyzerAnalytics.UIButton.ExportSingleFrames, analytic);
@@ -181,7 +214,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var analytic = ProfileAnalyzerAnalytics.BeginAnalytic();
                 using (StreamWriter file = new StreamWriter(path))
                 {
-                    file.WriteLine("Frame Offset; Frame Index; Frame Time (ms); Time from first frame (ms)");
+                    file.WriteLine("Frame Offset; Frame Index; Frame Time (ms); Time from first frame (ms); GC Alloc (bytes)");
                     float maxFrames = m_ProfileDataView.data.GetFrameCount();
 
                     var frame = m_ProfileDataView.data.GetFrame(0);
@@ -195,8 +228,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         frameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameIndex, m_ProfileDataView);
 
                         float msFrame = frame.msFrame;
-                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0};{1};{2};{3}",
-                            frameOffset, frameIndex, msFrame, msTimePassed));
+                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0};{1};{2};{3};{4}",
+                            frameOffset, frameIndex, msFrame, msTimePassed, frame.bytesFrame));
 
                         msTimePassed += msFrame;
                     }
@@ -222,7 +255,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     file.Write("Left Frame Index; Right Frame Index; ");
                     file.Write("Left Frame Time (ms); Left time from first frame (ms); ");
                     file.Write("Right Frame Time (ms); Right time from first frame (ms); ");
-                    file.WriteLine("Frame Time Diff (ms)");
+                    file.Write("Frame Time Diff (ms); ");
+                    file.WriteLine("Left GC Alloc (bytes); Right GC Alloc (bytes); GC Alloc Diff (bytes)");
                     float maxFrames = Math.Max(m_LeftDataView.data.GetFrameCount(), m_RightDataView.data.GetFrameCount());
 
                     var leftFrame = m_LeftDataView.data.GetFrame(0);
@@ -245,11 +279,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         float msFrameLeft = leftFrame != null ? leftFrame.msFrame : 0;
                         float msFrameRight = rightFrame != null ? rightFrame.msFrame : 0;
                         float msFrameDiff = msFrameRight - msFrameLeft;
+                        long bytesFrameLeft = leftFrame != null ? leftFrame.bytesFrame : 0;
+                        long bytesFrameRight = rightFrame != null ? rightFrame.bytesFrame : 0;
+                        long bytesFrameDiff = bytesFrameRight - bytesFrameLeft;
                         file.Write("{0};", frameOffset);
                         file.Write("{0};{1};", leftFrameIndex, rightFrameIndex);
                         file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};", msFrameLeft, msTimePassedLeft));
                         file.Write(string.Format(CultureInfo.InvariantCulture, "{0};{1};", msFrameRight, msTimePassedRight));
-                        file.WriteLine(string.Format(CultureInfo.InvariantCulture, "{0}", msFrameDiff));
+                        file.Write(string.Format(CultureInfo.InvariantCulture, "{0};", msFrameDiff));
+                        file.WriteLine("{0};{1};{2}", bytesFrameLeft, bytesFrameRight, bytesFrameDiff);
 
                         msTimePassedLeft += msFrameLeft;
                         msTimePassedRight += msFrameRight;

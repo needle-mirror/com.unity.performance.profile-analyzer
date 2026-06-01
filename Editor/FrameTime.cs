@@ -15,15 +15,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         /// <summary>Number of occurrences</summary>
         public int count;
 
+        public long bytesAllocated;
+
         /// <summary>Initialise FrameTime</summary>
         /// <param name="index"> The frame index</param>
         /// <param name="msTime"> The duration of the frame in milliseconds</param>
         /// <param name="_count"> The number of occurrences</param>
-        public FrameTime(int index, float msTime, int _count)
+        public FrameTime(int index, float msTime, int _count, long _bytesAllocated = 0)
         {
             frameIndex = index;
             ms = msTime;
             count = _count;
+            bytesAllocated = _bytesAllocated;
         }
 
         /// <summary>Initialise from another FrameTime</summary>
@@ -33,6 +36,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             frameIndex = t.frameIndex;
             ms = t.ms;
             count = t.count;
+            bytesAllocated = t.bytesAllocated;
         }
 
         /// <summary>Compare the time duration between the frames. Used for sorting in ascending order</summary>
@@ -78,6 +82,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return a.count.CompareTo(b.count);
         }
+
+        /// <summary>Compare the GC allocations between two FrameTimes. Used for sorting in ascending order</summary>
+        /// <param name="a"> The first FrameTime to compare </param>
+        /// <param name="b"> The second FrameTime to compare </param>
+        /// <returns>-1 if a is smaller, 0 if the same, 1 if a is larger</returns>
+        public static int CompareGCAllocations(FrameTime a, FrameTime b)
+        {
+            if (a.bytesAllocated == b.bytesAllocated)
+            {
+                // secondary sort by frame index order
+                return a.frameIndex.CompareTo(b.frameIndex);
+            }
+
+            return a.bytesAllocated.CompareTo(b.bytesAllocated);
+        }
+
 
         /// <summary>Compare the time duration between two FrameTimes. Used for sorting in descending order</summary>
         /// <param name="a"> The first FrameTime to compare </param>

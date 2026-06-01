@@ -76,7 +76,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     [Serializable]
     internal class ProfileData
     {
-        public static readonly int latestVersion = 7;
+        public static readonly int latestVersion = 9;
         /*
         Version 1 - Initial version. Thread names index:threadName (Some invalid thread names count:threadName index)
         Version 2 - Added frame start time.
@@ -85,6 +85,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Version 5 - Updated the thread names to include the thread group as a prefix (index:threadGroup.threadName, index is 1 based, original is 0 based)
         Version 6 - fixed msStartTime (previously was 'seconds')
         Version 7 - Data now only skips the frame at the end
+        Version 8 - Added GC allocation bytes per marker
+        Version 9 - Persist gcAllocMarkerNameIndex / gcAllocMarkerMetaDataSizeIndex so the GC summary panels survive save+load
         */
         static readonly Regex trailingDigit = new Regex(@"^(.*[^\s])[\s]+([\d]+)$", RegexOptions.Compiled);
         public int Version { get; private set; }
@@ -98,6 +100,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         Dictionary<string, int> threadNameDict = new();
         public string FilePath { get; private set; }
         public int MarkerNameCount => markerNames.Count;
+        public int gcAllocMarkerNameIndex = -1;
+        public int gcAllocMarkerMetaDataSizeIndex = -1;
         static float s_Progress;
         internal static readonly int k_FileStreamBufferSize = 16384; // Default would be 4096,
 
@@ -167,6 +171,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 threadNames.Add(threadNameWithIndex);
                 s_Progress = 2f / 3f + (1f / 3f * ((float)thread / threadCount));
+            }
+
+            if (Version >= 9)
+            {
+                gcAllocMarkerNameIndex = reader.ReadInt32();
+                gcAllocMarkerMetaDataSizeIndex = reader.ReadInt32();
+            }
+            else
+            {
+                // Pre-v9 captures didn't persist the index; recover by name. Capture only registers
+                // the GC.Alloc marker when its name is exactly "GC.Alloc", so this matches.
+                // Pre-v8 captures didn't serialize bytesAllocated, so leave the index unset to keep the GC panels hidden.
+                gcAllocMarkerNameIndex = Version >= 8 ? markerNames.IndexOf("GC.Alloc") : -1;
             }
         }
 
@@ -259,13 +276,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return displayFrame - (1 + FrameIndexOffset);
         }
 
-        public void AddThreadName(string threadName, ProfileThread thread)
+        public int AddThreadName(string threadName)
         {
             threadName = CorrectThreadName(threadName);
 
-            int index = -1;
-
-            if (!threadNameDict.TryGetValue(threadName, out index))
+            if (!threadNameDict.TryGetValue(threadName, out var index))
             {
                 threadNames.Add(threadName);
                 index = threadNames.Count - 1;
@@ -273,13 +288,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 threadNameDict.Add(threadName, index);
             }
 
-            thread.threadIndex = index;
+            return index;
         }
 
         public void AddMarkerName(string markerName, ref ProfileMarker marker)
         {
-            int index = -1;
-            if (!markerNamesDict.TryGetValue(markerName, out index))
+            if (!markerNamesDict.TryGetValue(markerName, out var index))
             {
                 markerNames.Add(markerName);
                 index = markerNames.Count - 1;
@@ -288,6 +302,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             marker.nameIndex = index;
+        }
+
+        public void AddGCMarkerInfo(int nameIndex, int metaDataSizeIndex)
+        {
+            if (gcAllocMarkerNameIndex != -1)
+            {
+                if (gcAllocMarkerNameIndex == nameIndex && gcAllocMarkerMetaDataSizeIndex == metaDataSizeIndex)
+                    return;
+
+                Debug.LogWarning("Multiple GC.Alloc markers with different IDs in capture, code will have to be updated to reflect this");
+            }
+
+            gcAllocMarkerNameIndex = nameIndex;
+            gcAllocMarkerMetaDataSizeIndex = metaDataSizeIndex;
         }
 
         public string GetThreadName(ProfileThread thread)
@@ -355,6 +383,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 {
                     writer.Write(threadName);
                 }
+
+                writer.Write(gcAllocMarkerNameIndex);
+                writer.Write(gcAllocMarkerMetaDataSizeIndex);
             }
         }
 
@@ -465,7 +496,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             get
             {
                 if (frames.Count > 0 && frames[0].threads.Count > 0)
-                    return frames[0].threads[0].markers.Length != frames[0].threads[0].markerCount;
+                {
+                    var markers = frames[0].threads[0].markers;
+                    return markers == null || markers.Length != frames[0].threads[0].markerCount;
+                }
 
                 return false;
             }
@@ -579,6 +613,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             {
                 int parentIndex = markerStack.Peek();
                 threadMarkers[parentIndex].msChildren += threadMarkers[childIndex].msMarkerTotal;
+                threadMarkers[parentIndex].bytesAllocatedWithChildren += threadMarkers[childIndex].bytesAllocatedWithChildren;
+                threadMarkers[parentIndex].gcAllocationCountWithChildren += threadMarkers[childIndex].gcAllocationCountWithChildren;
             }
         }
 
@@ -592,6 +628,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 if (frameData == null)
                     continue;
 
+                frameData.bytesFrame = 0;
+
                 for (int threadIndex = 0; threadIndex < frameData.threads.Count; threadIndex++)
                 {
                     var threadData = frameData.threads[threadIndex];
@@ -602,6 +640,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     for (int markerIndex = 0; markerIndex < threadData.markers.Length; markerIndex++)
                     {
                         threadData.markers[markerIndex].msChildren = 0.0f;
+                        threadData.markers[markerIndex].bytesAllocatedWithChildren = threadData.markers[markerIndex].bytesAllocated;
+                        // Each GC.Alloc marker has bytesAllocated > 0 and is a leaf in the capture, so it represents one allocation event.
+                        threadData.markers[markerIndex].gcAllocationCountWithChildren = threadData.markers[markerIndex].bytesAllocated > 0 ? 1 : 0;
+                        frameData.bytesFrame += threadData.markers[markerIndex].bytesAllocated;
                     }
 
                     // Update the child times
@@ -618,7 +660,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             {
                                 PopMarkerAndRecordTimeInParent(threadData.markers, markerStack);
                             }
-
+                            
                             // Assume we can't move down depth without markers between levels.
                         }
                         else if (depth < markerStack.Count)
@@ -654,12 +696,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public List<ProfileThread> threads;
         public double msStartTime;
         public float msFrame;
+        [NonSerialized]
+        public long bytesFrame; // Not serialized because it's recalculated
 
         public ProfileFrame()
         {
             threads = new List<ProfileThread>();
             msStartTime = 0.0;
             msFrame = 0f;
+            bytesFrame = 0;
         }
 
         public bool IsSame(ProfileFrame otherFrame)
@@ -727,10 +772,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int markerCount;
         public int fileVersion;
 
-        public ProfileThread()
+        public ProfileThread(int nameIndex)
         {
             markers = new ProfileMarker[0];
-            threadIndex = -1;
+            threadIndex = nameIndex;
         }
 
         public void Write(BinaryWriter writer)
@@ -790,19 +835,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
     [Serializable]
     internal struct ProfileMarker
     {
+        // 8-byte fields first to keep the struct packed (40 bytes) instead of 48 with padding
+        public long bytesAllocated;
+        [NonSerialized]
+        public long bytesAllocatedWithChildren;        // Recalculated on load so not saved in file
         public int nameIndex;
         public float msMarkerTotal;
         public int depth;
         [NonSerialized]
         public float msChildren;        // Recalculated on load so not saved in file
+        [NonSerialized]
+        public int gcAllocationCountWithChildren;      // Number of GC.Alloc events nested in this marker; recalculated on load
 
-        public static ProfileMarker Create(float durationMS, int depth)
+        public static ProfileMarker Create(float durationMS, int depth, long bytesAllocated = 0)
         {
             var item = new ProfileMarker
             {
                 msMarkerTotal = durationMS,
                 depth = depth,
-                msChildren = 0.0f
+                bytesAllocated = bytesAllocated,
+                msChildren = 0.0f,
+                bytesAllocatedWithChildren = bytesAllocated,
+                gcAllocationCountWithChildren = bytesAllocated > 0 ? 1 : 0
             };
 
             return item;
@@ -818,6 +872,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             writer.Write(nameIndex);
             writer.WriteSingleNoGC(msMarkerTotal);
             writer.Write(depth);
+            writer.Write(bytesAllocated);
         }
 
         public ProfileMarker(BinaryReader reader, int fileVersion)
@@ -829,6 +884,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 msChildren = reader.ReadSingleNoGC();
             else
                 msChildren = 0.0f;
+
+            if (fileVersion >= 8)
+                bytesAllocated = reader.ReadInt64();
+            else
+                bytesAllocated = 0;
+
+            bytesAllocatedWithChildren = bytesAllocated;
+            gcAllocationCountWithChildren = bytesAllocated > 0 ? 1 : 0;
         }
     }
 }

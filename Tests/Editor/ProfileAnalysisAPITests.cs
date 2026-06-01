@@ -11,8 +11,8 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
         analysis.SetRange(first, last);
 
         Assert.IsTrue(first == analysis.GetFrameSummary().first);
-        Assert.IsTrue(first == analysis.GetFrameSummary().minFrameIndex);
-        Assert.IsTrue(first == analysis.GetFrameSummary().maxFrameIndex);
+        Assert.IsTrue(first == analysis.GetFrameSummary().msMinFrameIndex);
+        Assert.IsTrue(first == analysis.GetFrameSummary().msMaxFrameIndex);
         Assert.IsTrue(last == analysis.GetFrameSummary().last);
     }
 
@@ -24,7 +24,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 
         Assert.IsTrue(0 == frameSummary.frames.Count);
 
-        analysis.UpdateSummary(0, 0.1f);
+        analysis.UpdateSummary(0, 0.1f, 0);
 
         Assert.IsTrue(1 == frameSummary.frames.Count);
     }
@@ -39,7 +39,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 
         for (int i = 0; i < 10; ++i)
         {
-            var frameTime = new FrameTime(i, 0.1f * i, 1);
+            var frameTime = new FrameTime(i, 0.1f * i, 1, 0);
             marker.frames.Add(frameTime);
         }
 
@@ -87,7 +87,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
             float value = ((float)i / (float)range);
             if (i != 0 && i != range)
                 value += offset;
-            var frameTime = new FrameTime(i, value, 1);
+            var frameTime = new FrameTime(i, value, 1, 0);
             marker.frames.Add(frameTime);
         }
 
@@ -127,7 +127,7 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
 
         for (int i = 0; i < 20; ++i)
         {
-            analysis.UpdateSummary(i, 1.0f * i);
+            analysis.UpdateSummary(i, 1.0f * i, 0);
         }
 
         float timeScaleMin = 0f;

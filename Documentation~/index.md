@@ -1,6 +1,6 @@
 # About the Profile Analyzer package
 
-The Profile Analyzer aggregates and visualizes frame and marker data from a set of [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) frames to help you understand their behavior. You can use the Profile Analyzer to compare two sets of data side-by-side, which complements the single frame analysis already available in the Unity Profiler.
+The Profile Analyzer aggregates and visualizes frame and marker data, including CPU timings and GC allocation bytes, from a set of [Unity Profiler](https://docs.unity3d.com/Manual/Profiler.html) frames to help you understand their behavior. You can use the Profile Analyzer to compare two sets of data side-by-side, which complements the single frame analysis already available in the Unity Profiler.
 
 For information on how to use the Profile Analyzer, see the documentation on the [Profile Analyzer window](profile-analyzer-window.md)
 

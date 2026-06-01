@@ -1,20 +1,20 @@
 {
   "name": "com.unity.performance.profile-analyzer",
   "displayName": "Profile Analyzer",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "description": "The Profile Analyzer tool supports the standard Unity Profiler. You can use it to analyze multiple frames and multiple data sets of the CPU data in the Profiler.\n\nMain features: \n▪ Multi-frame analysis of a single set of Profiler CPU data \n▪ Comparison of two multi-frame profile scans \n\n",
   "unity": "2021.3",
   "dependencies": {},
   "_upm": {
-    "changelog": "### Fixed\n* Fix for UUM-138420 - Frame time values differ between Profiler and Profile Analyzer when comparing the same marker on the same frame."
+    "changelog": "### Added\n* Added GC allocation analysis: per-marker and per-frame GC allocation byte statistics, new Frame GC Allocation Summary and Marker GC Allocation Summary panels, a **GC Allocations** marker columns preset, and additional CSV export columns. Bumps the .pdata file format to Version 9.\n\n### Changed\n* Migrated editor analytics to the `IAnalytic` API on 2023.2 and newer, while retaining the legacy API on earlier editors. Events and reported data are unchanged.\n\n### Fixed\n* Fix for UUM-139769 - The \"Depth Slice\" title is clipped to \"D...\" when the Depth Slice dropdown is opened."
   },
   "upmCi": {
-    "footprint": "5578a5b4bc046b744d0446486ff8365b0f376cff"
+    "footprint": "798c78b5a6852581c6fd8bf1852e399e49c608b4"
   },
-  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.performance.profile-analyzer@1.3/manual/index.html",
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.performance.profile-analyzer@1.4/manual/index.html",
   "repository": {
     "url": "https://github.cds.internal.unity3d.com/unity/com.unity.performance.profile-analyzer.git",
     "type": "git",
-    "revision": "2b7a0e832ced04e744605b8b938cc55b16ad84f8"
+    "revision": "63d3e56aef5172cb0785708588d5224d3d589ddd"
   }
 }

@@ -382,8 +382,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                         threadNameWithIndex = ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName);
 
-                        var thread = new ProfileThread();
-                        data.AddThreadName(threadNameWithIndex, thread);
+                        var threadNameIndex = data.AddThreadName(threadNameWithIndex);
+
+                        var thread = new ProfileThread(threadNameIndex);
+
 
                         frame.Add(thread);
 
@@ -394,7 +396,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         for (int i = 1; i < frameData.sampleCount; i++)
                         {
                             float durationMS = frameData.GetSampleTimeMs(i);
-                            int markerId = frameData.GetSampleMarkerId(i);
+                            
                             if (durationMS < 0)
                             {
                                 if (firstError)
@@ -410,23 +412,43 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
                             else
                             {
+                                int markerId = frameData.GetSampleMarkerId(i);
                                 int depth = 1 + depthStack.Count;
-                                var markerData = ProfileMarker.Create(durationMS, depth);
 
-                                // Use name index directly if we have already stored this named marker before
+                                // Use name index directly if we have already stored this named marker before,
+                                // else add the name
                                 int nameIndex;
-                                if (markerIdToNameIndex.TryGetValue(markerId, out nameIndex))
-                                {
-                                    markerData.nameIndex = nameIndex;
-                                }
-                                else
+                                if (!markerIdToNameIndex.TryGetValue(markerId, out nameIndex))
                                 {
                                     string name = frameData.GetSampleName(i);
-                                    data.AddMarkerName(name, ref markerData);
-                                    markerIdToNameIndex[markerId] = markerData.nameIndex;
+                                    var tempMarker = ProfileMarker.Create(durationMS, depth);
+                                    data.AddMarkerName(name, ref tempMarker);
+                                    nameIndex = tempMarker.nameIndex;
+                                    markerIdToNameIndex[markerId] = nameIndex;
+
+                                    if (name == "GC.Alloc")
+                                    {
+                                        var metaDataInfos = frameData.GetMarkerMetadataInfo(markerId);
+
+                                        for(int markerMetaDataIndex = 0; markerMetaDataIndex < metaDataInfos.Length; markerMetaDataIndex++)
+                                        {
+                                            var mdi = metaDataInfos[markerMetaDataIndex];
+                                            if (mdi.name == "Size" && mdi.unit == Unity.Profiling.ProfilerMarkerDataUnit.Bytes)
+                                            {
+                                                data.AddGCMarkerInfo(nameIndex, markerMetaDataIndex);
+                                            }
+                                        }
+                                    }
                                 }
 
-                                threadMarkers[i - 1] = markerData;
+                                long bytesAllocated = 0;
+                                if (nameIndex == data.gcAllocMarkerNameIndex)
+                                {
+                                    bytesAllocated = frameData.GetSampleMetadataAsLong(i, data.gcAllocMarkerMetaDataSizeIndex);
+                                }
+
+                                threadMarkers[i - 1] = ProfileMarker.Create(durationMS, depth, bytesAllocated);
+                                threadMarkers[i - 1].nameIndex = nameIndex;
                             }
 
                             int childrenCount = frameData.GetSampleChildrenCount(i);
@@ -457,7 +479,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             return data;
         }
-
+        
+        // Unused?
         ProfileData GetDataOriginal(ProfileData data, int firstFrameIndex, int lastFrameIndex)
         {
             ProfilerFrameDataIterator frameData = new ProfilerFrameDataIterator();
@@ -536,14 +559,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     var groupName = frameData.GetGroupName();
                     threadName = ProfileData.GetThreadNameWithGroup(threadName, groupName);
 
-                    ProfileThread thread = new ProfileThread();
-                    frame.Add(thread);
 
-                    int nameCount = 0;
-                    threadNameCount.TryGetValue(threadName, out nameCount);
+                    threadNameCount.TryGetValue(threadName, out var nameCount);
                     threadNameCount[threadName] = nameCount + 1;
 
-                    data.AddThreadName(ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName), thread);
+                    var threadNameIndex = data.AddThreadName(ProfileData.ThreadNameWithIndex(threadNameCount[threadName], threadName));
+
+                    ProfileThread thread = new ProfileThread(threadNameIndex);
+                    frame.Add(thread);
 
                     const bool enterChildren = true;
                     // The markers are in depth first order and the depth is known
@@ -564,8 +587,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                             }
                             continue;
                         }
-                        var markerData = ProfileMarker.Create(frameData);
 
+                        var markerData = ProfileMarker.Create(frameData);
                         data.AddMarkerName(frameData.name, ref markerData);
                         markers.Add(markerData);
                     }

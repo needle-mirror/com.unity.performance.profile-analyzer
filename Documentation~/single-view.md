@@ -13,7 +13,7 @@ To load data into the **Single** view, select the **Pull Data** button in the fr
 >[!NOTE]
 >If you select the **Load** option, the data must be in the Profile Analyzer .pdata format. If you have data from the Profiler in the .data file format, open it in the Profiler first, and then select the **Pull Data** button in the Profile Analyzer.
 
-For more information on how to pull data into the Profile Analyzer, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
+For more information on how to pull data into the Profile Analyzer, see the workflow documentation on [Collecting and viewing data workflow](collecting-and-viewing-data.md).
 
 ## Marker details list
 
@@ -31,6 +31,7 @@ By default, the **Marker columns** dropdown in the **Filters** pane has six pres
 * **Time with totals:** Displays information about both the average and total times of the markers.
 * **Count totals:** Displays information about the total number of times the markers were called.
 * **Count per frame:** Displays information on the average total per frame the markers were called.
+* **GC Allocations:** Displays per-marker GC allocation statistics: median, mean, min, max, range, total, and allocation event count. For more on how this data is sourced, see [Marker Summary](marker-summary.html#marker-gc-allocation-summary).
 * **Depths:** Displays information on where the markers are in the Hierarchy. For more information, see the documentation on Depth Slices in [Filters pane](filtering-system.html#depth-slice).
 * **Threads:** Displays the name of the thread that the markers appear on. For more information, see the documentation on the Thread window in [Filters pane](filtering-system.html#thread-window).
 
@@ -38,27 +39,36 @@ You can also use the **Custom** column layout, to select your own custom mix of 
 
 The following table shows the columns that the Profile Analyzer displays when you select that layout.
 
-||**Time and count**|**Time**|**Totals**|**Time with totals**|**Count totals**|**Count per frame**|**Depths**|**Threads**|**Custom only**|
-|---|---|---|---|---|---|---|---|---|---|
-|**Marker Name**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;||
-|**Depth**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|||
-|**Median**|&#10003;|&#10003;||&#10003;||||||
-|**Median Bar**|&#10003;|&#10003;||&#10003;||||||
-|**Mean**|&#10003;|||||||||
-|**SD**|||||||||&#10003;|
-|**Min**|&#10003;|&#10003;||&#10003;||||||
-|**Max**|&#10003;|&#10003;||&#10003;||||||
-|**Range**|&#10003;|&#10003;||&#10003;|||||
-|**Count**|&#10003;||||&#10003;|||||
-|**Count Bar**|||||&#10003;|||||
-|**Count Frame**|&#10003;|||||&#10003;||||
-|**Count Frame Bar**||||||&#10003;||||
-|**Count SD**|||||||||&#10003;|
-|**1st**|||||||&#10003;||||
-|**At Median Frame**|&#10003;|&#10003;||&#10003;||||||
-|**Total**|||&#10003;|&#10003;||||||
-|**Total Bar**|||&#10003;|&#10003;||||||
-|**Threads**||||||||&#10003;||
+||**Time and count**|**Time**|**Totals**|**Time with totals**|**Count totals**|**Count per frame**|**GC Allocations**|**Depths**|**Threads**|**Custom only**|
+|---|---|---|---|---|---|---|---|---|---|---|
+|**Marker Name**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;||
+|**Depth**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|||
+|**Median**|&#10003;|&#10003;||&#10003;|||||||
+|**Median Bar**|&#10003;|&#10003;||&#10003;|||||||
+|**Mean**|&#10003;||||||||||
+|**SD**||||||||||&#10003;|
+|**Min**|&#10003;|&#10003;||&#10003;|||||||
+|**Max**|&#10003;|&#10003;||&#10003;|||||||
+|**Range**|&#10003;|&#10003;||&#10003;|||||||
+|**Count**|&#10003;||||&#10003;||||||
+|**Count Bar**|||||&#10003;||||||
+|**Count Frame**|&#10003;|||||&#10003;|||||
+|**Count Frame Bar**||||||&#10003;|||||
+|**Count SD**||||||||||&#10003;|
+|**1st**|||||||||&#10003;||
+|**At Median Frame**|&#10003;|&#10003;||&#10003;|||||||
+|**Total**|||&#10003;|&#10003;|||||||
+|**Total Bar**|||&#10003;|&#10003;|||||||
+|**Threads**|||||||||&#10003;||
+|**GC Alloc Median**|&#10003;||||||&#10003;||||
+|**GC Alloc Median Bar**|||||||&#10003;||||
+|**GC Alloc Mean**|||||||&#10003;||||
+|**GC Alloc Min**|||||||&#10003;||||
+|**GC Alloc Max**|||||||&#10003;||||
+|**GC Alloc Range**|||||||&#10003;||||
+|**GC Alloc Total**|||||||&#10003;||||
+|**GC Alloc Total Bar**|||||||&#10003;||||
+|**GC Alloc Count**|&#10003;||||||&#10003;||||
 
 The following table explains what each column does:
 
@@ -83,6 +93,15 @@ The following table explains what each column does:
 |**Total**| The total time spent for this marker in all selected frames.|
 |**Total Bar**|A visualization of the **Total** value.|
 |**Threads**|The name of the thread that the marker appears on.|
+|**GC Alloc Median**|The median GC allocation bytes per frame attributed to this marker over all selected frames.|
+|**GC Alloc Median Bar**|A visualization of the **GC Alloc Median** value.|
+|**GC Alloc Mean**|The mean GC allocation bytes per frame attributed to this marker.|
+|**GC Alloc Min**|The minimum GC allocation bytes in any single frame attributed to this marker.|
+|**GC Alloc Max**|The maximum GC allocation bytes in any single frame attributed to this marker.|
+|**GC Alloc Range**|The difference between the marker's **GC Alloc Min** and **GC Alloc Max** values.|
+|**GC Alloc Total**|The total GC allocation bytes attributed to this marker over all selected frames.|
+|**GC Alloc Total Bar**|A visualization of the **GC Alloc Total** value.|
+|**GC Alloc Count**|The number of GC allocation events attributed to this marker over all selected frames.|
 
 ### Marker Details context menu commands
 

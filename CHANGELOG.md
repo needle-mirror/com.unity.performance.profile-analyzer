@@ -4,6 +4,17 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-01
+
+### Added
+* Added GC allocation analysis: per-marker and per-frame GC allocation byte statistics, new Frame GC Allocation Summary and Marker GC Allocation Summary panels, a **GC Allocations** marker columns preset, and additional CSV export columns. Bumps the .pdata file format to Version 9.
+
+### Changed
+* Migrated editor analytics to the `IAnalytic` API on 2023.2 and newer, while retaining the legacy API on earlier editors. Events and reported data are unchanged.
+
+### Fixed
+* Fix for UUM-139769 - The "Depth Slice" title is clipped to "D..." when the Depth Slice dropdown is opened.
+
 ## [1.3.4] - 2026-04-01
 
 ### Fixed

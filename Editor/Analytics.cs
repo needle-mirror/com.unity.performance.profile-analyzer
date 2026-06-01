@@ -17,10 +17,45 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public static void EnableAnalytics()
         {
+#if UNITY_2023_2_OR_NEWER
+            // Registration is handled automatically via the [AnalyticInfo] attribute on ProfileAnalyzerAnalytic.
+            s_EnableAnalytics = true;
+#else
             AnalyticsResult result = EditorAnalytics.RegisterEventWithLimit(k_EventTopicName, k_MaxEventsPerHour, k_MaxEventItems, k_VendorKey);
             if (result == AnalyticsResult.Ok)
                 s_EnableAnalytics = true;
+#endif
         }
+
+#if UNITY_2023_2_OR_NEWER
+        [AnalyticInfo(eventName: k_EventTopicName, vendorKey: k_VendorKey, maxEventsPerHour: k_MaxEventsPerHour, maxNumberOfElements: k_MaxEventItems)]
+        class ProfileAnalyzerAnalytic : IAnalytic
+        {
+            IAnalytic.IData m_Data;
+
+            public ProfileAnalyzerAnalytic(IAnalytic.IData data)
+            {
+                m_Data = data;
+            }
+
+            public bool TryGatherData(out IAnalytic.IData data, out Exception error)
+            {
+                data = m_Data;
+                error = null;
+                return true;
+            }
+        }
+
+        static bool SendEvent(IAnalytic.IData payload)
+        {
+            return EditorAnalytics.SendAnalytic(new ProfileAnalyzerAnalytic(payload)) == AnalyticsResult.Ok;
+        }
+#else
+        static bool SendEvent<T>(T payload)
+        {
+            return EditorAnalytics.SendEventWithLimit(k_EventTopicName, payload) == AnalyticsResult.Ok;
+        }
+#endif
 
         public enum UIButton
         {
@@ -69,6 +104,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         // camelCase since these events get serialized to Json and naming convention in analytics is camelCase
         [Serializable]
         struct ProfileAnalyzerUIButtonEvent
+#if UNITY_2023_2_OR_NEWER
+            : IAnalytic.IData
+#endif
         {
             public ProfileAnalyzerUIButtonEvent(string name, float durationInTicks)
             {
@@ -100,6 +138,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         [Serializable]
         struct ProfileAnalyzerUIUsageEvent
+#if UNITY_2023_2_OR_NEWER
+            : IAnalytic.IData
+#endif
         {
             public ProfileAnalyzerUIUsageEvent(string name, float durationInTicks)
             {
@@ -130,6 +171,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         [Serializable]
         struct ProfileAnalyzerUIVisibilityEvent
+#if UNITY_2023_2_OR_NEWER
+            : IAnalytic.IData
+#endif
         {
             public ProfileAnalyzerUIVisibilityEvent(string name, float durationInTicks, bool show)
             {
@@ -168,6 +212,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         [Serializable]
         struct ProfileAnalyzerUIResizeEvent
+#if UNITY_2023_2_OR_NEWER
+            : IAnalytic.IData
+#endif
         {
             public ProfileAnalyzerUIResizeEvent(string name, float durationInTicks, float width, float height, float screenWidth, float screenHeight, bool isDocked)
             {
@@ -223,11 +270,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
 
-            AnalyticsResult result = EditorAnalytics.SendEventWithLimit(k_EventTopicName, uiButtonEvent);
-            if (result != AnalyticsResult.Ok)
-                return false;
-
-            return true;
+            return SendEvent(uiButtonEvent);
         }
 
         public static bool SendUIUsageModeEvent(UIUsageMode uiUsageMode, float durationInSeconds)
@@ -253,11 +296,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
 
-            AnalyticsResult result = EditorAnalytics.SendEventWithLimit(k_EventTopicName, uiUsageEvent);
-            if (result != AnalyticsResult.Ok)
-                return false;
-
-            return true;
+            return SendEvent(uiUsageEvent);
         }
 
         public static bool SendUIVisibilityEvent(UIVisibility uiVisibility, float durationInSeconds, bool show)
@@ -294,11 +333,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return false;
             }
 
-            AnalyticsResult result = EditorAnalytics.SendEventWithLimit(k_EventTopicName, uiUsageEvent);
-            if (result != AnalyticsResult.Ok)
-                return false;
-
-            return true;
+            return SendEvent(uiUsageEvent);
         }
 
         public static bool SendUIResizeEvent(UIResizeView uiResizeView, float durationInSeconds, float width, float height, bool isDocked)
@@ -324,11 +359,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return false;
             }
 
-            AnalyticsResult result = EditorAnalytics.SendEventWithLimit(k_EventTopicName, uiResizeEvent);
-            if (result != AnalyticsResult.Ok)
-                return false;
-
-            return true;
+            return SendEvent(uiResizeEvent);
         }
 
         internal class Analytic

@@ -37,6 +37,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int maxFrameIndex;
         public int minDepth;
         public int maxDepth;
+
+        public long bytesAllocatedTotal;
+        public int countAllocations;
+
+        public long bytesAllocatedMean;
+        public long bytesAllocatedMedian;
+        public long bytesAllocatedLowerQuartile;
+        public long bytesAllocatedUpperQuartile;
+        public long bytesAllocatedMin;
+        public long bytesAllocatedMax;
+        public int bytesAllocatedMinFrameIndex;
+        public int bytesAllocatedMaxFrameIndex;
+        public int bytesAllocatedMedianFrameIndex;
+
         public List<int> globalThreadIndices;   // Index into profileData.GetThreadNameFromIndex
 
         const int bucketCount = 20;
@@ -84,6 +98,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             maxFrameIndex = 0;
             minDepth = 0;
             maxDepth = 0;
+            bytesAllocatedTotal = 0;
+            countAllocations = 0;
+            bytesAllocatedMin = long.MaxValue;
+            bytesAllocatedMax = long.MinValue;
+            bytesAllocatedMinFrameIndex = 0;
+            bytesAllocatedMaxFrameIndex = 0;
 
             for (int b = 0; b < buckets.Length; b++)
             {
@@ -242,6 +262,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public static int GetMedianFrameIndex(MarkerData marker)
         {
             return marker != null ? marker.medianFrameIndex : 0;
+        }
+
+        public static int GetBytesAllocatedMaxFrameIndex(MarkerData marker)
+        {
+            return marker != null ? marker.bytesAllocatedMaxFrameIndex : 0;
+        }
+
+        public static int GetBytesAllocatedMinFrameIndex(MarkerData marker)
+        {
+            return marker != null ? marker.bytesAllocatedMinFrameIndex : 0;
+        }
+
+        public static int GetBytesAllocatedMedianFrameIndex(MarkerData marker)
+        {
+            return marker != null ? marker.bytesAllocatedMedianFrameIndex : 0;
         }
 
         public static float GetMsUpperQuartile(MarkerData marker)

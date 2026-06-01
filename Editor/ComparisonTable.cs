@@ -44,6 +44,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         float m_CountDiffRange;
         float m_CountMeanDiffRange;
         double m_TotalDiffRange;
+        long m_GCAllocDiffRange;
+        long m_GCAllocTotalDiffRange;
+        long m_GCAllocCountDiffRange;
 
         const float kRowHeights = 20f;
         readonly List<TreeViewItem> m_Rows = new List<TreeViewItem>(100);
@@ -86,6 +89,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             DepthDiff,
             LeftThreads,
             RightThreads,
+            LeftGCAllocMedian,
+            LeftGCAllocBar,
+            RightGCAllocBar,
+            RightGCAllocMedian,
+            GCAllocDiff,
+            GCAllocDiffPercent,
+            AbsGCAllocDiff,
+            LeftGCAllocTotal,
+            LeftGCAllocTotalBar,
+            RightGCAllocTotalBar,
+            RightGCAllocTotal,
+            GCAllocTotalDiff,
+            GCAllocTotalDiffPercent,
+            AbsGCAllocTotalDiff,
+            LeftGCAllocCount,
+            LeftGCAllocCountBar,
+            RightGCAllocCountBar,
+            RightGCAllocCount,
+            GCAllocCountDiff,
+            GCAllocCountDiffPercent,
+            AbsGCAllocCountDiff,
         }
 
         static int m_MaxColumns;
@@ -123,6 +147,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             DepthDiff,
             LeftThreads,
             RightThreads,
+            LeftGCAllocMedian,
+            RightGCAllocMedian,
+            GCAllocDiff,
+            ReverseGCAllocDiff,
+            GCAllocDiffPercent,
+            AbsGCAllocDiff,
+            LeftGCAllocTotal,
+            RightGCAllocTotal,
+            GCAllocTotalDiff,
+            ReverseGCAllocTotalDiff,
+            GCAllocTotalDiffPercent,
+            AbsGCAllocTotalDiff,
+            LeftGCAllocCount,
+            RightGCAllocCount,
+            GCAllocCountDiff,
+            ReverseGCAllocCountDiff,
+            GCAllocCountDiffPercent,
+            AbsGCAllocCountDiff,
         }
 
         // Sort options per column
@@ -163,6 +205,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.DepthDiff,
             SortOption.LeftThreads,
             SortOption.RightThreads,
+            SortOption.LeftGCAllocMedian,
+            SortOption.ReverseGCAllocDiff,
+            SortOption.GCAllocDiff,
+            SortOption.RightGCAllocMedian,
+            SortOption.GCAllocDiff,
+            SortOption.GCAllocDiffPercent,
+            SortOption.AbsGCAllocDiff,
+            SortOption.LeftGCAllocTotal,
+            SortOption.ReverseGCAllocTotalDiff,
+            SortOption.GCAllocTotalDiff,
+            SortOption.RightGCAllocTotal,
+            SortOption.GCAllocTotalDiff,
+            SortOption.GCAllocTotalDiffPercent,
+            SortOption.AbsGCAllocTotalDiff,
+            SortOption.LeftGCAllocCount,
+            SortOption.ReverseGCAllocCountDiff,
+            SortOption.GCAllocCountDiff,
+            SortOption.RightGCAllocCount,
+            SortOption.GCAllocCountDiff,
+            SortOption.GCAllocCountDiffPercent,
+            SortOption.AbsGCAllocCountDiff,
         };
 
         internal static class Styles
@@ -223,6 +286,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             float countMaxDiff = 0.0f;
             float countMeanMinDiff = float.MaxValue;
             float countMeanMaxDiff = 0.0f;
+            long gcAllocMinDiff = long.MaxValue;
+            long gcAllocMaxDiff = 0;
+            long gcAllocTotalMinDiff = long.MaxValue;
+            long gcAllocTotalMaxDiff = 0;
+            long gcAllocCountMinDiff = long.MaxValue;
+            long gcAllocCountMaxDiff = 0;
             for (int index = 0; index < m_Pairings.Count; ++index)
             {
                 var pairing = m_Pairings[index];
@@ -261,12 +330,33 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     countMeanMinDiff = countMeanDiff;
                 if (countMeanDiff > countMeanMaxDiff && countMeanDiff < float.MaxValue)
                     countMeanMaxDiff = countMeanDiff;
+
+                long gcAllocDiff = GCAllocDiff(item);
+                if (gcAllocDiff < gcAllocMinDiff)
+                    gcAllocMinDiff = gcAllocDiff;
+                if (gcAllocDiff > gcAllocMaxDiff)
+                    gcAllocMaxDiff = gcAllocDiff;
+
+                long gcAllocTotalDiff = GCAllocTotalDiff(item);
+                if (gcAllocTotalDiff < gcAllocTotalMinDiff)
+                    gcAllocTotalMinDiff = gcAllocTotalDiff;
+                if (gcAllocTotalDiff > gcAllocTotalMaxDiff)
+                    gcAllocTotalMaxDiff = gcAllocTotalDiff;
+
+                long gcAllocCountDiff = GCAllocCountDiff(item);
+                if (gcAllocCountDiff < gcAllocCountMinDiff)
+                    gcAllocCountMinDiff = gcAllocCountDiff;
+                if (gcAllocCountDiff > gcAllocCountMaxDiff)
+                    gcAllocCountMaxDiff = gcAllocCountDiff;
             }
 
             m_DiffRange = Math.Max(Math.Abs(minDiff), Math.Abs(maxDiff));
             m_TotalDiffRange = Math.Max(Math.Abs(totalMinDiff), Math.Abs(totalMaxDiff));
             m_CountDiffRange = Math.Max(Math.Abs(countMinDiff), Math.Abs(countMaxDiff));
             m_CountMeanDiffRange = Math.Max(Math.Abs(countMeanMinDiff), Math.Abs(countMeanMaxDiff));
+            m_GCAllocDiffRange = Math.Max(Math.Abs(gcAllocMinDiff == long.MaxValue ? 0 : gcAllocMinDiff), Math.Abs(gcAllocMaxDiff));
+            m_GCAllocTotalDiffRange = Math.Max(Math.Abs(gcAllocTotalMinDiff == long.MaxValue ? 0 : gcAllocTotalMinDiff), Math.Abs(gcAllocTotalMaxDiff));
+            m_GCAllocCountDiffRange = Math.Max(Math.Abs(gcAllocCountMinDiff == long.MaxValue ? 0 : gcAllocCountMinDiff), Math.Abs(gcAllocCountMaxDiff));
 
             return root;
         }
@@ -434,6 +524,60 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         break;
                     case SortOption.RightThreads:
                         orderedQuery = orderedQuery.ThenBy(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.RightThreads].text : RightThreads(l), ascending);
+                        break;
+                    case SortOption.LeftGCAllocMedian:
+                        orderedQuery = orderedQuery.ThenBy(l => LeftGCAllocMedianSorting(l), ascending);
+                        break;
+                    case SortOption.RightGCAllocMedian:
+                        orderedQuery = orderedQuery.ThenBy(l => RightGCAllocMedianSorting(l), ascending);
+                        break;
+                    case SortOption.GCAllocDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocDiff(l), ascending);
+                        break;
+                    case SortOption.ReverseGCAllocDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => -GCAllocDiff(l), ascending);
+                        break;
+                    case SortOption.GCAllocDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocDiffPercent(l), ascending).ThenBy(l => GCAllocDiff(l), ascending);
+                        break;
+                    case SortOption.AbsGCAllocDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => AbsGCAllocDiff(l), ascending);
+                        break;
+                    case SortOption.LeftGCAllocTotal:
+                        orderedQuery = orderedQuery.ThenBy(l => LeftGCAllocTotalSorting(l), ascending);
+                        break;
+                    case SortOption.RightGCAllocTotal:
+                        orderedQuery = orderedQuery.ThenBy(l => RightGCAllocTotalSorting(l), ascending);
+                        break;
+                    case SortOption.GCAllocTotalDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocTotalDiff(l), ascending);
+                        break;
+                    case SortOption.ReverseGCAllocTotalDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => -GCAllocTotalDiff(l), ascending);
+                        break;
+                    case SortOption.GCAllocTotalDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocTotalDiffPercent(l), ascending).ThenBy(l => GCAllocTotalDiff(l), ascending);
+                        break;
+                    case SortOption.AbsGCAllocTotalDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => AbsGCAllocTotalDiff(l), ascending);
+                        break;
+                    case SortOption.LeftGCAllocCount:
+                        orderedQuery = orderedQuery.ThenBy(l => LeftGCAllocCountSorting(l), ascending);
+                        break;
+                    case SortOption.RightGCAllocCount:
+                        orderedQuery = orderedQuery.ThenBy(l => RightGCAllocCountSorting(l), ascending);
+                        break;
+                    case SortOption.GCAllocCountDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocCountDiff(l), ascending);
+                        break;
+                    case SortOption.ReverseGCAllocCountDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => -GCAllocCountDiff(l), ascending);
+                        break;
+                    case SortOption.GCAllocCountDiffPercent:
+                        orderedQuery = orderedQuery.ThenBy(l => GCAllocCountDiffPercent(l), ascending).ThenBy(l => GCAllocCountDiff(l), ascending);
+                        break;
+                    case SortOption.AbsGCAllocCountDiff:
+                        orderedQuery = orderedQuery.ThenBy(l => AbsGCAllocCountDiff(l), ascending);
                         break;
                 }
             }
@@ -699,6 +843,135 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return RightMinDepth(item) - LeftMinDepth(item);
         }
 
+        long LeftGCAllocMedian(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.bytesAllocatedMedian : 0;
+        }
+
+        long RightGCAllocMedian(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.bytesAllocatedMedian : 0;
+        }
+
+        long LeftGCAllocMedianSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.bytesAllocatedMedian : -1;
+        }
+
+        long RightGCAllocMedianSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.bytesAllocatedMedian : -1;
+        }
+
+        long GCAllocDiff(ComparisonTreeViewItem item)
+        {
+            return RightGCAllocMedian(item) - LeftGCAllocMedian(item);
+        }
+
+        float GCAllocDiffPercent(ComparisonTreeViewItem item)
+        {
+            long left = LeftGCAllocMedian(item);
+            long right = RightGCAllocMedian(item);
+            if (left == 0)
+                return right == 0 ? 0f : float.MaxValue;
+            return (float)((100.0 * (right - left)) / left);
+        }
+
+        long AbsGCAllocDiff(ComparisonTreeViewItem item)
+        {
+            return Math.Abs(GCAllocDiff(item));
+        }
+
+        long LeftGCAllocTotal(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.bytesAllocatedTotal : 0;
+        }
+
+        long RightGCAllocTotal(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.bytesAllocatedTotal : 0;
+        }
+
+        long LeftGCAllocTotalSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.bytesAllocatedTotal : -1;
+        }
+
+        long RightGCAllocTotalSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.bytesAllocatedTotal : -1;
+        }
+
+        long GCAllocTotalDiff(ComparisonTreeViewItem item)
+        {
+            return RightGCAllocTotal(item) - LeftGCAllocTotal(item);
+        }
+
+        float GCAllocTotalDiffPercent(ComparisonTreeViewItem item)
+        {
+            long left = LeftGCAllocTotal(item);
+            long right = RightGCAllocTotal(item);
+            if (left == 0)
+                return right == 0 ? 0f : float.MaxValue;
+            return (float)((100.0 * (right - left)) / left);
+        }
+
+        long AbsGCAllocTotalDiff(ComparisonTreeViewItem item)
+        {
+            return Math.Abs(GCAllocTotalDiff(item));
+        }
+
+        long LeftGCAllocCount(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.countAllocations : 0;
+        }
+
+        long RightGCAllocCount(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.countAllocations : 0;
+        }
+
+        long LeftGCAllocCountSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetLeftMarker(item);
+            return marker != null ? marker.countAllocations : -1;
+        }
+
+        long RightGCAllocCountSorting(ComparisonTreeViewItem item)
+        {
+            var marker = GetRightMarker(item);
+            return marker != null ? marker.countAllocations : -1;
+        }
+
+        long GCAllocCountDiff(ComparisonTreeViewItem item)
+        {
+            return RightGCAllocCount(item) - LeftGCAllocCount(item);
+        }
+
+        float GCAllocCountDiffPercent(ComparisonTreeViewItem item)
+        {
+            long left = LeftGCAllocCount(item);
+            long right = RightGCAllocCount(item);
+            if (left == 0)
+                return right == 0 ? 0f : float.MaxValue;
+            return (float)((100.0 * (right - left)) / left);
+        }
+
+        long AbsGCAllocCountDiff(ComparisonTreeViewItem item)
+        {
+            return Math.Abs(GCAllocCountDiff(item));
+        }
+
         double TimeRemoved(ComparisonTreeViewItem item)
         {
             double removed;
@@ -862,6 +1135,42 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return myTypes.Order(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.LeftThreads].text : LeftThreads(l), ascending);
                 case SortOption.RightThreads:
                     return myTypes.Order(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.RightThreads].text : RightThreads(l), ascending);
+                case SortOption.LeftGCAllocMedian:
+                    return myTypes.Order(l => LeftGCAllocMedianSorting(l), ascending);
+                case SortOption.RightGCAllocMedian:
+                    return myTypes.Order(l => RightGCAllocMedianSorting(l), ascending);
+                case SortOption.GCAllocDiff:
+                    return myTypes.Order(l => GCAllocDiff(l), ascending);
+                case SortOption.ReverseGCAllocDiff:
+                    return myTypes.Order(l => -GCAllocDiff(l), ascending);
+                case SortOption.GCAllocDiffPercent:
+                    return myTypes.Order(l => GCAllocDiffPercent(l), ascending).ThenBy(l => GCAllocDiff(l), ascending);
+                case SortOption.AbsGCAllocDiff:
+                    return myTypes.Order(l => AbsGCAllocDiff(l), ascending);
+                case SortOption.LeftGCAllocTotal:
+                    return myTypes.Order(l => LeftGCAllocTotalSorting(l), ascending);
+                case SortOption.RightGCAllocTotal:
+                    return myTypes.Order(l => RightGCAllocTotalSorting(l), ascending);
+                case SortOption.GCAllocTotalDiff:
+                    return myTypes.Order(l => GCAllocTotalDiff(l), ascending);
+                case SortOption.ReverseGCAllocTotalDiff:
+                    return myTypes.Order(l => -GCAllocTotalDiff(l), ascending);
+                case SortOption.GCAllocTotalDiffPercent:
+                    return myTypes.Order(l => GCAllocTotalDiffPercent(l), ascending).ThenBy(l => GCAllocTotalDiff(l), ascending);
+                case SortOption.AbsGCAllocTotalDiff:
+                    return myTypes.Order(l => AbsGCAllocTotalDiff(l), ascending);
+                case SortOption.LeftGCAllocCount:
+                    return myTypes.Order(l => LeftGCAllocCountSorting(l), ascending);
+                case SortOption.RightGCAllocCount:
+                    return myTypes.Order(l => RightGCAllocCountSorting(l), ascending);
+                case SortOption.GCAllocCountDiff:
+                    return myTypes.Order(l => GCAllocCountDiff(l), ascending);
+                case SortOption.ReverseGCAllocCountDiff:
+                    return myTypes.Order(l => -GCAllocCountDiff(l), ascending);
+                case SortOption.GCAllocCountDiffPercent:
+                    return myTypes.Order(l => GCAllocCountDiffPercent(l), ascending).ThenBy(l => GCAllocCountDiff(l), ascending);
+                case SortOption.AbsGCAllocCountDiff:
+                    return myTypes.Order(l => AbsGCAllocCountDiff(l), ascending);
                 default:
                     Assert.IsTrue(false, "Unhandled enum");
                     break;
@@ -912,6 +1221,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case MyColumns.RightTotalBar:
                 case MyColumns.LeftCountMeanBar:
                 case MyColumns.RightCountMeanBar:
+                case MyColumns.LeftGCAllocBar:
+                case MyColumns.RightGCAllocBar:
+                case MyColumns.LeftGCAllocTotalBar:
+                case MyColumns.RightGCAllocTotalBar:
+                case MyColumns.LeftGCAllocCountBar:
+                case MyColumns.RightGCAllocCountBar:
                     return true;
             }
 
@@ -920,12 +1235,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         internal void WriteTableContentsCSV(System.IO.StreamWriter writer)
         {
-            var visibleColumns = multiColumnHeader.state.visibleColumns.Where(c => !IsBar((MyColumns)c)).ToArray();
-            for (int i = 0, n = visibleColumns.Length; i < n; i++)
+            // Export every non-bar column regardless of on-screen visibility, so the user gets all
+            // available data in one CSV instead of just the columns visible in the current mode.
+            var exportColumns = Enumerable.Range(0, s_HeaderData.Length)
+                .Where(c => !IsBar((MyColumns)c))
+                .ToArray();
+            for (int i = 0, n = exportColumns.Length; i < n; i++)
             {
                 if (i != 0)
                     writer.Write(';');
-                var colIdx = visibleColumns[i];
+                var colIdx = exportColumns[i];
                 writer.Write(s_HeaderData[colIdx].content.text);
             }
             writer.WriteLine();
@@ -935,11 +1254,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 var item = (ComparisonTreeViewItem)child;
                 if (item.cachedRowString == null)
                     GenerateStrings(item);
-                for (int i = 0, n = visibleColumns.Length; i < n; i++)
+                for (int i = 0, n = exportColumns.Length; i < n; i++)
                 {
                     if (i != 0)
                         writer.Write(';');
-                    var colIdx = visibleColumns[i];
+                    var colIdx = exportColumns[i];
                     writer.Write(item.cachedRowString[colIdx].text);
                 }
 
@@ -1101,6 +1420,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             return PercentString(TotalDiffPercent(item));
         }
 
+        string GCAllocDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(GCAllocDiffPercent(item));
+        }
+
+        string GCAllocTotalDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(GCAllocTotalDiffPercent(item));
+        }
+
+        string GCAllocCountDiffPercentString(ComparisonTreeViewItem item)
+        {
+            return PercentString(GCAllocCountDiffPercent(item));
+        }
+
+        GUIContent ToMemoryUnitsWithTooltips(long bytes)
+        {
+            return m_ProfileAnalyzerWindow.ToMemoryUnits(bytes);
+        }
+
         void GenerateStrings(ComparisonTreeViewItem item)
         {
             item.cachedRowString = new GUIContent[m_MaxColumns];
@@ -1177,6 +1516,36 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             item.cachedRowString[(int)MyColumns.LeftThreads] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", LeftThreads(item)), LeftThreads(item));
             item.cachedRowString[(int)MyColumns.RightThreads] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", RightThreads(item)), RightThreads(item));
+
+            item.cachedRowString[(int)MyColumns.LeftGCAllocMedian] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(LeftGCAllocMedian(item));
+            item.cachedRowString[(int)MyColumns.RightGCAllocMedian] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(RightGCAllocMedian(item));
+            long gcAllocDiffVal = GCAllocDiff(item);
+            string gcAllocDiffTooltip = $"{gcAllocDiffVal} B";
+            item.cachedRowString[(int)MyColumns.LeftGCAllocBar] = gcAllocDiffVal < 0 ? new GUIContent("", gcAllocDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.RightGCAllocBar] = gcAllocDiffVal > 0 ? new GUIContent("", gcAllocDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.GCAllocDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(gcAllocDiffVal);
+            item.cachedRowString[(int)MyColumns.GCAllocDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(GCAllocDiffPercentString(item), "");
+            item.cachedRowString[(int)MyColumns.AbsGCAllocDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(AbsGCAllocDiff(item));
+
+            item.cachedRowString[(int)MyColumns.LeftGCAllocTotal] = item.data.leftIndex < 0 ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(LeftGCAllocTotal(item));
+            item.cachedRowString[(int)MyColumns.RightGCAllocTotal] = item.data.rightIndex < 0 ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(RightGCAllocTotal(item));
+            long gcAllocTotalDiffVal = GCAllocTotalDiff(item);
+            string gcAllocTotalDiffTooltip = $"{gcAllocTotalDiffVal} B";
+            item.cachedRowString[(int)MyColumns.LeftGCAllocTotalBar] = gcAllocTotalDiffVal < 0 ? new GUIContent("", gcAllocTotalDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.RightGCAllocTotalBar] = gcAllocTotalDiffVal > 0 ? new GUIContent("", gcAllocTotalDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.GCAllocTotalDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(gcAllocTotalDiffVal);
+            item.cachedRowString[(int)MyColumns.GCAllocTotalDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(GCAllocTotalDiffPercentString(item), "");
+            item.cachedRowString[(int)MyColumns.AbsGCAllocTotalDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : ToMemoryUnitsWithTooltips(AbsGCAllocTotalDiff(item));
+
+            item.cachedRowString[(int)MyColumns.LeftGCAllocCount] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", LeftGCAllocCount(item)));
+            item.cachedRowString[(int)MyColumns.RightGCAllocCount] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format("{0}", RightGCAllocCount(item)));
+            long gcAllocCountDiffVal = GCAllocCountDiff(item);
+            string gcAllocCountDiffTooltip = string.Format("{0}", gcAllocCountDiffVal);
+            item.cachedRowString[(int)MyColumns.LeftGCAllocCountBar] = gcAllocCountDiffVal < 0 ? new GUIContent("", gcAllocCountDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.RightGCAllocCountBar] = gcAllocCountDiffVal > 0 ? new GUIContent("", gcAllocCountDiffTooltip) : new GUIContent("", "");
+            item.cachedRowString[(int)MyColumns.GCAllocCountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", gcAllocCountDiffVal), GCAllocCountDiffPercentString(item));
+            item.cachedRowString[(int)MyColumns.GCAllocCountDiffPercent] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(GCAllocCountDiffPercentString(item), "");
+            item.cachedRowString[(int)MyColumns.AbsGCAllocCountDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0}", AbsGCAllocCountDiff(item)));
         }
 
         void ShowBar(Rect rect, float ms, float range, GUIContent content, Color color, bool rightAlign)
@@ -1235,6 +1604,21 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case MyColumns.LeftThreads:
                 case MyColumns.RightThreads:
                 case MyColumns.DepthDiff:
+                case MyColumns.LeftGCAllocMedian:
+                case MyColumns.RightGCAllocMedian:
+                case MyColumns.GCAllocDiff:
+                case MyColumns.GCAllocDiffPercent:
+                case MyColumns.AbsGCAllocDiff:
+                case MyColumns.LeftGCAllocTotal:
+                case MyColumns.RightGCAllocTotal:
+                case MyColumns.GCAllocTotalDiff:
+                case MyColumns.GCAllocTotalDiffPercent:
+                case MyColumns.AbsGCAllocTotalDiff:
+                case MyColumns.LeftGCAllocCount:
+                case MyColumns.RightGCAllocCount:
+                case MyColumns.GCAllocCountDiff:
+                case MyColumns.GCAllocCountDiffPercent:
+                case MyColumns.AbsGCAllocCountDiff:
                     ShowText(cellRect, content);
                     break;
                 case MyColumns.LeftBar:
@@ -1260,6 +1644,24 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     break;
                 case MyColumns.RightTotalBar:
                     ShowBar(cellRect, (float)TotalDiff(item), (float)m_TotalDiffRange, content, m_RightColor, false);
+                    break;
+                case MyColumns.LeftGCAllocBar:
+                    ShowBar(cellRect, (float)-GCAllocDiff(item), (float)m_GCAllocDiffRange, content, m_LeftColor, true);
+                    break;
+                case MyColumns.RightGCAllocBar:
+                    ShowBar(cellRect, (float)GCAllocDiff(item), (float)m_GCAllocDiffRange, content, m_RightColor, false);
+                    break;
+                case MyColumns.LeftGCAllocTotalBar:
+                    ShowBar(cellRect, (float)-GCAllocTotalDiff(item), (float)m_GCAllocTotalDiffRange, content, m_LeftColor, true);
+                    break;
+                case MyColumns.RightGCAllocTotalBar:
+                    ShowBar(cellRect, (float)GCAllocTotalDiff(item), (float)m_GCAllocTotalDiffRange, content, m_RightColor, false);
+                    break;
+                case MyColumns.LeftGCAllocCountBar:
+                    ShowBar(cellRect, (float)-GCAllocCountDiff(item), (float)m_GCAllocCountDiffRange, content, m_LeftColor, true);
+                    break;
+                case MyColumns.RightGCAllocCountBar:
+                    ShowBar(cellRect, (float)GCAllocCountDiff(item), (float)m_GCAllocCountDiffRange, content, m_RightColor, false);
                     break;
             }
 
@@ -1337,6 +1739,30 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 new HeaderData("Threads Left", "Threads the marker occurs on in left data set (with filtering applied)"),
                 new HeaderData("Threads Right", "Threads the marker occurs on in right data set (with filtering applied)"),
+
+                new HeaderData("GC Alloc Median Left", "Left median GC allocation bytes per frame"),
+                new HeaderData("< GC Alloc Median", "Median GC Alloc difference if left data set is a larger value", width: 50),
+                new HeaderData("> GC Alloc Median", "Median GC Alloc difference if right data set is a larger value", width: 50),
+                new HeaderData("GC Alloc Median Right", "Right median GC allocation bytes per frame"),
+                new HeaderData("GC Alloc Median Diff", "Difference in median GC allocation bytes"),
+                new HeaderData("GC Alloc Median Diff %", "Difference in median GC allocation bytes as percentage of left"),
+                new HeaderData("Abs GC Alloc Median Diff", "Absolute difference in median GC allocation bytes"),
+
+                new HeaderData("GC Alloc Total Left", "Left total GC allocation bytes over all selected frames"),
+                new HeaderData("< GC Total", "GC Alloc Total difference if left data set is a larger value", width: 50),
+                new HeaderData("> GC Total", "GC Alloc Total difference if right data set is a larger value", width: 50),
+                new HeaderData("GC Alloc Total Right", "Right total GC allocation bytes over all selected frames"),
+                new HeaderData("GC Total Delta", "Difference in total GC allocation bytes"),
+                new HeaderData("GC Total Delta %", "Difference in total GC allocation bytes as percentage of left"),
+                new HeaderData("Abs GC Total", "Absolute difference in total GC allocation bytes"),
+
+                new HeaderData("GC Count Left", "Left GC allocation event count over all selected frames"),
+                new HeaderData("< GC Count", "GC Count difference if left data set count is a larger value", width: 50),
+                new HeaderData("> GC Count", "GC Count difference if right data set count is a larger value", width: 50),
+                new HeaderData("GC Count Right", "Right GC allocation event count over all selected frames"),
+                new HeaderData("GC Count Delta", "Difference in GC allocation event count"),
+                new HeaderData("GC Count Delta %", "Difference in GC allocation event count as percentage of left"),
+                new HeaderData("Abs GC Count", "Absolute difference in GC allocation event count"),
             };
         public static MultiColumnHeaderState CreateDefaultMultiColumnHeaderState(MarkerColumnFilter modeFilter)
         {
@@ -1395,6 +1821,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.LeftCount,
                         (int)MyColumns.RightCount,
                         (int)MyColumns.CountDiff,
+                        (int)MyColumns.LeftGCAllocMedian,
+                        (int)MyColumns.RightGCAllocMedian,
+                        (int)MyColumns.LeftGCAllocCount,
+                        (int)MyColumns.RightGCAllocCount,
                     };
                     break;
                 case MarkerColumnFilter.Mode.Time:
@@ -1459,6 +1889,26 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.RightCountMean,
                         (int)MyColumns.CountMeanDiff,
                         (int)MyColumns.AbsCountMeanDiff,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.GCAllocations:
+                    visibleColumns = new int[]
+                    {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.LeftGCAllocMedian,
+                        (int)MyColumns.LeftGCAllocBar,
+                        (int)MyColumns.RightGCAllocBar,
+                        (int)MyColumns.RightGCAllocMedian,
+                        (int)MyColumns.GCAllocDiff,
+                        (int)MyColumns.AbsGCAllocDiff,
+                        (int)MyColumns.LeftGCAllocTotal,
+                        (int)MyColumns.LeftGCAllocTotalBar,
+                        (int)MyColumns.RightGCAllocTotalBar,
+                        (int)MyColumns.RightGCAllocTotal,
+                        (int)MyColumns.GCAllocTotalDiff,
+                        (int)MyColumns.AbsGCAllocTotalDiff,
+                        (int)MyColumns.LeftGCAllocCount,
+                        (int)MyColumns.RightGCAllocCount,
                     };
                     break;
                 case MarkerColumnFilter.Mode.Depth:

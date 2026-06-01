@@ -49,6 +49,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_Callback = callback;
             m_DepthDiff = depthDiff;
 
+            // The popup button is intentionally narrow (~50px), but the dropdown header reads "Depth Slice"
+            // and gets clipped to "D..." since Unity 2023.2.0a18 (UUM-35176) made AdvancedDropdown
+            // strictly honor the source rect width. Force a wider minimum so the header fits.
+            minimumSize = new Vector2(140f, 0f);
+
             // Note this reflection code is here as the IMGUI AdvancedDropdown doesn't support setting the selection after inserting the elements.
             // You can set 'enable' to false on some of the entries to get a similar result but it won't match the check mark visualisation.
             if (m_DataSourceFieldInfo == null || m_DataSourceFieldInfo == null || m_SelectedIdsFieldInfo == null)

@@ -98,8 +98,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             // Get the info for the marker we plan to remove (assume thats what we are at)
             ProfileMarker profileMarker = threadData.markers[markerAt];
             float markerTime = profileMarker.msMarkerTotal;
+            var markerBytesAllocated = profileMarker.bytesAllocatedWithChildren;
 
-            // Traverse parents and remove time from them
+            // Traverse parents and remove time and allocations from them
             int currentDepth = profileMarker.depth;
             for (int parentMarkerAt = markerAt - 1; parentMarkerAt >= 0; parentMarkerAt--)
             {
@@ -113,6 +114,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (markers[parentMarkerData.nameIndex].globalNameIndex != -1)
                     {
                         markers[parentMarkerData.nameIndex].RemoveMarkerTimeFromParent(markerTime);
+                        markers[parentMarkerData.nameIndex].RemoveMarkerBytesFromParent(markerBytesAllocated, profileMarker.gcAllocationCountWithChildren);
                     }
                 }
             }
@@ -172,8 +174,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             if (perFrameMarker.maxDepth > marker.maxDepth)
                 marker.maxDepth = perFrameMarker.maxDepth;
 
+            marker.bytesAllocatedTotal += perFrameMarker.bytesAllocatedTotal;
+            marker.countAllocations += perFrameMarker.countAllocations;
+
             marker.presentOnFrameCount += 1;
-            var frameTime = new FrameTime(frameIndex, perFrameMarker.msTotal, perFrameMarker.count);
+            var frameTime = new FrameTime(frameIndex, perFrameMarker.msTotal, perFrameMarker.count, perFrameMarker.bytesAllocatedTotal);
             marker.frames.Add(frameTime);
 
             // Add all thread names this marker occurs on
@@ -363,7 +368,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 result.markersOnFrame[markerData.nameIndex].maxDepth = markerDepth;
                             }
 
-                            result.markersOnFrame[markerData.nameIndex].SetValue(threadData.threadIndex, frameIndex, ms, markerDepth, markerAndChildCount);
+                            result.markersOnFrame[markerData.nameIndex].SetValue(threadData.threadIndex, frameIndex, ms, markerDepth, markerAndChildCount, markerData.bytesAllocatedWithChildren, markerData.gcAllocationCountWithChildren);
                         }
 
                         if (include)
@@ -373,6 +378,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     }
 
                     result.msFrame = msFrame;
+                    result.bytesFrame = frameData.bytesFrame;
                 }
             }
         }
@@ -395,6 +401,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             List<int> extendedThreadIndices;                        // Index into the threads list for the frame if more than the static size
             public int threadIndexCount { get; private set; }
 
+            public long bytesAllocatedTotal;
+            public int countAllocations;
+
             public double timeRemoved;
             public double timeIgnored;
 
@@ -404,6 +413,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 msMinIndividual = float.MaxValue;
                 msMaxIndividual = float.MinValue;
                 threadIndexCount = 0;
+                bytesAllocatedTotal = 0;
+                countAllocations = 0;
             }
 
             bool ContainsThreadIndex(int threadIndex)
@@ -466,7 +477,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 int frameIndex,
                 float ms,
                 int markerDepth,
-                int markerAndChildCount)
+                int markerAndChildCount,
+                long bytesAllocatedWithChildren = 0,
+                int gcAllocationCount = 0)
             {
                 count += 1;
 
@@ -480,13 +493,17 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     if (timeIgnored == 0.0)
                         timeIgnored = double.Epsilon;
 
-                    // zero out removed marker time
+                    // zero out removed marker time and allocations
                     // so we don't record in the individual marker times, marker frame times or min/max times
                     // ('min/max times' is calculated later from marker frame times)
                     ms = 0f;
+                    bytesAllocatedWithChildren = 0;
+                    gcAllocationCount = 0;
                 }
 
                 msTotal += ms;
+                bytesAllocatedTotal += bytesAllocatedWithChildren;
+                countAllocations += gcAllocationCount;
 
                 // Individual marker time (not total over frame)
                 if (ms < msMinIndividual)
@@ -538,6 +555,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     timeRemoved = double.Epsilon;
             }
 
+            public void RemoveMarkerBytesFromParent(long markerBytes, int gcAllocationCount)
+            {
+                bytesAllocatedTotal -= markerBytes;
+                countAllocations -= gcAllocationCount;
+            }
+
         }
 
         internal struct PerFrameThreadData
@@ -552,6 +575,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             public PerFrameMarkerData[] markersOnFrame;
             public int maxMarkerDepthFound;
             public float msFrame;
+            public long bytesFrame;
 
             public PerFrameOutputData(int threadCount, int markerCount)
             {
@@ -658,7 +682,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 for (int selectionAt = 0; selectionAt < frameCount; selectionAt++)
                 {
                     int frameIndex = selectionIndices[selectionAt];
-                    analysis.UpdateSummary(frameIndex, frameResults[selectionAt].msFrame);
+                    analysis.UpdateSummary(frameIndex, frameResults[selectionAt].msFrame, frameResults[selectionAt].bytesFrame);
                 }
 
                 analysis.GetFrameSummary().totalMarkers = profileData.MarkerNameCount;

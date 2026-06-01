@@ -5,7 +5,7 @@ This workflow explains how to compare two frames from different data sets. In th
 ## Step 1: Collect performance data to analyze
 
 1. Open the Profile Analyzer window (menu: **Window &gt; Analysis &gt; Profile Analyzer**). Click the **Compare** button in the toolbar to enter the Compare view.
-1. Collect some profiling data. To pull data from an active profiling session, click the **Pull Data** button. This pulls in the current set of available frames from the Profiler. If you don't have an active profile session, click the **Open Profiler Window** button, then load or record some data. For more information on how to collect data, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
+1. Collect some profiling data. To pull data from an active profiling session, click the **Pull Data** button. This pulls in the current set of available frames from the Profiler. If you don't have an active profile session, click the **Open Profiler Window** button, then load or record some data. For more information on how to collect data, refer to the workflow documentation on [Collecting and viewing data workflow](collecting-and-viewing-data.md).
 1. Pull a different data set that you want to analyze into each graph in the [Frame Control](frame-range-selection.md) pane.
 
 ## Step 2: Select frames of interest

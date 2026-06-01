@@ -13,7 +13,7 @@ To load data into the **Compare** view, select the **Pull Data** button in the f
 >[!NOTE]
 >If you select the **Load** option, the data must be in the Profile Analyzer .pdata format. If you have data from the Profiler in the .data file format, open it in the Profiler first, and then select the **Pull Data** button in the Profile Analyzer.
 
-For more information on how to pull data into the Profile Analyzer, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
+For more information on how to pull data into the Profile Analyzer, refer to the workflow documentation on [Collecting and viewing data workflow](collecting-and-viewing-data.md).
 
 ## Marker Comparison list
 
@@ -33,6 +33,7 @@ By default, the **Marker columns** dropdown in the **Filters** pane has six pres
 * **Time with totals:** Displays information about both the average and total times of the markers.
 * **Count totals:** Displays information about the total number of times the markers were called.
 * **Count per frame:** Displays information on the average total per frame the markers were called.
+* **GC Allocations:** Displays per-marker GC allocation statistics: left/right median bytes, total bytes, allocation event counts, and the corresponding diff/absolute-diff columns. For more on how this data is sourced, refer to [Marker Summary](marker-summary.html#marker-gc-allocation-summary).
 * **Depths:** Displays information on where the markers are in the Hierarchy. For more information, see the documentation on Depth Slices in [Filters pane](filtering-system.html#depth-slice).
 * **Threads:** Displays the name of the thread that the markers appear on. For more information, see the documentation on the Thread window in [Filters pane](filtering-system.html#thread-window).
 
@@ -43,32 +44,47 @@ You can also use the **Custom** column layout to select your own custom mix of c
 
 The following table shows the columns that the Profile Analyzer displays when you select that layout.
 
-||**Time and count**| **Time**| **Totals**| **Time with totals**| **Count totals**| **Count per frame** |**Depths**|**Threads**|
-|---|---|---|---|---|---|---|---|---|
-|**Marker Name**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|
-|**Left Median**<br/> **Right Median**|&#10003;|&#10003;||&#10003;|||||
-|`<`<br/> `>`|&#10003;|&#10003;||&#10003;|||||
-|**Diff**|&#10003;|&#10003;|||||||
-|**Diff Percent**|||||||||
-|**Abs Diff**|&#10003;|&#10003;||&#10003;|||||
-|**Count Left** <br/> **Count Right**|&#10003;||||&#10003;||||
-|`<` **Count** <br/> `>` **Count**|||||&#10003;||||
-|**Count Delta**|&#10003;||||&#10003;||||
-|**Count Delta Percent**|||||||||
-|**Abs Count**|||||&#10003;||||
-|**Count Left Frame** <br/> **Count Right Frame**||||||&#10003;|||
-|`<` **Frame Count** <br/> `>` **Frame Count**||||||&#10003;|||
-|**Count Delta Frame**||||||&#10003;|||
-|**Count Delta Percent Frame**|||||||||
-|**Abs Frame Count**||||||&#10003;|||
-|**Total Left** <br/> **Total Right**|||&#10003;|&#10003;|||||
-|`<` **Total** <br/> `>` **Total**|||&#10003;|&#10003;|||||
-|**Total Delta**|||&#10003;||||||
-|**Total Delta Percent**|||||||||
-|**Abs Total**|||&#10003;|&#10003;|||||
-|**Depth Left** <br/> **Depth Right**|||||||&#10003;||
-|**Depth Diff**|||||||&#10003;||
-|**Threads Left** <br/> **Threads Right**||||||||&#10003;|
+||**Time and count**| **Time**| **Totals**| **Time with totals**| **Count totals**| **Count per frame** |**GC Allocations**|**Depths**|**Threads**|
+|---|---|---|---|---|---|---|---|---|---|
+|**Marker Name**|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|&#10003;|
+|**Left Median**<br/> **Right Median**|&#10003;|&#10003;||&#10003;||||||
+|`<`<br/> `>`|&#10003;|&#10003;||&#10003;||||||
+|**Diff**|&#10003;|&#10003;||||||||
+|**Diff Percent**||||||||||
+|**Abs Diff**|&#10003;|&#10003;||&#10003;||||||
+|**Count Left** <br/> **Count Right**|&#10003;||||&#10003;|||||
+|`<` **Count** <br/> `>` **Count**|||||&#10003;|||||
+|**Count Delta**|&#10003;||||&#10003;|||||
+|**Count Delta Percent**||||||||||
+|**Abs Count**|||||&#10003;|||||
+|**Count Left Frame** <br/> **Count Right Frame**||||||&#10003;||||
+|`<` **Frame Count** <br/> `>` **Frame Count**||||||&#10003;||||
+|**Count Delta Frame**||||||&#10003;||||
+|**Count Delta Percent Frame**||||||||||
+|**Abs Frame Count**||||||&#10003;||||
+|**Total Left** <br/> **Total Right**|||&#10003;|&#10003;||||||
+|`<` **Total** <br/> `>` **Total**|||&#10003;|&#10003;||||||
+|**Total Delta**|||&#10003;|||||||
+|**Total Delta Percent**||||||||||
+|**Abs Total**|||&#10003;|&#10003;||||||
+|**Depth Left** <br/> **Depth Right**|||||||&#10003;|||
+|**Depth Diff**|||||||&#10003;|||
+|**Threads Left** <br/> **Threads Right**||||||||&#10003;||
+|**GC Alloc Median Left** <br/> **GC Alloc Median Right**|&#10003;||||||&#10003;|||
+|`<` **GC Alloc Median** <br/> `>` **GC Alloc Median**|||||||&#10003;|||
+|**GC Alloc Median Diff**|||||||&#10003;|||
+|**GC Alloc Median Diff %**||||||||||
+|**Abs GC Alloc Median Diff**|||||||&#10003;|||
+|**GC Alloc Total Left** <br/> **GC Alloc Total Right**|||||||&#10003;|||
+|`<` **GC Total** <br/> `>` **GC Total**|||||||&#10003;|||
+|**GC Total Delta**|||||||&#10003;|||
+|**GC Total Delta %**||||||||||
+|**Abs GC Total**|||||||&#10003;|||
+|**GC Count Left** <br/> **GC Count Right**|&#10003;||||||&#10003;|||
+|`<` **GC Count** <br/> `>` **GC Count**||||||||||
+|**GC Count Delta**||||||||||
+|**GC Count Delta %**||||||||||
+|**Abs GC Count**||||||||||
 
 The following table explains what each column does:
 
@@ -98,6 +114,21 @@ The following table explains what each column does:
 |**Depth Left** <br/> **Depth Right**|The level, or depth, that the marker appears at. The marker might appear on multiple depth levels. **Depth Left** displays the first data set loaded into the **Frame Control** pane, colored blue. **Depth Right** displays the second data set loaded into the **Frame Control** pane, colored orange.|
 |**Depth Diff**|The difference between the **Depth Left** and **Depth Right** values.|
 |**Threads Left** <br/> **Threads Right**|The name of the thread that the marker appears on. **Threads Left** displays the first data set loaded into the **Frame Control** pane, colored blue. **Threads Right** displays the second data set loaded into the **Frame Control** pane, colored orange.|
+|**GC Alloc Median Left** <br/> **GC Alloc Median Right**|The median GC allocation bytes per frame attributed to the marker in each data set.|
+|`<` **GC Alloc Median** <br/> `>` **GC Alloc Median**|A visual representation of the **GC Alloc Median Left** and **GC Alloc Median Right** data. `<` is shown when the left value is larger; `>` when the right is.|
+|**GC Alloc Median Diff**|The difference between the median GC allocation values. Negative values mean the left (blue) data set is bigger; positive means the right (orange) data set is bigger.|
+|**GC Alloc Median Diff %**|The median GC allocation difference relative to the left data set, as a percentage.|
+|**Abs GC Alloc Median Diff**|The absolute difference between the median GC allocation values.|
+|**GC Alloc Total Left** <br/> **GC Alloc Total Right**|The total GC allocation bytes attributed to the marker across all selected frames in each data set.|
+|`<` **GC Total** <br/> `>` **GC Total**|A visual representation of the **GC Alloc Total Left** and **GC Alloc Total Right** data.|
+|**GC Total Delta**|The difference between the total GC allocation values. Negative values mean the left (blue) data set is bigger; positive means the right (orange) data set is bigger.|
+|**GC Total Delta %**|The total GC allocation difference relative to the left data set, as a percentage.|
+|**Abs GC Total**|The absolute difference between the total GC allocation values.|
+|**GC Count Left** <br/> **GC Count Right**|The number of GC allocation events attributed to the marker across all selected frames in each data set.|
+|`<` **GC Count** <br/> `>` **GC Count**|A visual representation of the **GC Count Left** and **GC Count Right** data.|
+|**GC Count Delta**|The difference between the GC allocation event counts. Negative values mean the left (blue) data set is bigger; positive means the right (orange) data set is bigger.|
+|**GC Count Delta %**|The GC allocation event count difference relative to the left data set, as a percentage.|
+|**Abs GC Count**|The absolute difference between the GC allocation event counts.|
 
 ### Marker Comparison context menu commands
 

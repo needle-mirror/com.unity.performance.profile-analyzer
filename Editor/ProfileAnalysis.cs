@@ -28,10 +28,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_FrameSummary.first = firstFrameIndex;
             m_FrameSummary.last = lastFrameIndex;
 
-            // Ensure these are initialized to frame indices within the range
-            m_FrameSummary.minFrameIndex = firstFrameIndex;
-            // if this wasn't initialized, and all frames had 0 length, it wouldn't be set in the UpdateSummary step of the analysis and point out of range
-            m_FrameSummary.maxFrameIndex = firstFrameIndex;
+            // Ensure these are initialized to frame indices within the range.
+            // If left uninitialized and no frame updates the min/max in UpdateSummary
+            // (e.g. all frames have 0 length, or all frames have 0 GC allocations),
+            // they would point out of range.
+            m_FrameSummary.msMinFrameIndex = firstFrameIndex;
+            m_FrameSummary.msMaxFrameIndex = firstFrameIndex;
+            m_FrameSummary.bytesMinFrameIndex = firstFrameIndex;
+            m_FrameSummary.bytesMaxFrameIndex = firstFrameIndex;
         }
 
         public void AddMarker(MarkerData marker)
@@ -46,22 +50,35 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_ThreadsByName[thread.threadNameWithIndex] = thread;
         }
 
-        public void UpdateSummary(int frameIndex, float msFrame)
+        public void UpdateSummary(int frameIndex, float msFrame, long bytesFrame)
         {
             m_FrameSummary.msTotal += msFrame;
+            m_FrameSummary.bytesTotal += bytesFrame;
             m_FrameSummary.count += 1;
+
             if (msFrame < m_FrameSummary.msMin)
             {
                 m_FrameSummary.msMin = msFrame;
-                m_FrameSummary.minFrameIndex = frameIndex;
+                m_FrameSummary.msMinFrameIndex = frameIndex;
             }
             if (msFrame > m_FrameSummary.msMax)
             {
                 m_FrameSummary.msMax = msFrame;
-                m_FrameSummary.maxFrameIndex = frameIndex;
+                m_FrameSummary.msMaxFrameIndex = frameIndex;
             }
 
-            m_FrameSummary.frames.Add(new FrameTime(frameIndex, msFrame, 1));
+            if (bytesFrame < m_FrameSummary.bytesMin)
+            {
+                m_FrameSummary.bytesMin = bytesFrame;
+                m_FrameSummary.bytesMinFrameIndex = frameIndex;
+            }
+            if (bytesFrame > m_FrameSummary.bytesMax)
+            {
+                m_FrameSummary.bytesMax = bytesFrame;
+                m_FrameSummary.bytesMaxFrameIndex = frameIndex;
+            }
+
+            m_FrameSummary.frames.Add(new FrameTime(frameIndex, msFrame, 1, bytesFrame));
         }
 
         FrameTime GetPercentageOffset(List<FrameTime> frames, float percent, out int outputFrameIndex)
@@ -126,6 +143,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 marker.maxFrameIndex = 0;
                 marker.countMin = int.MaxValue;
                 marker.countMax = int.MinValue;
+                marker.bytesAllocatedMin = long.MaxValue;
+                marker.bytesAllocatedMax = long.MinValue;
+                marker.bytesAllocatedMinFrameIndex = 0;
+                marker.bytesAllocatedMaxFrameIndex = 0;
 
                 foreach (FrameTime frameTime in marker.frames)
                 {
@@ -144,7 +165,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         marker.maxFrameIndex = frameIndex;
                     }
 
-                    if (frameIndex == m_FrameSummary.medianFrameIndex)
+                    if (frameIndex == m_FrameSummary.msMedianFrameIndex)
                         marker.msAtMedian = ms;
 
                     var count = frameTime.count;
@@ -158,9 +179,28 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         marker.countMax = count;
                     }
+
+                    var bytes = frameTime.bytesAllocated;
+
+                    if (bytes < marker.bytesAllocatedMin)
+                    {
+                        marker.bytesAllocatedMin = bytes;
+                        marker.bytesAllocatedMinFrameIndex = frameIndex;
+                    }
+                    if (bytes > marker.bytesAllocatedMax)
+                    {
+                        marker.bytesAllocatedMax = bytes;
+                        marker.bytesAllocatedMaxFrameIndex = frameIndex;
+                    }
                 }
 
                 int unusedIndex;
+
+                marker.bytesAllocatedMean = marker.presentOnFrameCount > 0 ? (marker.bytesAllocatedTotal / marker.presentOnFrameCount) : 0;
+                marker.frames.Sort(FrameTime.CompareGCAllocations);
+                marker.bytesAllocatedMedian = GetPercentageOffset(marker.frames, 50, out marker.bytesAllocatedMedianFrameIndex).bytesAllocated;
+                marker.bytesAllocatedLowerQuartile = GetPercentageOffset(marker.frames, 25, out unusedIndex).bytesAllocated;
+                marker.bytesAllocatedUpperQuartile = GetPercentageOffset(marker.frames, 75, out unusedIndex).bytesAllocated;
 
                 marker.msMean = marker.presentOnFrameCount > 0 ? (float)(marker.msTotal / marker.presentOnFrameCount) : 0f;
                 marker.frames.Sort(FrameTime.CompareCount);
@@ -300,22 +340,29 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         {
             if (m_FrameSummary.frames.Count > 0)
             {
+                m_FrameSummary.frames.Sort(FrameTime.CompareGCAllocations);
+                m_FrameSummary.bytesMean = m_FrameSummary.bytesTotal / m_FrameSummary.count;
+                m_FrameSummary.bytesMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.bytesMedianFrameIndex).bytesAllocated;
+                m_FrameSummary.bytesLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out _).bytesAllocated;
+                m_FrameSummary.bytesUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out _).bytesAllocated;
+
                 m_FrameSummary.frames.Sort();
                 m_FrameSummary.msMean = (float)(m_FrameSummary.msTotal / m_FrameSummary.count);
-                m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.medianFrameIndex).ms;
-                int unusedIndex;
-                m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out unusedIndex).ms;
-                m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out unusedIndex).ms;
+                m_FrameSummary.msMedian = GetPercentageOffset(m_FrameSummary.frames, 50, out m_FrameSummary.msMedianFrameIndex).ms;
+                m_FrameSummary.msLowerQuartile = GetPercentageOffset(m_FrameSummary.frames, 25, out _).ms;
+                m_FrameSummary.msUpperQuartile = GetPercentageOffset(m_FrameSummary.frames, 75, out _).ms;
             }
             else
             {
                 m_FrameSummary.msMean = 0f;
+                m_FrameSummary.bytesMean = 0;
                 m_FrameSummary.msMedian = 0f;
                 m_FrameSummary.msLowerQuartile = 0f;
                 m_FrameSummary.msUpperQuartile = 0f;
 
                 // This started as float.MaxValue and won't have been updated
                 m_FrameSummary.msMin = 0f;
+                m_FrameSummary.bytesMin = 0;
             }
             // No longer need the frame time list ?
             //m_frameSummary.msFrame.Clear();

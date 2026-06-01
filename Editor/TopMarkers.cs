@@ -751,7 +751,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             leftAlignStyle.normal.textColor = m_TextColor;
             Color contentColor = GUI.contentColor;
 
-            int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameSummary.medianFrameIndex, m_CurrentSettings.rangeSettings.dataView);
+            int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(frameSummary.msMedianFrameIndex, m_CurrentSettings.rangeSettings.dataView);
 
             Profiler.BeginSample("DrawText");
             foreach (MarkerSummaryEntry entry in m_MarkerSummary.entry)

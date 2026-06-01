@@ -77,10 +77,8 @@ public class ProfileAnalyzerBaseTest
             profileFrame.msFrame = msFrameDuration;
             msFrameStartTime += msFrameDuration;
 
-            var profileThread = new ProfileThread();
+            var profileThread = new ProfileThread(profileData.AddThreadName("1:Main Thread"));
             profileThread.fileVersion = ProfileData.latestVersion;
-            profileThread.threadIndex = 0;
-            profileData.AddThreadName("1:Main Thread", profileThread);
 
             var markerArray = new ProfileMarker[markers.Length];
             for (int markerIndex = 0; markerIndex < markers.Length; markerIndex++)

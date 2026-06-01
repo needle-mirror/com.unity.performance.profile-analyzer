@@ -53,9 +53,9 @@ public class ProfileAnalyzerEmptyTests : ProfileAnalyzerBaseTest
         Assert.AreEqual(0, frameSummary.msUpperQuartile);
         Assert.AreEqual(0, frameSummary.msMin);
         Assert.AreEqual(0, frameSummary.msMax);
-        Assert.AreEqual(Mathf.RoundToInt((float)(k_LastFrameInProfileAnalyzer + 0.1f) / 2.0f), frameSummary.medianFrameIndex);
-        Assert.AreEqual(k_FirstValidFrameInProfiler, frameSummary.minFrameIndex);
-        Assert.AreEqual(k_FirstValidFrameInProfiler, frameSummary.maxFrameIndex);
+        Assert.AreEqual(Mathf.RoundToInt((float)(k_LastFrameInProfileAnalyzer + 0.1f) / 2.0f), frameSummary.msMedianFrameIndex);
+        Assert.AreEqual(k_FirstValidFrameInProfiler, frameSummary.msMinFrameIndex);
+        Assert.AreEqual(k_FirstValidFrameInProfiler, frameSummary.msMaxFrameIndex);
         Assert.AreEqual(0, frameSummary.maxMarkerDepth);
         Assert.AreEqual(0, frameSummary.totalMarkers);
     }

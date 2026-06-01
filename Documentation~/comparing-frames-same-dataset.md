@@ -6,7 +6,7 @@ This workflow explains how to compare two frames from the same data set. In this
 
 Open the Profile Analyzer window (menu: **Window &gt; Analysis &gt; Profile Analyzer**) and collect some profiling data. To pull data from an active profiling session, click the **Pull Data** button. This pulls in the current set of available frames from the Profiler. If you don't have an active profile session, click the **Open Profiler Window** button, then load or record some data.
 
-For more information on how to collect data, see the workflow documentation on [Collecting and viewing data](collecting-and-viewing-data.md).
+For more information on how to collect data, refer to the workflow documentation on [Collecting and viewing data workflow](collecting-and-viewing-data.md).
 
 ## Step 2: Open Compare view
 

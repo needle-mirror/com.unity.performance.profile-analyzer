@@ -40,6 +40,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int m_MaxCount;
         float m_MaxCountMean;
         double m_MaxTotal;
+        long m_MaxGCAllocMedian;
+        long m_MaxGCAllocTotal;
+        int m_MaxGCAllocCount;
 
         const float kRowHeights = 20f;
         readonly List<TreeViewItem> m_Rows = new List<TreeViewItem>(100);
@@ -67,6 +70,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Total,
             TotalBar,
             Threads,
+            GCAllocMedian,
+            GCAllocMedianBar,
+            GCAllocMean,
+            GCAllocMin,
+            GCAllocMax,
+            GCAllocRange,
+            GCAllocTotal,
+            GCAllocTotalBar,
+            GCAllocCount,
         }
 
         static int m_MaxColumns;
@@ -89,6 +101,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             AtMedian,
             Total,
             Threads,
+            GCAllocMedian,
+            GCAllocMean,
+            GCAllocMin,
+            GCAllocMax,
+            GCAllocRange,
+            GCAllocTotal,
+            GCAllocCount,
         }
 
         // Sort options per column
@@ -114,6 +133,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             SortOption.Total,
             SortOption.Total,
             SortOption.Threads,
+            SortOption.GCAllocMedian,
+            SortOption.GCAllocMedian,
+            SortOption.GCAllocMean,
+            SortOption.GCAllocMin,
+            SortOption.GCAllocMax,
+            SortOption.GCAllocRange,
+            SortOption.GCAllocTotal,
+            SortOption.GCAllocTotal,
+            SortOption.GCAllocCount,
         };
 
         internal static class Styles
@@ -165,6 +193,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_MaxTotal = 0.0;
             m_MaxCount = 0;
             m_MaxCountMean = 0.0f;
+            m_MaxGCAllocMedian = 0;
+            m_MaxGCAllocTotal = 0;
+            m_MaxGCAllocCount = 0;
             var markers = m_DataView.analysis.GetMarkers();
             for (int index = 0; index < markers.Count; ++index)
             {
@@ -192,6 +223,18 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 float countMean = item.data.countMean;
                 if (countMean > m_MaxCountMean)
                     m_MaxCountMean = countMean;
+
+                long gcAllocMedian = item.data.bytesAllocatedMedian;
+                if (gcAllocMedian > m_MaxGCAllocMedian)
+                    m_MaxGCAllocMedian = gcAllocMedian;
+
+                long gcAllocTotal = item.data.bytesAllocatedTotal;
+                if (gcAllocTotal > m_MaxGCAllocTotal)
+                    m_MaxGCAllocTotal = gcAllocTotal;
+
+                int gcAllocCount = item.data.countAllocations;
+                if (gcAllocCount > m_MaxGCAllocCount)
+                    m_MaxGCAllocCount = gcAllocCount;
             }
 
             return root;
@@ -350,6 +393,27 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     case SortOption.Threads:
                         orderedQuery = orderedQuery.ThenBy(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.Threads].text : GetThreadNames(l), ascending);
                         break;
+                    case SortOption.GCAllocMedian:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.bytesAllocatedMedian, ascending);
+                        break;
+                    case SortOption.GCAllocMean:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.bytesAllocatedMean, ascending);
+                        break;
+                    case SortOption.GCAllocMin:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.bytesAllocatedMin, ascending);
+                        break;
+                    case SortOption.GCAllocMax:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.bytesAllocatedMax, ascending);
+                        break;
+                    case SortOption.GCAllocRange:
+                        orderedQuery = orderedQuery.ThenBy(l => (l.data.bytesAllocatedMax == long.MinValue || l.data.bytesAllocatedMin == long.MaxValue) ? 0 : (l.data.bytesAllocatedMax - l.data.bytesAllocatedMin), ascending);
+                        break;
+                    case SortOption.GCAllocTotal:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.bytesAllocatedTotal, ascending);
+                        break;
+                    case SortOption.GCAllocCount:
+                        orderedQuery = orderedQuery.ThenBy(l => l.data.countAllocations, ascending);
+                        break;
                 }
             }
 
@@ -394,6 +458,20 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return myTypes.Order(l => l.data.msTotal, ascending);
                 case SortOption.Threads:
                     return myTypes.Order(l => l.cachedRowString != null ? l.cachedRowString[(int)MyColumns.Threads].text : GetThreadNames(l), ascending);
+                case SortOption.GCAllocMedian:
+                    return myTypes.Order(l => l.data.bytesAllocatedMedian, ascending);
+                case SortOption.GCAllocMean:
+                    return myTypes.Order(l => l.data.bytesAllocatedMean, ascending);
+                case SortOption.GCAllocMin:
+                    return myTypes.Order(l => l.data.bytesAllocatedMin, ascending);
+                case SortOption.GCAllocMax:
+                    return myTypes.Order(l => l.data.bytesAllocatedMax, ascending);
+                case SortOption.GCAllocRange:
+                    return myTypes.Order(l => (l.data.bytesAllocatedMax == long.MinValue || l.data.bytesAllocatedMin == long.MaxValue) ? 0 : (l.data.bytesAllocatedMax - l.data.bytesAllocatedMin), ascending);
+                case SortOption.GCAllocTotal:
+                    return myTypes.Order(l => l.data.bytesAllocatedTotal, ascending);
+                case SortOption.GCAllocCount:
+                    return myTypes.Order(l => l.data.countAllocations, ascending);
                 default:
                     Assert.IsTrue(false, "Unhandled enum");
                     break;
@@ -477,6 +555,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         GUIContent ToDisplayUnitsWithTooltips(double ms, bool showUnits = false, int onFrame = -1)
         {
             return ToDisplayUnitsWithTooltips((float)ms, showUnits, onFrame);
+        }
+
+        GUIContent ToMemoryUnitsWithTooltips(long bytes)
+        {
+            return m_ProfileAnalyzerWindow.ToMemoryUnits(bytes);
         }
 
         void CopyToClipboard(Event current, string text)
@@ -584,7 +667,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             int minFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(item.data.minFrameIndex, m_DataView);
             int maxFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(item.data.maxFrameIndex, m_DataView);
             int firstFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(item.data.firstFrameIndex, m_DataView);
-            int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(m_DataView.analysis.GetFrameSummary().medianFrameIndex, m_DataView);
+            int frameSummaryMedianFrameIndex = m_ProfileAnalyzerWindow.GetRemappedUIFrameIndex(m_DataView.analysis.GetFrameSummary().msMedianFrameIndex, m_DataView);
 
             if (item.data.timeRemoved > 0.0)
             {
@@ -631,6 +714,19 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             string threadNames = GetThreadNames(item);
             item.cachedRowString[(int)MyColumns.Threads] = new GUIContent(threadNames, threadNames);
+
+            item.cachedRowString[(int)MyColumns.GCAllocMedian] = ToMemoryUnitsWithTooltips(item.data.bytesAllocatedMedian);
+            string gcAllocMedianTooltip = $"{item.data.bytesAllocatedMedian} B";
+            item.cachedRowString[(int)MyColumns.GCAllocMedianBar] = new GUIContent("", gcAllocMedianTooltip);
+            item.cachedRowString[(int)MyColumns.GCAllocMean] = ToMemoryUnitsWithTooltips(item.data.bytesAllocatedMean);
+            item.cachedRowString[(int)MyColumns.GCAllocMin] = ToMemoryUnitsWithTooltips(item.data.bytesAllocatedMin == long.MaxValue ? 0 : item.data.bytesAllocatedMin);
+            item.cachedRowString[(int)MyColumns.GCAllocMax] = ToMemoryUnitsWithTooltips(item.data.bytesAllocatedMax == long.MinValue ? 0 : item.data.bytesAllocatedMax);
+            long gcAllocRange = (item.data.bytesAllocatedMax == long.MinValue || item.data.bytesAllocatedMin == long.MaxValue) ? 0 : item.data.bytesAllocatedMax - item.data.bytesAllocatedMin;
+            item.cachedRowString[(int)MyColumns.GCAllocRange] = ToMemoryUnitsWithTooltips(gcAllocRange);
+            item.cachedRowString[(int)MyColumns.GCAllocTotal] = ToMemoryUnitsWithTooltips(item.data.bytesAllocatedTotal);
+            string gcAllocTotalTooltip = $"{item.data.bytesAllocatedTotal} B";
+            item.cachedRowString[(int)MyColumns.GCAllocTotalBar] = new GUIContent("", gcAllocTotalTooltip);
+            item.cachedRowString[(int)MyColumns.GCAllocCount] = new GUIContent(string.Format("{0}", item.data.countAllocations), "");
         }
 
         void ShowBar(Rect rect, float ms, float range, GUIContent content)
@@ -678,6 +774,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 case MyColumns.AtMedian:
                 case MyColumns.Total:
                 case MyColumns.Threads:
+                case MyColumns.GCAllocMedian:
+                case MyColumns.GCAllocMean:
+                case MyColumns.GCAllocMin:
+                case MyColumns.GCAllocMax:
+                case MyColumns.GCAllocRange:
+                case MyColumns.GCAllocTotal:
+                case MyColumns.GCAllocCount:
                     ShowText(cellRect, content);
                     break;
                 case MyColumns.MedianBar:
@@ -691,6 +794,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     break;
                 case MyColumns.CountMeanBar:
                     ShowBar(cellRect, item.data.countMean, m_MaxCountMean, content);
+                    break;
+                case MyColumns.GCAllocMedianBar:
+                    ShowBar(cellRect, (float)item.data.bytesAllocatedMedian, (float)m_MaxGCAllocMedian, content);
+                    break;
+                case MyColumns.GCAllocTotalBar:
+                    ShowBar(cellRect, (float)item.data.bytesAllocatedTotal, (float)m_MaxGCAllocTotal, content);
                     break;
                 case MyColumns.FirstFrame:
                     if (!m_ProfileAnalyzerWindow.IsProfilerWindowOpen() || !m_DataView.inSyncWithProfilerData)
@@ -761,6 +870,15 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 new HeaderData("Total", "Marker total time over all selected frames"),
                 new HeaderData("Total Bar", "Marker total time over all selected frames"),
                 new HeaderData("Threads", "Threads the marker occurs on (with filtering applied)"),
+                new HeaderData("GC Alloc Median", "Median GC allocation bytes per frame over all selected frames"),
+                new HeaderData("GC Alloc Median Bar", "Median GC allocation bytes per frame over all selected frames", width: 50),
+                new HeaderData("GC Alloc Mean", "Mean GC allocation bytes per frame"),
+                new HeaderData("GC Alloc Min", "Minimum GC allocation bytes in a frame"),
+                new HeaderData("GC Alloc Max", "Maximum GC allocation bytes in a frame"),
+                new HeaderData("GC Alloc Range", "Difference between maximum and minimum GC allocation bytes"),
+                new HeaderData("GC Alloc Total", "Total GC allocation bytes over all selected frames"),
+                new HeaderData("GC Alloc Total Bar", "Total GC allocation bytes over all selected frames", width: 50),
+                new HeaderData("GC Alloc Count", "Number of GC allocation events over all selected frames"),
             };
             foreach (var header in headerData)
             {
@@ -821,6 +939,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.Count,
                         (int)MyColumns.CountMean,
                         (int)MyColumns.AtMedian,
+                        (int)MyColumns.GCAllocMedian,
+                        (int)MyColumns.GCAllocCount,
                     };
                     break;
                 case MarkerColumnFilter.Mode.Time:
@@ -876,6 +996,22 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         (int)MyColumns.Depth,
                         (int)MyColumns.CountMean,
                         (int)MyColumns.CountMeanBar,
+                    };
+                    break;
+                case MarkerColumnFilter.Mode.GCAllocations:
+                    visibleColumns = new int[]
+                    {
+                        (int)MyColumns.Name,
+                        (int)MyColumns.Depth,
+                        (int)MyColumns.GCAllocMedian,
+                        (int)MyColumns.GCAllocMedianBar,
+                        (int)MyColumns.GCAllocMean,
+                        (int)MyColumns.GCAllocMin,
+                        (int)MyColumns.GCAllocMax,
+                        (int)MyColumns.GCAllocRange,
+                        (int)MyColumns.GCAllocTotal,
+                        (int)MyColumns.GCAllocTotalBar,
+                        (int)MyColumns.GCAllocCount,
                     };
                     break;
                 case MarkerColumnFilter.Mode.Depth:

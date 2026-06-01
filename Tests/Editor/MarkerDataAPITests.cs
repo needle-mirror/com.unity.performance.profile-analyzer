@@ -11,7 +11,7 @@ public class MarkerDataAPITests : ProfileAnalyzerBaseTest
 
         for (int i = 0; i < 20; ++i)
         {
-            var frameTime = new FrameTime(1, 1f * i, 1);
+            var frameTime = new FrameTime(1, 1f * i, 1, 0);
             marker.frames.Add(frameTime);
         }
 
