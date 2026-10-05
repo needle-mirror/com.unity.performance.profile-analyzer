@@ -17,7 +17,7 @@ When using any Unity version newer than 2021.2.0a5, you can just click __[this l
 
 This version of the Profile Analyzer is compatible with the following versions of the Unity Editor:
 
-* 2020.3 and later
+* 2021.3 and later
 
 For earlier versions, follow this link to the Profile Analyzer [download](https://download.packages.unity.com/com.unity.performance.profile-analyzer/-/com.unity.performance.profile-analyzer-1.1.1.tgz) and place the contents into your Project's Assets folder.
 

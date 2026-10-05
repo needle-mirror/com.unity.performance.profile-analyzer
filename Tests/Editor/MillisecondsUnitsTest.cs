@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 using System.Collections.Generic;
+using UnityEngine.TestTools;
+
 
 public class MillisecondsUnitsFixture : UnitsTestFixture
 {
@@ -28,6 +30,10 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00"),
     };
 
+    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void DecimalLimit([ValueSource("DecimalLimitValues")] TestData testData)
     {
@@ -52,6 +58,10 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00"),
     };
 
+    // Mono rounds 0.015f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.014999999...) and yields "0.01".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void ShowFullValueWhenBelowZero([ValueSource("ShowFullValueWhenBelowZeroValues")] TestData testData)
     {
@@ -74,6 +84,10 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00ms"),
     };
 
+    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00ms".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void ShowUnits([ValueSource("ShowUnitsValues")] TestData testData)
     {
@@ -96,6 +110,10 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100s"),
     };
 
+    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void LimitedTo5Digits([ValueSource("LimitedTo5DigitsValues")] TestData testData)
     {
@@ -118,6 +136,10 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100s"),
     };
 
+    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00ms".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void WithUnitsLimitedTo5Digits([ValueSource("WithUnitsLimitedTo5DigitsValues")] TestData testData)
     {

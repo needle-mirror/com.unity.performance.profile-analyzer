@@ -1,6 +1,8 @@
 using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 using System.Collections.Generic;
+using UnityEngine.TestTools;
+
 
 public class MicrosecondsUnitsFixture : UnitsTestFixture
 {
@@ -30,6 +32,10 @@ public class MicrosecondsUnitsTest : MicrosecondsUnitsFixture
         new TestData(100000.0012f,  "100000000"),
     };
 
+    // Mono's legacy 7-significant-digit float formatting prints 10000.0012f * 1000 as "10000000", while CoreCLR formats the exact float value and prints "10000001".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void DecimalLimit([ValueSource("DecimalLimitValues")] TestData testData)
     {
@@ -56,6 +62,10 @@ public class MicrosecondsUnitsTest : MicrosecondsUnitsFixture
         new TestData(100000.0012f,  "100000000"),
     };
 
+    // Mono's legacy 7-significant-digit float formatting prints 10000.0012f * 1000 as "10000000", while CoreCLR formats the exact float value and prints "10000001".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void ShowFullValueWhenBelowZero([ValueSource("ShowFullValueWhenBelowZeroValues")] TestData testData)
     {
@@ -80,6 +90,10 @@ public class MicrosecondsUnitsTest : MicrosecondsUnitsFixture
         new TestData(100000.0012f,  "100000000us"),
     };
 
+    // Mono's legacy 7-significant-digit float formatting prints 10000.0012f * 1000 as "10000000us", while CoreCLR formats the exact float value and prints "10000001us".
+#if ENABLE_CORECLR
+    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
+#endif
     [Test]
     public void WithUnits([ValueSource("WithUnitsValues")] TestData testData)
     {
