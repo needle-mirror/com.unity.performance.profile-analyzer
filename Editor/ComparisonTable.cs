@@ -1494,7 +1494,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             item.cachedRowString[(int)MyColumns.LeftCountMean] = item.data.leftIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", LeftCountMean(item)));
             item.cachedRowString[(int)MyColumns.RightCountMean] = item.data.rightIndex < 0 ? Styles.invalidEntry : new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", RightCountMean(item)));
-            tooltip = string.Format("{0}", CountMeanDiff(item));
+            tooltip = string.Format("{0:G7}", CountMeanDiff(item));
             item.cachedRowString[(int)MyColumns.LeftCountMeanBar] = CountMeanDiff(item) < 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.RightCountMeanBar] = CountMeanDiff(item) > 0 ? new GUIContent("", tooltip) : new GUIContent("", "");
             item.cachedRowString[(int)MyColumns.CountMeanDiff] = (item.data.leftIndex < 0 && item.data.rightIndex < 0) ? Styles.invalidEntry : new GUIContent(string.Format("{0:f0}", CountMeanDiff(item)), CountMeanDiffPercentString(item));

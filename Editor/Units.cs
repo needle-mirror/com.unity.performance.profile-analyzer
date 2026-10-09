@@ -178,7 +178,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             string numberStr;
             if (value < minValueShownWhenUsingLimitedDecimalPlaces && showFullValueWhenBelowZero)
             {
-                numberStr = string.Format(CultureInfo.InvariantCulture, "{0}", value);
+                numberStr = string.Format(CultureInfo.InvariantCulture, "{0:G7}", value);
             }
             else
             {

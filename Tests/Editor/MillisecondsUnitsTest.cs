@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using UnityEditor.Performance.ProfileAnalyzer;
 using System.Collections.Generic;
-using UnityEngine.TestTools;
-
 
 public class MillisecondsUnitsFixture : UnitsTestFixture
 {
@@ -20,7 +18,11 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(0.00000001f,   "0.00"),
         new TestData(0.0009f,       "0.00"),
         new TestData(0.004f,        "0.00"),
-        new TestData(0.005f,        "0.01"),
+#if ENABLE_CORECLR
+        new TestData(0.005f,        "0.00"),    // Stored as 0.0049999..., which CoreCLR rounds down
+#else
+        new TestData(0.005f,        "0.01"),    // Mono rounds to 7 significant digits (0.005000000) first
+#endif
         new TestData(0.1012f,       "0.10"),
         new TestData(1.0012f,       "1.00"),
         new TestData(10.0012f,      "10.00"),
@@ -30,10 +32,6 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00"),
     };
 
-    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00".
-#if ENABLE_CORECLR
-    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
-#endif
     [Test]
     public void DecimalLimit([ValueSource("DecimalLimitValues")] TestData testData)
     {
@@ -45,10 +43,15 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
     {
         new TestData(0.00000001f,   "1E-08"),
         new TestData(0.0009f,       "0.0009"),
+        new TestData(0.0025000002f, "0.0025"),    // Limited to 7 significant digits, not the shortest round-trippable "0.0025000002"
         new TestData(0.004f,        "0.004"),
         new TestData(0.005f,        "0.005"),
         new TestData(0.01f,         "0.01"),
-        new TestData(0.015f,        "0.02"),
+#if ENABLE_CORECLR
+        new TestData(0.015f,        "0.01"),    // Stored as 0.0149999..., which CoreCLR rounds down
+#else
+        new TestData(0.015f,        "0.02"),    // Mono rounds to 7 significant digits (0.01500000) first
+#endif
         new TestData(0.1012f,       "0.10"),
         new TestData(1.0012f,       "1.00"),
         new TestData(10.0012f,      "10.00"),
@@ -58,10 +61,6 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00"),
     };
 
-    // Mono rounds 0.015f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.014999999...) and yields "0.01".
-#if ENABLE_CORECLR
-    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
-#endif
     [Test]
     public void ShowFullValueWhenBelowZero([ValueSource("ShowFullValueWhenBelowZeroValues")] TestData testData)
     {
@@ -74,7 +73,11 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(0.00000001f,   "0.00ms"),
         new TestData(0.0009f,       "0.00ms"),
         new TestData(0.004f,        "0.00ms"),
-        new TestData(0.005f,        "0.01ms"),
+#if ENABLE_CORECLR
+        new TestData(0.005f,        "0.00ms"),    // Stored as 0.0049999..., which CoreCLR rounds down
+#else
+        new TestData(0.005f,        "0.01ms"),    // Mono rounds to 7 significant digits (0.005000000) first
+#endif
         new TestData(0.1012f,       "0.10ms"),
         new TestData(1.0012f,       "1.00ms"),
         new TestData(10.0012f,      "10.00ms"),
@@ -84,10 +87,6 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100000.00ms"),
     };
 
-    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00ms".
-#if ENABLE_CORECLR
-    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
-#endif
     [Test]
     public void ShowUnits([ValueSource("ShowUnitsValues")] TestData testData)
     {
@@ -100,7 +99,11 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(0.00000001f,   "0.00"),
         new TestData(0.0009f,       "0.00"),
         new TestData(0.004f,        "0.00"),
-        new TestData(0.005f,        "0.01"),
+#if ENABLE_CORECLR
+        new TestData(0.005f,        "0.00"),    // Stored as 0.0049999..., which CoreCLR rounds down
+#else
+        new TestData(0.005f,        "0.01"),    // Mono rounds to 7 significant digits (0.005000000) first
+#endif
         new TestData(0.1012f,       "0.10"),
         new TestData(1.0012f,       "1.00"),
         new TestData(10.0012f,      "10.00"),
@@ -110,10 +113,6 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100s"),
     };
 
-    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00".
-#if ENABLE_CORECLR
-    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
-#endif
     [Test]
     public void LimitedTo5Digits([ValueSource("LimitedTo5DigitsValues")] TestData testData)
     {
@@ -126,7 +125,11 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(0.00000001f,   "0.00ms"),
         new TestData(0.0009f,       "0.00ms"),
         new TestData(0.004f,        "0.00ms"),
-        new TestData(0.005f,        "0.01ms"),
+#if ENABLE_CORECLR
+        new TestData(0.005f,        "0.00ms"),    // Stored as 0.0049999..., which CoreCLR rounds down
+#else
+        new TestData(0.005f,        "0.01ms"),    // Mono rounds to 7 significant digits (0.005000000) first
+#endif
         new TestData(0.1012f,       "0.10ms"),
         new TestData(1.0012f,       "1.00ms"),
         new TestData(10.0012f,      "10.0ms"),
@@ -136,10 +139,6 @@ public class MillisecondsUnitsTest : MillisecondsUnitsFixture
         new TestData(100000.0012f,  "100s"),
     };
 
-    // Mono rounds 0.005f up in "{0:f2}" via its legacy shortened float precision, while CoreCLR formats the exact float (0.004999999...) and yields "0.00ms".
-#if ENABLE_CORECLR
-    [Explicit("Disabled for CoreCLR, see https://jira.unity3d.com/browse/UUM-149946")]
-#endif
     [Test]
     public void WithUnitsLimitedTo5Digits([ValueSource("WithUnitsLimitedTo5DigitsValues")] TestData testData)
     {

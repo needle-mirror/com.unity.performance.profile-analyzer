@@ -705,7 +705,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             item.cachedRowString[(int)MyColumns.CountBar] = new GUIContent("", string.Format("{0}", item.data.count));
             item.cachedRowString[(int)MyColumns.CountMean] = new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countMean), "");
             item.cachedRowString[(int)MyColumns.CountMeanBar] = new GUIContent("", string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countMean));
-            item.cachedRowString[(int)MyColumns.CountStandardDeviation] = new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countStandardDeviation), string.Format(CultureInfo.InvariantCulture, "{0}", item.data.countStandardDeviation));
+            item.cachedRowString[(int)MyColumns.CountStandardDeviation] = new GUIContent(string.Format(CultureInfo.InvariantCulture, "{0:f0}", item.data.countStandardDeviation), string.Format(CultureInfo.InvariantCulture, "{0:G7}", item.data.countStandardDeviation));
             item.cachedRowString[(int)MyColumns.FirstFrame] = new GUIContent(firstFrameIndex.ToString());
             item.cachedRowString[(int)MyColumns.AtMedian] = ToDisplayUnitsWithTooltips(item.data.msAtMedian, false, frameSummaryMedianFrameIndex);
             item.cachedRowString[(int)MyColumns.Total] = ToDisplayUnitsWithTooltips(item.data.msTotal);

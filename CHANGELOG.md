@@ -4,6 +4,14 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-10-09
+
+### Changed
+* On the CoreCLR scripting runtime, displayed times are rounded from the exact stored value, so a value right at a rounding boundary can differ from Mono in its last digit (for example, 0.005ms, which is stored as 0.0049999..., displays as "0.00ms" rather than "0.01ms").
+
+### Fixed
+* Fixed tooltips showing float noise on the CoreCLR scripting runtime, such as "0.0025000002ms" instead of "0.0025ms". Full time values and the count mean difference and count standard deviation tooltips in the marker tables are now limited to 7 significant digits, as on Mono.
+
 ## [1.4.1] - 2026-10-05
 
 ### Changed
