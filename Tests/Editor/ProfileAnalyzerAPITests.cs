@@ -26,6 +26,21 @@ public class ProfileAnalyzerAPITests : ProfileAnalyzerBaseTest
     }
 
     [Test]
+    public void ProfileAnalyzer_ThreadFrames_EachSelectedFrameCountedOnce([Values(1, 2)] int numberOfFramesToSelect)
+    {
+        ExpectedResults expectedResults;
+        var profileData = SetupCommonProfileData(out expectedResults);
+
+        m_SetupData = new FrameSetupData(1, numberOfFramesToSelect, -1, new List<string> { "1:Main Thread" });
+
+        var analysis = GetAnalysisFromFrameData(profileData);
+
+        var thread = analysis.GetThreadByName("1:Main Thread");
+        Assert.IsNotNull(thread);
+        Assert.AreEqual(numberOfFramesToSelect, thread.frames.Count);
+    }
+
+    [Test]
     public void ProfileAnalyzer_MultipleMarkerInstances_ReturnsCombinedTime()
     {
         ExpectedResults expectedResults;

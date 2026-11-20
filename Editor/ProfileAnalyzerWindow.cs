@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -457,6 +458,8 @@ To compare two data sets:
 
         bool m_Async = true;
         Thread m_BackgroundThread;
+        CancellationTokenSource m_CancellationTokenSource;
+        CancellationToken m_CancellationToken;
         ThreadActivity m_ThreadActivity;
         ProfileData m_ProfilerData;
         string m_Path;
@@ -519,9 +522,9 @@ To compare two data sets:
         GUIStyle m_StyleUpperLeft;
         bool m_StylesSetup = false;
 
-        static Regex quotedStringWithoutQuotes = new Regex("\"([^\"]*)\"");
-        static Regex quotedString = new Regex("(\"[^\"]*\")");
-        static Regex stringWithoutWhiteSpace = new Regex("([^ \t]+)");
+        static readonly Regex quotedStringWithoutQuotes = new Regex("\"([^\"]*)\"");
+        static readonly Regex quotedString = new Regex("(\"[^\"]*\")");
+        static readonly Regex stringWithoutWhiteSpace = new Regex("([^ \t]+)");
         /*
                 static Regex lastSpace = new Regex("(.+)[ ]([^ ]*)");
         */
@@ -562,9 +565,12 @@ To compare two data sets:
             m_FrameTimeGraphGlobalSettings = new FrameTimeGraphGlobalSettings();
         }
 
+        [NoAutoStaticsCleanup]
         static int s_TmpCount = 0;
+        [NoAutoStaticsCleanup]
         static string s_TmpDir = "";
         ActiveView m_ActiveLoadingView;
+        [NoAutoStaticsCleanup]
         static string s_ApplicationDataPath;
 
         internal static string TmpDir
@@ -600,6 +606,8 @@ To compare two data sets:
         {
             //do this here to safeguard against Application.dataPAth being accessed off the main thread
             s_ApplicationDataPath = Application.dataPath;
+
+            AssemblyReloadEvents.beforeAssemblyReload += CancelBackgroundWork;
 
             // Update styles so we get the theme changes
             m_StylesSetup = false;
@@ -708,6 +716,8 @@ To compare two data sets:
 
         void OnDisable()
         {
+            AssemblyReloadEvents.beforeAssemblyReload -= CancelBackgroundWork;
+
             if (ProfileAnalyzerExportWindow.IsOpen())
                 ProfileAnalyzerExportWindow.CloseAll();
             m_ProfilerWindowInterface.selectedMarkerChanged -= OnProfilerWindowCpuModuleSelectionChanged;
@@ -716,18 +726,50 @@ To compare two data sets:
             m_ProfilerWindowInterface = null;
         }
 
+        // Asks any running analysis/compare/load to stop at its next cancellation check.
+        // Thread.Abort is not supported on CoreCLR, so cancellation is cooperative.
+        void CancelBackgroundWork()
+        {
+            try
+            {
+                m_CancellationTokenSource?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
         void OnDestroy()
         {
-            if (m_BackgroundThread != null)
-                m_BackgroundThread.Abort();
-            if (m_ProfileSingleView != null && m_ProfileSingleView.data != null)
-                m_ProfileSingleView.data.DeleteTmpFiles();
-            if (m_ProfileLeftView != null && m_ProfileLeftView.data != null)
-                m_ProfileLeftView.data.DeleteTmpFiles();
-            if (m_ProfileRightView != null && m_ProfileRightView.data != null)
-                m_ProfileRightView.data.DeleteTmpFiles();
-            if (Directory.Exists(TmpDir) && Directory.GetFiles(TmpDir).Length == 0)
-                Directory.Delete(TmpDir, true);
+            CancelBackgroundWork();
+
+            // Wait for the worker to exit so it has closed the tmp file before we delete it.
+            // It checks for cancellation at least once per frame, so this should return quickly.
+            m_BackgroundThread?.Join();
+            m_CancellationTokenSource?.Dispose();
+
+            // Isolated so that one failure cannot skip the rest of the cleanup.
+            foreach (var view in new[] { m_ProfileSingleView, m_ProfileLeftView, m_ProfileRightView })
+            {
+                try
+                {
+                    view?.data?.DeleteTmpFiles();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"Unable to delete Profile Analyzer temporary file: {e.Message}");
+                }
+            }
+
+            try
+            {
+                if (Directory.Exists(TmpDir) && Directory.GetFiles(TmpDir).Length == 0)
+                    Directory.Delete(TmpDir, true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Unable to remove Profile Analyzer temporary folder: {e.Message}");
+            }
         }
 
         bool DisplayCount()
@@ -1601,6 +1643,10 @@ To compare two data sets:
             m_ThreadPhase = 0;
             SetThreadPhaseCount(activity);
 
+            m_CancellationTokenSource?.Dispose();
+            m_CancellationTokenSource = new CancellationTokenSource();
+            m_CancellationToken = m_CancellationTokenSource.Token;
+
             m_BackgroundThread = new Thread(BackgroundThread);
             m_BackgroundThread.Start();
         }
@@ -1718,9 +1764,9 @@ To compare two data sets:
 
             // First scan just the frames
             m_ThreadPhase = 0;
-            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+            var leftAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, null, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
             m_ThreadPhase++;
-            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+            var rightAnalysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, null, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
             m_ThreadPhase++;
 
             if (leftAnalysisNew == null || rightAnalysisNew == null)
@@ -1738,9 +1784,9 @@ To compare two data sets:
             // For now do it always if the depth is auto and not 'all'
             if (updateDepthPhase != 0)
             {
-                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
+                var leftAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker, m_CancellationToken);
                 m_ThreadPhase++;
-                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
+                var rightAnalysis = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, ProfileAnalyzer.kDepthAll, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker, m_CancellationToken);
                 m_ThreadPhase++;
 
                 var pairings = GeneratePairings(leftAnalysis, rightAnalysis);
@@ -1767,7 +1813,7 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+                m_ProfileLeftView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, selection, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
@@ -1782,15 +1828,15 @@ To compare two data sets:
 
                 // We don't pass timeScaleMax as that is only for the selected region.
                 // Pass 0 to auto select full range
-                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+                m_ProfileRightView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, selection, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
                 m_ThreadPhase++;
             }
             m_ThreadPhase++;
 
-            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
+            m_ProfileLeftView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileLeftView.data, m_ProfileLeftView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter1, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker, m_CancellationToken);
             m_ThreadPhase++;
 
-            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker);
+            m_ProfileRightView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileRightView.data, m_ProfileRightView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter2, selfTimes, m_ParentMarker, timeScaleMin, timeScaleMax, removeMarker, m_CancellationToken);
             m_ThreadPhase++;
 
             m_TotalCombinedMarkerCountNew = GetTotalCombinedMarkerCount(m_ProfileLeftView.data, m_ProfileRightView.data);
@@ -1926,7 +1972,7 @@ To compare two data sets:
                         break;
 
                     case ThreadActivity.Load:
-                        m_ThreadActivity = ProfileData.Load(m_Path, out m_ProfilerData) ? ThreadActivity.LoadDone : ThreadActivity.None;
+                        m_ThreadActivity = ProfileData.Load(m_Path, out m_ProfilerData, m_CancellationToken) ? ThreadActivity.LoadDone : ThreadActivity.None;
                         break;
 
                     case ThreadActivity.LoadDone:
@@ -1937,10 +1983,19 @@ To compare two data sets:
                         break;
                 }
             }
-            catch (ThreadAbortException)
+            catch (OperationCanceledException)
             {
+                // Cancelled by a window close or domain reload (see CancelBackgroundWork).
                 var activity = (m_ThreadActivity == ThreadActivity.Load) ? "Load" : "Analysis";
-                Debug.LogFormat("{0} failed due to a domain reload. Please try again.", activity);
+                Debug.LogFormat("{0} was cancelled due to the window closing or a domain reload.", activity);
+                m_ThreadActivity = ThreadActivity.None;
+            }
+            catch (AggregateException e) when (e.InnerExceptions.All(inner => inner is OperationCanceledException))
+            {
+                // Parallel.For wraps cancellation in an AggregateException if workers also threw it.
+                var activity = (m_ThreadActivity == ThreadActivity.Load) ? "Load" : "Analysis";
+                Debug.LogFormat("{0} was cancelled due to the window closing or a domain reload.", activity);
+                m_ThreadActivity = ThreadActivity.None;
             }
         }
 
@@ -2034,10 +2089,10 @@ To compare two data sets:
                     selection.Add(m_ProfileSingleView.data.OffsetToDisplayFrame(frameOffset));
                 }
 
-                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+                m_ProfileSingleView.analysisFullNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, selection, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
                 m_ThreadPhase++;
             }
-            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker);
+            m_ProfileSingleView.analysisNew = m_ProfileAnalyzer.Analyze(m_ProfileSingleView.data, m_ProfileSingleView.selectedIndices, threadSelection, m_DepthSliceUI.depthFilter, selfTimes, m_ParentMarker, 0, 0, removeMarker, m_CancellationToken);
             m_ThreadPhase++;
             stopwatch.Stop();
             m_LastAnalysisTimeMilliseconds = stopwatch.ElapsedMilliseconds;

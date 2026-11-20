@@ -1,8 +1,10 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditorInternal;
 using System.IO;
+using System.Threading;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
 using UnityEditor.Profiling;
@@ -102,6 +104,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int MarkerNameCount => markerNames.Count;
         public int gcAllocMarkerNameIndex = -1;
         public int gcAllocMarkerMetaDataSizeIndex = -1;
+        [NoAutoStaticsCleanup]
         static float s_Progress;
         internal static readonly int k_FileStreamBufferSize = 16384; // Default would be 4096,
 
@@ -116,7 +119,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             threadNames = new List<string>();
         }
 
-        public ProfileData(string filename)
+        public ProfileData(string filename, CancellationToken cancellationToken = default)
         {
             FrameIndexOffset = 0;
             FilePath = filename;
@@ -149,6 +152,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             frames = new List<ProfileFrame>(frameCount);
             for (int frame = 0; frame < frameCount; frame++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 frames.Add(new ProfileFrame(reader, Version));
                 s_Progress = 1f / 3f * ((float)frame / frameCount);
             }
@@ -533,7 +537,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static readonly ProfilerMarkerAbstracted k_LoadProfilerMarker = new ProfilerMarkerAbstracted("ProfileData.Load");
 
-        public static bool Load(string filename, out ProfileData data)
+        public static bool Load(string filename, out ProfileData data, CancellationToken cancellationToken = default)
         {
             using (k_LoadProfilerMarker.Auto())
             {
@@ -552,7 +556,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                     try
                     {
-                        data = new ProfileData(filename);
+                        data = new ProfileData(filename, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
                     }
                     catch (Exception e)
                     {
@@ -584,7 +592,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     return false;
                 }
 
-                data.Finalise();
+                data.Finalise(cancellationToken);
                 return true;
             }
         }
@@ -596,11 +604,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         }
 
         static readonly ProfilerMarkerAbstracted k_FinaliseProfilerMarker = new ProfilerMarkerAbstracted("ProfileData.Finalise");
-        public void Finalise()
+        public void Finalise(CancellationToken cancellationToken = default)
         {
             using (k_FinaliseProfilerMarker.Auto())
             {
-                CalculateMarkerChildTimes();
+                CalculateMarkerChildTimes(cancellationToken);
                 markerNamesDict.Clear();
             }
         }
@@ -618,12 +626,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
-        void CalculateMarkerChildTimes()
+        void CalculateMarkerChildTimes(CancellationToken cancellationToken)
         {
             var markerStack = new Stack<int>();
 
             for (int frameOffset = 0; frameOffset <= frames.Count; ++frameOffset)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var frameData = GetFrame(frameOffset);
                 if (frameData == null)
                     continue;
@@ -641,8 +650,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     {
                         threadData.markers[markerIndex].msChildren = 0.0f;
                         threadData.markers[markerIndex].bytesAllocatedWithChildren = threadData.markers[markerIndex].bytesAllocated;
-                        // Each GC.Alloc marker has bytesAllocated > 0 and is a leaf in the capture, so it represents one allocation event.
-                        threadData.markers[markerIndex].gcAllocationCountWithChildren = threadData.markers[markerIndex].bytesAllocated > 0 ? 1 : 0;
+                        // One allocation event per GC.Alloc sample, even when its Size metadata is missing (UUM-157575).
+                        threadData.markers[markerIndex].gcAllocationCountWithChildren = threadData.markers[markerIndex].nameIndex == gcAllocMarkerNameIndex ? 1 : 0;
                         frameData.bytesFrame += threadData.markers[markerIndex].bytesAllocated;
                     }
 
@@ -845,7 +854,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         [NonSerialized]
         public float msChildren;        // Recalculated on load so not saved in file
         [NonSerialized]
-        public int gcAllocationCountWithChildren;      // Number of GC.Alloc events nested in this marker; recalculated on load
+        public int gcAllocationCountWithChildren;      // Number of GC.Alloc events nested in this marker; calculated in ProfileData.Finalise
 
         public static ProfileMarker Create(float durationMS, int depth, long bytesAllocated = 0)
         {
@@ -855,8 +864,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 depth = depth,
                 bytesAllocated = bytesAllocated,
                 msChildren = 0.0f,
-                bytesAllocatedWithChildren = bytesAllocated,
-                gcAllocationCountWithChildren = bytesAllocated > 0 ? 1 : 0
+                bytesAllocatedWithChildren = bytesAllocated
             };
 
             return item;
@@ -891,7 +899,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 bytesAllocated = 0;
 
             bytesAllocatedWithChildren = bytesAllocated;
-            gcAllocationCountWithChildren = bytesAllocated > 0 ? 1 : 0;
+            gcAllocationCountWithChildren = 0; // Calculated in ProfileData.Finalise
         }
     }
 }

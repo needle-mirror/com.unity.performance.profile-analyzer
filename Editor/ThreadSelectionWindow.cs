@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using UnityEngine;
 using System.IO;
 using System;
@@ -798,10 +799,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
     internal class ThreadSelectionWindow : EditorWindow
     {
+        [NoAutoStaticsCleanup]
         private static HashSet<ThreadSelectionWindow> s_Instances = new HashSet<ThreadSelectionWindow>();
         ProfileAnalyzerWindow m_ProfileAnalyzerWindow;
         TreeViewState m_ThreadTreeViewState;
         //Static to store state between open/close
+        [NoAutoStaticsCleanup]
         static MultiColumnHeaderState m_ThreadMulticolumnHeaderState;
         ThreadTable m_ThreadTable;
 

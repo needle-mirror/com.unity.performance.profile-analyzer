@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using UnityEngine;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
     internal class FrameTimeGraph
     {
+        [NoAutoStaticsCleanup]
         static FrameTimeGraphGlobalSettings m_GlobalSettings = new FrameTimeGraphGlobalSettings();
 
         static public void SetGlobalSettings(FrameTimeGraphGlobalSettings globalSettings)
@@ -137,7 +139,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         const int kYAxisDetailThreshold = 40;
         const int kOverrunHeight = 3;
 
+        [NoAutoStaticsCleanup]
         static AxisMode s_YAxisMode;
+        [NoAutoStaticsCleanup]
         static float m_YAxisMs;
 
         bool m_IsOrderedByFrameDuration;
@@ -154,7 +158,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         int m_GraphId;
         int m_ControlID;
+        [NoAutoStaticsCleanup]
         static int s_LastSelectedGraphId = -1;
+        [NoAutoStaticsCleanup]
         static int s_CurrentSelectedGraphId = -1;
 
         bool m_Enabled;

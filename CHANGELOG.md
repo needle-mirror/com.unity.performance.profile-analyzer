@@ -4,6 +4,18 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-11-20
+
+### Changed
+* Minimum supported Unity version has been increased to 6000.0
+
+### Fixed
+* Fix for UUM-157575 - Pulling data from the Profiler no longer fails with "IndexOutOfRangeException: metadataIndex 0 must be in range of 0 to GetSampleMetadataCount" when the capture contains GC.Alloc samples without a size. These samples now count as 0 bytes.
+* GC Alloc Count now counts every GC.Alloc sample, including samples without a size or with 0 bytes, to match the Profiler window.
+* Fix for UUM-158828 - Thread Summary shows unique threads without an instance number, and correctly numbers every thread that shares a name.
+* Fix for UUM-158687 - Thread Summary statistics no longer count the first selected frame twice, which skewed each thread's median and quartiles.
+* Fix for UUM-158645 - Closing the window no longer throws "PlatformNotSupportedException: Thread abort is not supported on this platform" under CoreCLR, and temporary .pdata files are now deleted. Background analysis/load is cancelled cooperatively with a CancellationToken instead of Thread.Abort.
+
 ## [1.4.2] - 2026-10-09
 
 ### Changed

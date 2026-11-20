@@ -15,9 +15,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         public int index { get; private set; }
 
         /// <summary>Thread index id which means all threads of the same name</summary>
-        public static int kAll = -1;
+        public const int kAll = -1;
         /// <summary>Thread index id use when there is only one thread with this name</summary>
-        public static int kSingle = 0;
+        public const int kSingle = 0;
 
         /// <summary>Initialise ThreadIdentifier</summary>
         /// <param name="name">The thread name</param>

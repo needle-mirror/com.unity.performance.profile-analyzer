@@ -442,7 +442,9 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                                 }
 
                                 long bytesAllocated = 0;
-                                if (nameIndex == data.gcAllocMarkerNameIndex)
+                                // GC.Alloc samples can lack the Size metadata (UUM-157575); count them as 0 bytes instead of throwing.
+                                if (nameIndex == data.gcAllocMarkerNameIndex
+                                    && data.gcAllocMarkerMetaDataSizeIndex < frameData.GetSampleMetadataCount(i))
                                 {
                                     bytesAllocated = frameData.GetSampleMetadataAsLong(i, data.gcAllocMarkerMetaDataSizeIndex);
                                 }

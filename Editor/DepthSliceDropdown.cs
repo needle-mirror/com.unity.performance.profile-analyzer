@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using UnityEngine;
 using System.Collections.Generic;
@@ -36,8 +37,11 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         int m_CurrentDepthSliceB;
         int m_DepthDiff;
 
+        [NoAutoStaticsCleanup]
         static FieldInfo m_DataSourceFieldInfo;
+        [NoAutoStaticsCleanup]
         static Type m_DataSourceTypeInfo;
+        [NoAutoStaticsCleanup]
         static PropertyInfo m_SelectedIdsFieldInfo;
 
         public DepthSliceDropdown(int depthSliceCount, int currentDepthSliceA, int currentDepthSliceB, Action<int, int, int> callback, int depthDiff, int depthSliceCountRight = ProfileAnalyzer.kDepthAll) : base(new AdvancedDropdownState())

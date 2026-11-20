@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -81,6 +82,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             GCAllocCount,
         }
 
+        [NoAutoStaticsCleanup]
         static int m_MaxColumns;
 
         public enum SortOption

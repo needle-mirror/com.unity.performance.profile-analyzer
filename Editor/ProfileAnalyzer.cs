@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditorInternal;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
@@ -597,13 +598,16 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static readonly ProfilerMarkerAbstracted k_AllocateFrameResultsStorageProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.AllocateFrameResultsStorage");
 
-        public List<PerFrameOutputData> AllocateFrameResultsStorage(int threadCount, int frameCount, int markerCount)
+        public List<PerFrameOutputData> AllocateFrameResultsStorage(int threadCount, int frameCount, int markerCount, CancellationToken cancellationToken = default)
         {
             using (k_AllocateFrameResultsStorageProfilerMarker.Auto())
             {
                 List<PerFrameOutputData> frameResults = new List<PerFrameOutputData>(frameCount);
                 for (int frameIndex = 0; frameIndex < frameCount; frameIndex++)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
                     frameResults.Add(new PerFrameOutputData(threadCount, markerCount));
+                }
 
                 return frameResults;
             }
@@ -613,7 +617,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         static readonly ProfilerMarkerAbstracted k_MergeMarkersProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.MergeMarkers");
         static readonly ProfilerMarkerAbstracted k_FinaliseProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.Finalise");
 
-        public ProfileAnalysis MergeMarkers(ProfileData profileData, List<int> selectionIndices, List<PerFrameOutputData> frameResults, float timeScaleMin, float timeScaleMax)
+        public ProfileAnalysis MergeMarkers(ProfileData profileData, List<int> selectionIndices, List<PerFrameOutputData> frameResults, float timeScaleMin, float timeScaleMax, CancellationToken cancellationToken = default)
         {
             int frameCount = selectionIndices.Count;
             if (frameCount < 0)
@@ -636,6 +640,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 // Merge frames
                 for (int selectionAt = 0; selectionAt < frameCount; selectionAt++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     int frameIndex = selectionIndices[selectionAt];
                     foreach (var threadOnFrame in frameResults[selectionAt].threadsOnFrame)
                     {
@@ -647,7 +652,6 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                         if (threadData == null)
                         {
                             threadData = new ThreadData(threadNameWithIndex);
-                            threadData.frames.Add(threadOnFrame.FrameTime);
                             analysis.AddThread(threadData);
                         }
 
@@ -695,9 +699,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             using (k_FinaliseProfilerMarker.Auto())
             {
-                analysis.Finalise(timeScaleMin, timeScaleMax, maxMarkerDepthFound);
+                analysis.Finalise(timeScaleMin, timeScaleMax, maxMarkerDepthFound, cancellationToken);
             }
 
             return analysis;
@@ -705,7 +710,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         static readonly ProfilerMarkerAbstracted k_AnalyzeProfilerMarker = new ProfilerMarkerAbstracted("ProfileAnalyzer.Analyze");
 
-        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMin = 0, float timeScaleMax = 0, string removeMarker = null)
+        public ProfileAnalysis Analyze(ProfileData profileData, List<int> selectionIndices, List<string> threadFilters, int depthFilter, bool selfTimes = false, string parentMarker = null, float timeScaleMin = 0, float timeScaleMax = 0, string removeMarker = null, CancellationToken cancellationToken = default)
         {
             using (k_AnalyzeProfilerMarker.Auto())
             {
@@ -728,7 +733,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 if (profileData.HasFrames && !profileData.HasThreads)
                 {
-                    if (!ProfileData.Load(profileData.FilePath, out profileData))
+                    if (!ProfileData.Load(profileData.FilePath, out profileData, cancellationToken))
                     {
                         return null;
                     }
@@ -737,7 +742,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                 int threadCount = profileData.GetThreadCount();
                 int markerCount = profileData.MarkerNameCount;
 
-                List<PerFrameOutputData> frameResults = AllocateFrameResultsStorage(threadCount, frameCount, markerCount);
+                List<PerFrameOutputData> frameResults = AllocateFrameResultsStorage(threadCount, frameCount, markerCount, cancellationToken);
 
                 var frameProcessingSettings = new FrameProcessingSettings(
                     profileData,
@@ -749,7 +754,8 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
                 int completedFrames = 0;
 
-                Parallel.For(0, frameCount, selectionAt =>
+                var parallelOptions = new ParallelOptions { CancellationToken = cancellationToken };
+                Parallel.For(0, frameCount, parallelOptions, selectionAt =>
                     {
                         int frameIndex = selectionIndices[selectionAt];
 
@@ -771,7 +777,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
                     }
                 );
 
-                var analysis = MergeMarkers(profileData, selectionIndices, frameResults, timeScaleMin, timeScaleMax);
+                var analysis = MergeMarkers(profileData, selectionIndices, frameResults, timeScaleMin, timeScaleMax, cancellationToken);
 
                 m_Progress = 100;
                 return analysis;

@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -112,6 +113,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             AbsGCAllocCountDiff,
         }
 
+        [NoAutoStaticsCleanup]
         static int m_MaxColumns;
 
         public enum SortOption
@@ -1696,6 +1698,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
         }
 
+        [NoAutoStaticsCleanup]
         static HeaderData[] s_HeaderData = new HeaderData[]
             {
                 new HeaderData("Marker Name", "Marker Name\n\nFrame marker time is total of all instances in frame", width: 300, minWidth: 100, autoResize: false, allowToggleVisibility: false, ascending: true),

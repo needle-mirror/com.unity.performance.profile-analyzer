@@ -141,4 +141,47 @@ public class ProfileAnalysisAPITests : ProfileAnalyzerBaseTest
             Assert.IsTrue(1 == summary.buckets[i]);
         }
     }
+
+    [Test]
+    public void ProfileAnalysis_UpdateThreadCounts_CountsThreadsWithSameName()
+    {
+        var analysis = new ProfileAnalysis();
+        analysis.AddThread(new ThreadData("1:Main Thread"));
+        analysis.AddThread(new ThreadData("1:Render Thread"));
+        analysis.AddThread(new ThreadData("1:Job.Worker"));
+        analysis.AddThread(new ThreadData("2:Job.Worker"));
+
+        analysis.UpdateThreadCounts();
+
+        Assert.AreEqual(1, analysis.GetThreadByName("1:Main Thread").threadsInGroup);
+        Assert.AreEqual(1, analysis.GetThreadByName("1:Render Thread").threadsInGroup);
+        Assert.AreEqual(2, analysis.GetThreadByName("1:Job.Worker").threadsInGroup);
+        Assert.AreEqual(2, analysis.GetThreadByName("2:Job.Worker").threadsInGroup);
+    }
+
+    [Test]
+    public void ProfileAnalysis_UpdateThreadCounts_ThreadNotCountedAgainstSelf()
+    {
+        var analysis = new ProfileAnalysis();
+        analysis.AddThread(new ThreadData("1:Main Thread"));
+
+        analysis.UpdateThreadCounts();
+
+        Assert.AreEqual(1, analysis.GetThreadByName("1:Main Thread").threadsInGroup);
+    }
+
+    [Test]
+    public void ProfileAnalysis_UpdateThreadCounts_ThreeThreadsWithSameNameCountThree()
+    {
+        var analysis = new ProfileAnalysis();
+        analysis.AddThread(new ThreadData("1:Job.Worker"));
+        analysis.AddThread(new ThreadData("2:Job.Worker"));
+        analysis.AddThread(new ThreadData("3:Job.Worker"));
+
+        analysis.UpdateThreadCounts();
+
+        Assert.AreEqual(3, analysis.GetThreadByName("1:Job.Worker").threadsInGroup);
+        Assert.AreEqual(3, analysis.GetThreadByName("2:Job.Worker").threadsInGroup);
+        Assert.AreEqual(3, analysis.GetThreadByName("3:Job.Worker").threadsInGroup);
+    }
 }

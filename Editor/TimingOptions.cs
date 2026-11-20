@@ -8,12 +8,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             Self,
         };
 
-        public static string[] TimingOptionNames =
+        public static readonly string[] TimingOptionNames =
         {
             "Total",
             "Self",
         };
 
-        public static string Tooltip = "Marker timings :\n\nTotal : \tIncluding children\nSelf : \tExcluding children";
+        public const string Tooltip = "Marker timings :\n\nTotal : \tIncluding children\nSelf : \tExcluding children";
     }
 }

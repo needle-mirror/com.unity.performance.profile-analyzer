@@ -1,3 +1,4 @@
+using Unity.Scripting.LifecycleManagement;
 using System;
 using System.Collections.Generic;
 using UnityEditor.Analytics;
@@ -13,6 +14,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         const string k_VendorKey = "unity.profileanalyzer";
         const string k_EventTopicName = "usability";
 
+        [NoAutoStaticsCleanup]
         static bool s_EnableAnalytics = false;
 
         public static void EnableAnalytics()

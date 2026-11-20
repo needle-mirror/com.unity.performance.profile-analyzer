@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using ProfilerMarkerAbstracted = Unity.Profiling.ProfilerMarker;
 
@@ -129,13 +130,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             marker.countStandardDeviation = (float)Math.Sqrt(variance);
         }
 
-        public void SetupMarkers()
+        public void SetupMarkers(CancellationToken cancellationToken = default)
         {
             int countMax = 0;
             float countMaxMean = 0.0f;
 
             foreach (MarkerData marker in m_Markers)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 marker.msAtMedian = 0.0f;
                 marker.msMin = float.MaxValue;
                 marker.msMax = float.MinValue;
@@ -227,11 +229,12 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             m_FrameSummary.markerCountMaxMean = countMaxMean;
         }
 
-        public void SetupMarkerBuckets()
+        public void SetupMarkerBuckets(CancellationToken cancellationToken = default)
         {
             // using a for loop instead of foreach is surprisingly faster on Mono
             for (int i = 0, n = m_Markers.Count; i < n; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var marker = m_Markers[i];
                 marker.ComputeBuckets(marker.msMin, marker.msMax);
                 marker.ComputeCountBuckets(marker.countMin, marker.countMax);
@@ -314,17 +317,14 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
         public void UpdateThreadCounts()
         {
-            foreach (var thread in m_Threads)
+            for (var i = 0; i < m_Threads.Count; i++)
             {
-                foreach (var otherThread in m_Threads)
+                for (var j = i + 1; j < m_Threads.Count; j++)
                 {
-                    if (thread == otherThread)
-                        continue;
-
-                    if (thread.threadGroupIndex == otherThread.threadGroupIndex)
+                    if (m_Threads[i].threadGroupName == m_Threads[j].threadGroupName)
                     {
-                        otherThread.threadsInGroup += 1;
-                        thread.threadsInGroup += 1;
+                        m_Threads[i].threadsInGroup += 1;
+                        m_Threads[j].threadsInGroup += 1;
                     }
                 }
             }
@@ -336,7 +336,7 @@ namespace UnityEditor.Performance.ProfileAnalyzer
         static readonly ProfilerMarkerAbstracted k_UpdateThreadCounts = new ProfilerMarkerAbstracted("ProfileAnalysis.UpdateThreadCounts");
         static readonly ProfilerMarkerAbstracted k_CalculateMedians = new ProfilerMarkerAbstracted("ProfileAnalysis.CalculateMedians");
 
-        public void Finalise(float timeScaleMin, float timeScaleMax, int maxMarkerDepth)
+        public void Finalise(float timeScaleMin, float timeScaleMax, int maxMarkerDepth, CancellationToken cancellationToken = default)
         {
             if (m_FrameSummary.frames.Count > 0)
             {
@@ -396,12 +396,13 @@ namespace UnityEditor.Performance.ProfileAnalyzer
 
             using (k_SetupMarkers.Auto())
             {
-                SetupMarkers();
+                SetupMarkers(cancellationToken);
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             using (k_SetupMarkerBuckets.Auto())
             {
-                SetupMarkerBuckets();
+                SetupMarkerBuckets(cancellationToken);
             }
 
             using (k_SetupFrameBuckets.Auto())
@@ -415,8 +416,10 @@ namespace UnityEditor.Performance.ProfileAnalyzer
             }
 
             // Sort in median order (highest first)
+            cancellationToken.ThrowIfCancellationRequested();
             m_Markers.Sort(SortByAtMedian);
 
+            cancellationToken.ThrowIfCancellationRequested();
             using (k_CalculateMedians.Auto())
             {
                 CalculateThreadMedians();
